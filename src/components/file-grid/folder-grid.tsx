@@ -38,56 +38,48 @@ export function FolderGrid({ folders }: FolderGridProps) {
   if (folders.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
       {folders.map((folder) => (
         <div
           key={folder.id}
-          className="group bg-white rounded-xl border p-3.5 hover:shadow-md hover:border-gray-300 transition-all duration-150"
+          className="group relative flex items-center gap-3 rounded-xl border border-[#dadce0] bg-white px-3 py-2.5 hover:shadow-md transition-shadow duration-200 cursor-pointer"
         >
-          <div className="flex items-center justify-between">
-            <Link
-              href={`/dashboard/folder/${folder.id}`}
-              className="flex items-center gap-3 flex-1 min-w-0"
-            >
-              <div
-                className="p-2 rounded-lg transition-transform group-hover:scale-105"
-                style={{
-                  backgroundColor: `${folder.color || "#3B82F6"}15`,
-                }}
-              >
-                <Folder
-                  className="h-5 w-5"
-                  style={{ color: folder.color || "#3B82F6" }}
-                  fill={folder.color || "#3B82F6"}
-                />
-              </div>
-              <span className="text-[13px] font-medium truncate">
-                {folder.name}
-              </span>
-            </Link>
+          <Link
+            href={`/dashboard/folder/${folder.id}`}
+            className="flex items-center gap-3 flex-1 min-w-0"
+          >
+            <Folder
+              className="h-5 w-5 flex-shrink-0"
+              style={{ color: folder.color || "#5f6368" }}
+              fill={folder.color || "#5f6368"}
+              fillOpacity={0.22}
+            />
+            <span className="text-[13px] font-medium text-[#202124] truncate">
+              {folder.name}
+            </span>
+          </Link>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-gray-100 transition-all">
-                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/folder/${folder.id}`}>Open</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleRename(folder)}>
-                  Rename
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={() => handleDelete(folder.id)}
-                >
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-gray-100 transition-all duration-150">
+                <MoreVertical className="h-4 w-4 text-[#5f6368]" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/folder/${folder.id}`}>Open</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleRename(folder)}>
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => handleDelete(folder.id)}
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       ))}
     </div>

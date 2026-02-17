@@ -27,13 +27,13 @@ export function SearchBar() {
 
   return (
     <div className="relative">
-      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-[18px] w-[18px] text-gray-400 pointer-events-none" />
       <Input
         type="text"
         placeholder="Search files and folders..."
         value={localQuery}
         onChange={(e) => handleSearch(e.target.value)}
-        className="pl-10 h-9 bg-gray-50/80 border-gray-200 focus:bg-white rounded-lg text-sm"
+        className="pl-11 h-11 bg-gray-50 border-gray-200 focus:bg-white rounded-xl text-sm font-medium placeholder:text-gray-400 shadow-sm"
       />
     </div>
   );

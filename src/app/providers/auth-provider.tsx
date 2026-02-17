@@ -35,17 +35,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
 
-      // Create guest session for unauthenticated users
-      if (!session?.user) {
+        // Create guest session for unauthenticated users
+        if (!session?.user) {
+          setGuestSessionId(getGuestSessionId());
+        }
+      } catch (error) {
+        console.error("Auth session error:", error);
+        // Fall back to guest mode on error
         setGuestSessionId(getGuestSessionId());
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     };
 
     getSession();

@@ -4,6 +4,7 @@ import { useAuth } from "@/app/providers/auth-provider";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
 import { FolderGrid } from "@/components/file-grid/folder-grid";
+import { FileCard } from "@/components/file-grid/file-card";
 import { FileList } from "@/components/file-list/file-list";
 import { SuggestedFiles } from "@/components/suggested-files/suggested-files";
 import { Button } from "@/components/ui/button";
@@ -68,22 +69,22 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Welcome Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">Welcome back, {displayName}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Let&apos;s continue your activity on the dashboard.
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Welcome back, {displayName}</h1>
+          <p className="text-sm text-muted-foreground mt-1.5">
+            Manage and organize your files with ease
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2.5 flex-shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 text-[13px]">
-                <Plus className="h-4 w-4 mr-1.5" />
+              <Button variant="outline" size="sm" className="h-10 text-sm font-medium shadow-sm hover:shadow">
+                <Plus className="h-4 w-4 mr-2" />
                 Create
               </Button>
             </DropdownMenuTrigger>
@@ -102,29 +103,29 @@ export default function DashboardPage() {
           <Button
             variant="outline"
             size="sm"
-            className="h-9 text-[13px]"
+            className="h-10 text-sm font-medium shadow-sm hover:shadow"
             onClick={() => openFilePicker?.()}
           >
-            <Upload className="h-4 w-4 mr-1.5" />
+            <Upload className="h-4 w-4 mr-2" />
             <span className="hidden xs:inline">Upload</span>
           </Button>
 
           <Button
             variant="outline"
             size="sm"
-            className="h-9 text-[13px] hidden sm:flex"
+            className="h-10 text-sm font-medium hidden sm:flex shadow-sm hover:shadow"
             onClick={() => setNewFolderModalOpen(true)}
           >
-            <FolderPlus className="h-4 w-4 mr-1.5" />
+            <FolderPlus className="h-4 w-4 mr-2" />
             Folder
           </Button>
 
           {/* View mode toggle */}
-          <div className="flex items-center border rounded-lg overflow-hidden">
+          <div className="flex items-center border rounded-lg overflow-hidden shadow-sm bg-white">
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
               size="icon"
-              className="h-9 w-9 rounded-none"
+              className="h-10 w-10 rounded-none"
               onClick={() => setViewMode("grid")}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -132,7 +133,7 @@ export default function DashboardPage() {
             <Button
               variant={viewMode === "list" ? "secondary" : "ghost"}
               size="icon"
-              className="h-9 w-9 rounded-none"
+              className="h-10 w-10 rounded-none"
               onClick={() => setViewMode("list")}
             >
               <List className="h-4 w-4" />
@@ -144,7 +145,7 @@ export default function DashboardPage() {
       {/* Folders Section */}
       {filteredFolders.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Folders</h2>
+          <h2 className="text-sm font-medium text-[#202124] mb-3">Folders</h2>
           <FolderGrid folders={filteredFolders} />
         </section>
       )}
@@ -152,10 +153,10 @@ export default function DashboardPage() {
       {/* Suggested from your activity */}
       {!searchQuery && files.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Suggested from your activity
+          <h2 className="text-sm font-medium text-[#202124] mb-3">
+            Suggested
           </h2>
-          <SuggestedFiles files={recentFiles.slice(0, 4)} />
+          <SuggestedFiles files={recentFiles.slice(0, 6)} />
         </section>
       )}
 
@@ -163,19 +164,43 @@ export default function DashboardPage() {
       <section>
         <Tabs defaultValue="recent" className="w-full">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Your Files</h2>
-            <TabsList className="h-8">
-              <TabsTrigger value="recent" className="text-xs px-3 h-7">Recent</TabsTrigger>
-              <TabsTrigger value="starred" className="text-xs px-3 h-7">Starred</TabsTrigger>
+            <h2 className="text-sm font-medium text-[#202124]">Files</h2>
+            <TabsList className="h-8 bg-[#f1f3f4] rounded-full px-1">
+              <TabsTrigger value="recent" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Recent</TabsTrigger>
+              <TabsTrigger value="starred" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Starred</TabsTrigger>
             </TabsList>
           </div>
 
           <TabsContent value="recent">
-            <FileList files={filteredFiles} />
+            {viewMode === "grid" ? (
+              filteredFiles.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                  {filteredFiles.map((file) => (
+                    <FileCard key={file.id} file={file} />
+                  ))}
+                </div>
+              ) : (
+                <FileList files={filteredFiles} />
+              )
+            ) : (
+              <FileList files={filteredFiles} />
+            )}
           </TabsContent>
 
           <TabsContent value="starred">
-            <FileList files={starredFiles} />
+            {viewMode === "grid" ? (
+              starredFiles.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                  {starredFiles.map((file) => (
+                    <FileCard key={file.id} file={file} />
+                  ))}
+                </div>
+              ) : (
+                <FileList files={starredFiles} />
+              )
+            ) : (
+              <FileList files={starredFiles} />
+            )}
           </TabsContent>
         </Tabs>
       </section>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
 import { FileContextMenu } from "@/components/context-menu/file-context-menu";
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import {
   FileText,
-  Image,
+  Image as ImageIcon,
   Film,
   Music,
   Archive,
@@ -30,14 +31,43 @@ interface FileListProps {
 }
 
 const iconMap = {
-  image: { icon: Image, color: "text-green-600" },
-  video: { icon: Film, color: "text-purple-600" },
-  audio: { icon: Music, color: "text-pink-600" },
-  document: { icon: FileText, color: "text-blue-600" },
-  pdf: { icon: FileSpreadsheet, color: "text-red-600" },
-  archive: { icon: Archive, color: "text-yellow-600" },
-  other: { icon: FileIcon, color: "text-gray-600" },
+  image: { icon: ImageIcon, color: "text-green-600", bg: "bg-green-50" },
+  video: { icon: Film, color: "text-purple-600", bg: "bg-purple-50" },
+  audio: { icon: Music, color: "text-pink-600", bg: "bg-pink-50" },
+  document: { icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
+  pdf: { icon: FileSpreadsheet, color: "text-red-600", bg: "bg-red-50" },
+  archive: { icon: Archive, color: "text-yellow-600", bg: "bg-yellow-50" },
+  other: { icon: FileIcon, color: "text-gray-600", bg: "bg-gray-50" },
 };
+
+function FileThumbnail({ file }: { file: DbFile }) {
+  const category = getFileCategory(file.mime_type);
+  const { icon: Icon, color, bg } = iconMap[category];
+  const [imgError, setImgError] = useState(false);
+
+  const thumbnailSrc = file.thumbnail_url || (category === "image" ? `/api/download/${file.id}` : null);
+  const showThumbnail = (category === "image" || (category === "video" && file.thumbnail_url)) && !imgError;
+
+  if (showThumbnail && thumbnailSrc) {
+    return (
+      <div className="h-9 w-9 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+        <img
+          src={thumbnailSrc}
+          alt={file.name}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+          loading="lazy"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`h-9 w-9 rounded-lg ${bg} flex items-center justify-center flex-shrink-0`}>
+      <Icon className={`h-4 w-4 ${color}`} />
+    </div>
+  );
+}
 
 export function FileList({ files }: FileListProps) {
   const { selectedFiles, toggleFileSelection, setSelectedFiles } =
@@ -87,9 +117,6 @@ export function FileList({ files }: FileListProps) {
         </TableHeader>
         <TableBody>
           {files.map((file) => {
-            const category = getFileCategory(file.mime_type);
-            const { icon: Icon, color } = iconMap[category];
-
             return (
               <TableRow key={file.id} className="cursor-pointer group">
                 <TableCell className="py-2.5">
@@ -100,11 +127,11 @@ export function FileList({ files }: FileListProps) {
                 </TableCell>
                 <TableCell className="py-2.5">
                   <button
-                    className="flex items-center gap-2.5 text-left group-hover:text-foreground transition-colors"
+                    className="flex items-center gap-3 text-left group-hover:text-foreground transition-colors"
                     onClick={() => setPreviewFileId(file.id)}
                   >
-                    <Icon className={`h-4 w-4 flex-shrink-0 ${color}`} />
-                    <span className="text-[13px] font-medium truncate max-w-[300px]">
+                    <FileThumbnail file={file} />
+                    <span className="text-sm font-medium truncate max-w-[300px]">
                       {file.name}
                     </span>
                   </button>

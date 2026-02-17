@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
 import { FileList } from "@/components/file-list/file-list";
+import { FileCard } from "@/components/file-grid/file-card";
 import { FolderGrid } from "@/components/file-grid/folder-grid";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, FolderOpen, Upload } from "lucide-react";
@@ -16,7 +17,7 @@ export default function FolderPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { files, folders, setCurrentFolderId } = useFilesStore();
+  const { files, folders, viewMode, setCurrentFolderId } = useFilesStore();
   const { openFilePicker } = useUIStore();
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
 
@@ -70,7 +71,7 @@ export default function FolderPage({
       {/* Subfolders */}
       {subFolders.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-3">Folders</h2>
+          <h2 className="text-sm font-medium text-[#202124] mb-3">Folders</h2>
           <FolderGrid folders={subFolders} />
         </section>
       )}
@@ -78,8 +79,16 @@ export default function FolderPage({
       {/* Files */}
       {folderFiles.length > 0 ? (
         <section>
-          <h2 className="text-lg font-semibold mb-3">Files</h2>
-          <FileList files={folderFiles} />
+          <h2 className="text-sm font-medium text-[#202124] mb-3">Files</h2>
+          {viewMode === "grid" ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              {folderFiles.map((file) => (
+                <FileCard key={file.id} file={file} />
+              ))}
+            </div>
+          ) : (
+            <FileList files={folderFiles} />
+          )}
         </section>
       ) : (
         subFolders.length === 0 && (
