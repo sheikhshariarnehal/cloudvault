@@ -4,10 +4,17 @@ import { downloadFromTelegram } from "@/lib/telegram/download";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ params: string[] }> }
 ) {
   try {
-    const { id } = await params;
+    // params[0] = file ID, params[1] = optional filename (for clean URLs)
+    const { params: segments } = await params;
+    const id = segments[0];
+
+    if (!id) {
+      return NextResponse.json({ error: "File ID required" }, { status: 400 });
+    }
+
     const supabase = await createClient();
 
     // Fetch file record

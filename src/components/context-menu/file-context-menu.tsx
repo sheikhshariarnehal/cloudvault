@@ -21,6 +21,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { DbFile } from "@/types/file.types";
+import { getFileUrl } from "@/lib/utils";
 
 interface FileContextMenuProps {
   file: DbFile;
@@ -33,7 +34,7 @@ export function FileContextMenu({ file }: FileContextMenuProps) {
   const handlePreview = () => setPreviewFileId(file.id);
 
   const handleDownload = () => {
-    window.open(`/api/download/${file.id}`, "_blank");
+    window.open(getFileUrl(file.id, file.name, true), "_blank");
   };
 
   const handleRename = () => {

@@ -2,6 +2,7 @@
 
 import { useUIStore } from "@/store/ui-store";
 import { getFileCategory } from "@/types/file.types";
+import { getFileUrl } from "@/lib/utils";
 import {
   FileText,
   Image,
@@ -35,7 +36,7 @@ export function FileRow({ file }: FileRowProps) {
   if (category === "pdf") {
     return (
       <a
-        href={`/api/download/${file.id}`}
+        href={getFileUrl(file.id, file.name)}
         target="_blank"
         rel="noopener noreferrer"
         className="flex items-center gap-3 w-full text-left p-2 rounded-lg hover:bg-muted transition-colors"

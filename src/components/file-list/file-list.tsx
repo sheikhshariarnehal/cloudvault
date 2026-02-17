@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { formatFileSize, formatDate, getFileCategory } from "@/types/file.types";
 import type { DbFile } from "@/types/file.types";
+import { getFileUrl } from "@/lib/utils";
 
 interface FileListProps {
   files: DbFile[];
@@ -45,7 +46,7 @@ function FileThumbnail({ file }: { file: DbFile }) {
   const { icon: Icon, color, bg } = iconMap[category];
   const [imgError, setImgError] = useState(false);
 
-  const thumbnailSrc = file.thumbnail_url || (category === "image" ? `/api/download/${file.id}` : null);
+  const thumbnailSrc = file.thumbnail_url || (category === "image" ? getFileUrl(file.id, file.name) : null);
   const showThumbnail = (category === "image" || (category === "video" && file.thumbnail_url)) && !imgError;
 
   if (showThumbnail && thumbnailSrc) {
@@ -128,7 +129,7 @@ export function FileList({ files }: FileListProps) {
                 <TableCell className="py-2.5">
                   {getFileCategory(file.mime_type) === "pdf" ? (
                     <a
-                      href={`/api/download/${file.id}`}
+                      href={getFileUrl(file.id, file.name)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-3 text-left group-hover:text-foreground transition-colors"

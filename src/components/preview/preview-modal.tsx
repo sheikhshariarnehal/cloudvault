@@ -16,6 +16,7 @@ import {
   MoreVertical,
 } from "lucide-react";
 import { getFileCategory, formatFileSize } from "@/types/file.types";
+import { getFileUrl } from "@/lib/utils";
 
 export function PreviewModal() {
   const { files } = useFilesStore();
@@ -42,11 +43,11 @@ export function PreviewModal() {
       return;
     }
     if (file && getFileCategory(file.mime_type) === "pdf") {
-      window.open(`/api/download/${previewFileId}`, "_blank");
+      window.open(getFileUrl(previewFileId, file.name), "_blank");
       setPreviewFileId(null);
       return;
     }
-    setFileUrl(`/api/download/${previewFileId}`);
+    setFileUrl(getFileUrl(previewFileId, file.name));
   }, [previewFileId]);
 
   // Keyboard navigation
@@ -89,7 +90,7 @@ export function PreviewModal() {
   if (!file || !previewFileId) return null;
 
   const handleDownload = () => {
-    window.open(`/api/download/${file.id}?download=true`, "_blank");
+    window.open(getFileUrl(file.id, file.name, true), "_blank");
   };
 
   const handleShare = () => {

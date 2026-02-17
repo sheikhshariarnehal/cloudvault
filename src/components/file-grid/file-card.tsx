@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useUIStore } from "@/store/ui-store";
 import { FileContextMenu } from "@/components/context-menu/file-context-menu";
 import { getFileCategory } from "@/types/file.types";
+import { getFileUrl } from "@/lib/utils";
 import {
   FileText,
   Image as ImageIcon,
@@ -57,7 +58,7 @@ export function FileCard({ file }: FileCardProps) {
   const Icon = config.icon;
 
   const thumbnailSrc =
-    file.thumbnail_url || (category === "image" ? `/api/download/${file.id}` : null);
+    file.thumbnail_url || (category === "image" ? getFileUrl(file.id, file.name) : null);
   const showThumbnail =
     (category === "image" || (category === "video" && file.thumbnail_url) || ((category === "pdf" || category === "document") && file.thumbnail_url)) && !imgError && !!thumbnailSrc;
 
@@ -82,7 +83,7 @@ export function FileCard({ file }: FileCardProps) {
       {/* ===== THUMBNAIL / PREVIEW AREA ===== */}
       {category === "pdf" ? (
         <a
-          href={`/api/download/${file.id}`}
+          href={getFileUrl(file.id, file.name)}
           target="_blank"
           rel="noopener noreferrer"
           className="relative w-full flex-1 border-t border-[#e0e0e0] overflow-hidden block"

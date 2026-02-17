@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getFileCategory, formatFileSize } from "@/types/file.types";
 import { Download, FileIcon, ArrowLeft } from "lucide-react";
 import { PreviewClient } from "./preview-client";
+import { getFileUrl } from "@/lib/utils";
 
 export default async function PreviewPage({
   params,
@@ -23,8 +24,8 @@ export default async function PreviewPage({
   }
 
   const category = getFileCategory(file.mime_type);
-  const downloadUrl = `/api/download/${file.id}`;
-  const directDownloadUrl = `/api/download/${file.id}?download=true`;
+  const downloadUrl = getFileUrl(file.id, file.name);
+  const directDownloadUrl = getFileUrl(file.id, file.name, true);
 
   // PDF files redirect to Chrome's built-in PDF viewer
   if (category === "pdf") {
