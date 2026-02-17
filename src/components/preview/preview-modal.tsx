@@ -38,17 +38,17 @@ export function PreviewModal() {
 
   // If a PDF is set for preview, open it in a new browser tab and clear the preview
   useEffect(() => {
-    if (!previewFileId) {
+    if (!previewFileId || !file) {
       setFileUrl(null);
       return;
     }
-    if (file && getFileCategory(file.mime_type) === "pdf") {
+    if (getFileCategory(file.mime_type) === "pdf") {
       window.open(getFileUrl(previewFileId, file.name), "_blank");
       setPreviewFileId(null);
       return;
     }
     setFileUrl(getFileUrl(previewFileId, file.name));
-  }, [previewFileId]);
+  }, [previewFileId, file]);
 
   // Keyboard navigation
   const handleKeyDown = useCallback(
