@@ -78,13 +78,13 @@ export async function GET(
         .eq("id", shareLink.id);
 
       // Download from Telegram
-      const { stream, contentType } = await downloadFromTelegram(
+      const { stream } = await downloadFromTelegram(
         file.telegram_file_id
       );
 
       return new NextResponse(stream, {
         headers: {
-          "Content-Type": contentType,
+          "Content-Type": file.mime_type || "application/octet-stream",
           "Content-Disposition": `attachment; filename="${encodeURIComponent(file.original_name)}"`,
           "Cache-Control": "private, max-age=3600",
         },
@@ -95,15 +95,15 @@ export async function GET(
     const isPreview = request.nextUrl.searchParams.get("preview") === "true";
 
     if (isPreview) {
-      const { stream, contentType } = await downloadFromTelegram(
+      const { stream } = await downloadFromTelegram(
         file.telegram_file_id
       );
 
       return new NextResponse(stream, {
         headers: {
-          "Content-Type": contentType,
+          "Content-Type": file.mime_type || "application/octet-stream",
           "Content-Disposition": `inline; filename="${encodeURIComponent(file.original_name)}"`,
-          "Cache-Control": "private, max-age=3600",
+          "Cache-Control": "no-cache",
         },
       });
     }

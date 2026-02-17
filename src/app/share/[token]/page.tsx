@@ -120,7 +120,7 @@ export default function SharePage() {
 
   const { file, shareLink } = data;
   const category = getFileCategory(file.mime_type);
-  const previewUrl = `/api/share/${token}?preview=true`;
+  const previewUrl = `/api/share/${token}?preview=true&_t=${Date.now()}`;
   const downloadUrl = `/api/share/${token}?download=true`;
 
   return (
@@ -198,11 +198,12 @@ export default function SharePage() {
         )}
 
         {category === "pdf" && (
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden max-w-4xl w-full">
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden max-w-5xl w-full">
             <iframe
               src={previewUrl}
-              className="w-full h-[75vh]"
+              className="w-full h-[80vh] border-0"
               title={file.name}
+              allow="fullscreen"
             />
           </div>
         )}
