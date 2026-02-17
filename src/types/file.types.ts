@@ -122,6 +122,8 @@ const ALLOWED_MIME_TYPES = [
   "application/gzip",
   "application/x-tar",
   "application/x-bzip2",
+  "application/x-compressed",
+  "application/x-compress",
   
   // Text & Code
   "text/plain",

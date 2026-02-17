@@ -47,72 +47,82 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       hasGuestSession: !!guestSessionId,
     });
 
-    try {
-      const xhr = new XMLHttpRequest();
+    const attemptUpload = async (attempt: number): Promise<void> => {
+      try {
+        // Rebuild FormData for each attempt to avoid consumed body issues
+        const uploadData = new FormData();
+        uploadData.append("file", file);
+        if (targetFolderId) uploadData.append("folder_id", targetFolderId);
+        if (user?.id) uploadData.append("user_id", user.id);
+        if (guestSessionId) uploadData.append("guest_session_id", guestSessionId);
 
-      xhr.upload.addEventListener("progress", (e) => {
-        if (e.lengthComputable) {
-          const pct = Math.round((e.loaded / e.total) * 100);
-          updateUploadProgress(queueId, pct);
-        }
-      });
+        if (attempt === 1) {
+          // First attempt: use XHR for progress tracking
+          const xhr = new XMLHttpRequest();
 
-      const result = await new Promise<Response>((resolve, reject) => {
-        xhr.open("POST", "/api/upload");
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(new Response(xhr.response));
-          } else {
-            try {
-              const errorData = JSON.parse(xhr.response);
-              reject(new Error(errorData.error || `Upload failed with status ${xhr.status}`));
-            } catch {
-              reject(new Error(`Upload failed with status ${xhr.status}`));
+          xhr.upload.addEventListener("progress", (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100);
+              updateUploadProgress(queueId, pct);
             }
-          }
-        };
-        xhr.onerror = () => reject(new Error("Upload failed"));
-        xhr.send(formData);
-      });
-
-      const data = await result.json();
-      addFile(data.file);
-      updateUploadStatus(queueId, "success");
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Upload failed";
-      console.error("Upload error:", message, error);
-      updateUploadStatus(queueId, "error", message);
-
-      // Retry logic with exponential backoff
-      let retries = 0;
-      const maxRetries = 3;
-      const retry = async () => {
-        if (retries >= maxRetries) return;
-        retries++;
-        const delay = Math.pow(2, retries) * 1000;
-        await new Promise((res) => setTimeout(res, delay));
-
-        try {
-          const retryResponse = await fetch("/api/upload", {
-            method: "POST",
-            body: formData,
           });
 
-          if (retryResponse.ok) {
-            const data = await retryResponse.json();
-            addFile(data.file);
-            updateUploadStatus(queueId, "success");
-          } else {
-            retry();
-          }
-        } catch {
-          retry();
-        }
-      };
+          const response = await new Promise<string>((resolve, reject) => {
+            xhr.open("POST", "/api/upload");
+            xhr.responseType = "text";
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(xhr.responseText);
+              } else {
+                try {
+                  const errorData = JSON.parse(xhr.responseText);
+                  reject(new Error(errorData.error || `Upload failed with status ${xhr.status}`));
+                } catch {
+                  reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+              }
+            };
+            xhr.onerror = () => reject(new Error("Upload failed - network error"));
+            xhr.send(uploadData);
+          });
 
-      retry();
-    }
+          const data = JSON.parse(response);
+          addFile(data.file);
+          updateUploadStatus(queueId, "success");
+        } else {
+          // Retry attempts: use fetch
+          const response = await fetch("/api/upload", {
+            method: "POST",
+            body: uploadData,
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+          }
+
+          const data = await response.json();
+          addFile(data.file);
+          updateUploadStatus(queueId, "success");
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Upload failed";
+
+        if (attempt >= 4) {
+          console.error("Upload error:", message, error);
+          updateUploadStatus(queueId, "error", message);
+          return;
+        }
+
+        // Exponential backoff before retry
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise((res) => setTimeout(res, delay));
+        await attemptUpload(attempt + 1);
+      }
+    };
+
+    await attemptUpload(1);
   }, [user, guestSessionId, updateUploadStatus, updateUploadProgress, addFile]);
 
   const onDrop = useCallback(
