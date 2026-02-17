@@ -1,82 +1,215 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { ImagePreview } from "@/components/preview/image-preview";
 import { VideoPreview } from "@/components/preview/video-preview";
 import { PdfPreview } from "@/components/preview/pdf-preview";
-import { Download, X, FileIcon } from "lucide-react";
+import {
+  Download,
+  X,
+  FileIcon,
+  ChevronLeft,
+  ChevronRight,
+  Share2,
+  Printer,
+  MoreVertical,
+} from "lucide-react";
 import { getFileCategory, formatFileSize } from "@/types/file.types";
 
 export function PreviewModal() {
   const { files } = useFilesStore();
-  const { previewFileId, setPreviewFileId } = useUIStore();
+  const { previewFileId, setPreviewFileId, setShareModalOpen, setShareFileId } =
+    useUIStore();
   const [fileUrl, setFileUrl] = useState<string | null>(null);
 
   const file = files.find((f) => f.id === previewFileId);
+
+  // Get only previewable image files for navigation
+  const imageFiles = files.filter(
+    (f) => getFileCategory(f.mime_type) === "image"
+  );
+  const currentImageIndex = imageFiles.findIndex(
+    (f) => f.id === previewFileId
+  );
+  const category = file ? getFileCategory(file.mime_type) : null;
+  const isImage = category === "image";
 
   useEffect(() => {
     if (!previewFileId) {
       setFileUrl(null);
       return;
     }
-
     setFileUrl(`/api/download/${previewFileId}`);
   }, [previewFileId]);
 
-  if (!file) return null;
+  // Keyboard navigation
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!previewFileId) return;
 
-  const category = getFileCategory(file.mime_type);
+      if (e.key === "Escape") {
+        setPreviewFileId(null);
+      } else if (e.key === "ArrowLeft" && isImage && currentImageIndex > 0) {
+        setPreviewFileId(imageFiles[currentImageIndex - 1].id);
+      } else if (
+        e.key === "ArrowRight" &&
+        isImage &&
+        currentImageIndex < imageFiles.length - 1
+      ) {
+        setPreviewFileId(imageFiles[currentImageIndex + 1].id);
+      }
+    },
+    [previewFileId, isImage, currentImageIndex, imageFiles, setPreviewFileId]
+  );
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (previewFileId) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [previewFileId]);
+
+  if (!file || !previewFileId) return null;
 
   const handleDownload = () => {
     window.open(`/api/download/${file.id}?download=true`, "_blank");
   };
 
-  return (
-    <Dialog
-      open={!!previewFileId}
-      onOpenChange={(open) => !open && setPreviewFileId(null)}
-    >
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader className="flex flex-row items-center justify-between">
-          <div>
-            <DialogTitle className="text-lg">{file.name}</DialogTitle>
-            <DialogDescription className="sr-only">
-              File preview - {formatFileSize(file.size_bytes)}
-            </DialogDescription>
-            <p className="text-sm text-muted-foreground">
-              {formatFileSize(file.size_bytes)}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleDownload}>
-              <Download className="h-4 w-4 mr-2" />
-              Download
-            </Button>
-          </div>
-        </DialogHeader>
+  const handleShare = () => {
+    setShareFileId(file.id);
+    setShareModalOpen(true);
+  };
 
-        <div className="flex-1 overflow-auto flex items-center justify-center min-h-[300px] bg-gray-50 rounded-lg">
+  const handlePrint = () => {
+    if (fileUrl && isImage) {
+      const printWindow = window.open(fileUrl, "_blank");
+      printWindow?.addEventListener("load", () => printWindow.print());
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentImageIndex > 0) {
+      setPreviewFileId(imageFiles[currentImageIndex - 1].id);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentImageIndex < imageFiles.length - 1) {
+      setPreviewFileId(imageFiles[currentImageIndex + 1].id);
+    }
+  };
+
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      setPreviewFileId(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col bg-[#202124]">
+      {/* ===== TOP BAR - Google Drive style ===== */}
+      <div className="flex items-center justify-between h-16 px-4 bg-[#202124] flex-shrink-0">
+        {/* Left: Close + filename */}
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={() => setPreviewFileId(null)}
+            className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors flex-shrink-0"
+            title="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-medium text-white truncate">
+              {file.name}
+            </h2>
+            {file.size_bytes && (
+              <p className="text-xs text-white/50">
+                {formatFileSize(file.size_bytes)}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {isImage && (
+            <button
+              onClick={handlePrint}
+              className="p-2.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+              title="Print"
+            >
+              <Printer className="h-5 w-5" />
+            </button>
+          )}
+          <button
+            onClick={handleDownload}
+            className="p-2.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+            title="Download"
+          >
+            <Download className="h-5 w-5" />
+          </button>
+          <button
+            onClick={handleShare}
+            className="p-2.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+            title="Share"
+          >
+            <Share2 className="h-5 w-5" />
+          </button>
+          <button className="p-2.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors" title="More actions">
+            <MoreVertical className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* ===== MAIN CONTENT AREA ===== */}
+      <div
+        className="flex-1 relative flex items-center justify-center overflow-hidden"
+        onClick={handleOverlayClick}
+      >
+        {/* Left navigation arrow */}
+        {isImage && currentImageIndex > 0 && (
+          <button
+            onClick={handlePrev}
+            className="absolute left-4 z-10 p-3 text-white/60 hover:text-white bg-black/30 hover:bg-black/50 rounded-full transition-all"
+            title="Previous"
+          >
+            <ChevronLeft className="h-7 w-7" />
+          </button>
+        )}
+
+        {/* Preview content */}
+        <div className="w-full h-full flex items-center justify-center">
           {fileUrl && (
             <>
-              {category === "image" && (
-                <ImagePreview src={fileUrl} alt={file.name} />
+              {isImage && <ImagePreview src={fileUrl} alt={file.name} />}
+              {category === "video" && (
+                <div className="max-w-5xl w-full px-8">
+                  <VideoPreview src={fileUrl} />
+                </div>
               )}
-              {category === "video" && <VideoPreview src={fileUrl} />}
-              {category === "pdf" && <PdfPreview src={fileUrl} />}
+              {category === "pdf" && (
+                <div className="w-full h-full max-w-5xl px-8">
+                  <PdfPreview src={fileUrl} />
+                </div>
+              )}
               {category === "audio" && (
                 <div className="p-8 text-center">
-                  <FileIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-lg font-medium mb-4">{file.name}</p>
+                  <FileIcon className="h-20 w-20 text-white/30 mx-auto mb-6" />
+                  <p className="text-lg font-medium mb-6 text-white">
+                    {file.name}
+                  </p>
                   <audio controls src={fileUrl} className="w-full max-w-md" />
                 </div>
               )}
@@ -84,21 +217,44 @@ export function PreviewModal() {
                 category === "archive" ||
                 category === "other") && (
                 <div className="p-8 text-center">
-                  <FileIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-lg font-medium mb-2">{file.name}</p>
-                  <p className="text-sm text-muted-foreground mb-4">
+                  <FileIcon className="h-20 w-20 text-white/30 mx-auto mb-6" />
+                  <p className="text-lg font-medium mb-2 text-white">
+                    {file.name}
+                  </p>
+                  <p className="text-sm text-white/50 mb-6">
                     Preview not available for this file type
                   </p>
-                  <Button onClick={handleDownload}>
-                    <Download className="h-4 w-4 mr-2" />
+                  <button
+                    onClick={handleDownload}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#8ab4f8] text-[#202124] rounded-full font-medium hover:bg-[#aecbfa] transition-colors"
+                  >
+                    <Download className="h-4 w-4" />
                     Download File
-                  </Button>
+                  </button>
                 </div>
               )}
             </>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Right navigation arrow */}
+        {isImage && currentImageIndex < imageFiles.length - 1 && (
+          <button
+            onClick={handleNext}
+            className="absolute right-4 z-10 p-3 text-white/60 hover:text-white bg-black/30 hover:bg-black/50 rounded-full transition-all"
+            title="Next"
+          >
+            <ChevronRight className="h-7 w-7" />
+          </button>
+        )}
+      </div>
+
+      {/* Image counter for multi-image navigation */}
+      {isImage && imageFiles.length > 1 && (
+        <div className="absolute bottom-6 right-6 text-xs text-white/50 bg-[#2d2e30] px-3 py-1.5 rounded-full">
+          {currentImageIndex + 1} / {imageFiles.length}
+        </div>
+      )}
+    </div>
   );
 }

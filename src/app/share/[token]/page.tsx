@@ -15,7 +15,6 @@ import {
   AlertCircle,
   CloudOff,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 interface SharedFile {
   id: string;
@@ -124,14 +123,14 @@ export default function SharePage() {
   const downloadUrl = `/api/share/${token}?download=true`;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <a href="/" className="flex items-center gap-2 text-gray-900">
+    <div className="min-h-screen bg-[#202124] flex flex-col">
+      {/* Header - Google Drive style */}
+      <header className="bg-[#202124] h-16 flex-shrink-0">
+        <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <a href="/" className="flex items-center gap-2 text-white/80 hover:text-white">
               <svg
-                className="h-7 w-7"
+                className="h-6 w-6"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -141,55 +140,43 @@ export default function SharePage() {
                 <path d="M12 12v9" />
                 <path d="m16 16-4-4-4 4" />
               </svg>
-              <span className="font-bold text-lg">CloudVault</span>
+              <span className="font-bold text-sm">CloudVault</span>
             </a>
-          </div>
-          <Button asChild>
-            <a href={downloadUrl}>
-              <Download className="h-4 w-4 mr-2" />
-              Download
-            </a>
-          </Button>
-        </div>
-      </header>
-
-      {/* File Info Bar */}
-      <div className="bg-white border-b">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3">
-          <div className="flex items-center gap-3">
-            <div className="shrink-0">
-              {getCategoryIcon(category)}
-            </div>
+            <div className="w-px h-6 bg-white/20 mx-1" />
             <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-gray-900 truncate">
+              <h1 className="text-[15px] font-medium text-white truncate">
                 {file.name}
               </h1>
-              <p className="text-sm text-gray-500">
-                {formatFileSize(file.size_bytes)} &middot;{" "}
-                Shared via CloudVault
+              <p className="text-xs text-white/50">
+                {formatFileSize(file.size_bytes)}
               </p>
             </div>
           </div>
+          <a
+            href={downloadUrl}
+            className="p-2.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+            title="Download"
+          >
+            <Download className="h-5 w-5" />
+          </a>
         </div>
-      </div>
+      </header>
 
       {/* Preview Content */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
+      <main className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-hidden">
         {category === "image" && (
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden max-w-4xl w-full">
-            <img
-              src={previewUrl}
-              alt={file.name}
-              className="w-full max-h-[75vh] object-contain"
-            />
-          </div>
+          <img
+            src={previewUrl}
+            alt={file.name}
+            className="max-w-full max-h-[calc(100vh-128px)] object-contain"
+          />
         )}
 
         {category === "video" && (
-          <div className="bg-black rounded-xl shadow-lg overflow-hidden max-w-4xl w-full">
+          <div className="max-w-5xl w-full">
             <video
               controls
-              className="w-full max-h-[75vh]"
+              className="w-full max-h-[calc(100vh-128px)] rounded-lg mx-auto"
             >
               <source src={previewUrl} type={file.mime_type} />
               Your browser does not support the video tag.
@@ -198,10 +185,10 @@ export default function SharePage() {
         )}
 
         {category === "pdf" && (
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden max-w-5xl w-full">
+          <div className="max-w-5xl w-full h-[calc(100vh-128px)]">
             <iframe
               src={previewUrl}
-              className="w-full h-[80vh] border-0"
+              className="w-full h-full rounded-lg border-0"
               title={file.name}
               allow="fullscreen"
             />
@@ -209,9 +196,11 @@ export default function SharePage() {
         )}
 
         {category === "audio" && (
-          <div className="bg-white rounded-xl shadow-lg p-10 text-center max-w-md w-full">
-            {getCategoryIcon(category)}
-            <p className="text-lg font-medium mt-4 mb-6">{file.name}</p>
+          <div className="text-center max-w-md w-full">
+            <div className="text-white/30 flex justify-center mb-6">
+              {getCategoryIcon(category)}
+            </div>
+            <p className="text-lg font-medium text-white mt-4 mb-6">{file.name}</p>
             <audio controls src={previewUrl} className="w-full" />
           </div>
         )}
@@ -219,29 +208,32 @@ export default function SharePage() {
         {(category === "document" ||
           category === "archive" ||
           category === "other") && (
-          <div className="bg-white rounded-xl shadow-lg p-10 text-center max-w-md w-full">
-            {getCategoryIcon(category)}
-            <p className="text-lg font-medium mt-4 mb-1">{file.name}</p>
-            <p className="text-sm text-gray-500 mb-6">
+          <div className="text-center max-w-md w-full">
+            <div className="text-white/30 flex justify-center mb-4">
+              {getCategoryIcon(category)}
+            </div>
+            <p className="text-lg font-medium text-white mt-4 mb-1">{file.name}</p>
+            <p className="text-sm text-white/50 mb-6">
               {formatFileSize(file.size_bytes)} &middot;{" "}
               Preview not available for this file type
             </p>
-            <Button asChild size="lg">
-              <a href={downloadUrl}>
-                <Download className="h-4 w-4 mr-2" />
-                Download File
-              </a>
-            </Button>
+            <a
+              href={downloadUrl}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#8ab4f8] text-[#202124] rounded-full font-medium hover:bg-[#aecbfa] transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Download File
+            </a>
           </div>
         )}
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t py-4">
+      <footer className="bg-[#202124] border-t border-white/10 py-4 flex-shrink-0">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-white/30">
             Shared via{" "}
-            <a href="/" className="text-gray-600 hover:underline font-medium">
+            <a href="/" className="text-white/50 hover:text-white/70 font-medium">
               CloudVault
             </a>
           </p>
