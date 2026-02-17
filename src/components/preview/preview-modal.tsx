@@ -5,7 +5,6 @@ import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
 import { ImagePreview } from "@/components/preview/image-preview";
 import { VideoPreview } from "@/components/preview/video-preview";
-import { PdfPreview } from "@/components/preview/pdf-preview";
 import {
   Download,
   X,
@@ -36,9 +35,15 @@ export function PreviewModal() {
   const category = file ? getFileCategory(file.mime_type) : null;
   const isImage = category === "image";
 
+  // If a PDF is set for preview, open it in a new browser tab and clear the preview
   useEffect(() => {
     if (!previewFileId) {
       setFileUrl(null);
+      return;
+    }
+    if (file && getFileCategory(file.mime_type) === "pdf") {
+      window.open(`/api/download/${previewFileId}`, "_blank");
+      setPreviewFileId(null);
       return;
     }
     setFileUrl(`/api/download/${previewFileId}`);
@@ -197,11 +202,6 @@ export function PreviewModal() {
               {category === "video" && (
                 <div className="max-w-5xl w-full px-8">
                   <VideoPreview src={fileUrl} />
-                </div>
-              )}
-              {category === "pdf" && (
-                <div className="w-full h-full max-w-5xl px-8">
-                  <PdfPreview src={fileUrl} />
                 </div>
               )}
               {category === "audio" && (

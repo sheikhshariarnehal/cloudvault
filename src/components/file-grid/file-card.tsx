@@ -80,11 +80,33 @@ export function FileCard({ file }: FileCardProps) {
       </div>
 
       {/* ===== THUMBNAIL / PREVIEW AREA ===== */}
-      <div
-        className="relative w-full flex-1 border-t border-[#e0e0e0] overflow-hidden"
-        onClick={() => setPreviewFileId(file.id)}
-      >
-        {showThumbnail ? (
+      {category === "pdf" ? (
+        <a
+          href={`/api/download/${file.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="relative w-full flex-1 border-t border-[#e0e0e0] overflow-hidden block"
+        >
+          {showThumbnail ? (
+            <img
+              src={thumbnailSrc!}
+              alt={file.name}
+              className="w-full h-full object-cover"
+              onError={() => setImgError(true)}
+              loading="lazy"
+            />
+          ) : (
+            <div className={`flex items-center justify-center w-full h-full ${config.bgClass}`}>
+              <Icon className="h-12 w-12 opacity-20" style={{ color: config.color }} />
+            </div>
+          )}
+        </a>
+      ) : (
+        <div
+          className="relative w-full flex-1 border-t border-[#e0e0e0] overflow-hidden"
+          onClick={() => setPreviewFileId(file.id)}
+        >
+          {showThumbnail ? (
           <img
             src={thumbnailSrc!}
             alt={file.name}
@@ -93,11 +115,12 @@ export function FileCard({ file }: FileCardProps) {
             loading="lazy"
           />
         ) : (
-          <div className={`flex items-center justify-center w-full h-full ${config.bgClass}`}>
-            <Icon className="h-12 w-12 opacity-20" style={{ color: config.color }} />
-          </div>
-        )}
-      </div>
+            <div className={`flex items-center justify-center w-full h-full ${config.bgClass}`}>
+              <Icon className="h-12 w-12 opacity-20" style={{ color: config.color }} />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

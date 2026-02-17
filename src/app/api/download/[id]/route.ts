@@ -29,8 +29,11 @@ export async function GET(
     const isDownload =
       request.nextUrl.searchParams.get("download") === "true";
 
+    // Use the mime_type from the database instead of Telegram's content-type
+    const finalContentType = file.mime_type || contentType;
+
     const headers: HeadersInit = {
-      "Content-Type": contentType,
+      "Content-Type": finalContentType,
       "Cache-Control": "private, max-age=3600",
     };
 

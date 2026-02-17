@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getFileCategory, formatFileSize } from "@/types/file.types";
 import { Download, FileIcon, ArrowLeft } from "lucide-react";
 import { PreviewClient } from "./preview-client";
@@ -25,6 +25,11 @@ export default async function PreviewPage({
   const category = getFileCategory(file.mime_type);
   const downloadUrl = `/api/download/${file.id}`;
   const directDownloadUrl = `/api/download/${file.id}?download=true`;
+
+  // PDF files redirect to Chrome's built-in PDF viewer
+  if (category === "pdf") {
+    redirect(downloadUrl);
+  }
 
   return (
     <div className="min-h-screen bg-[#202124] flex flex-col">
@@ -69,13 +74,6 @@ export default async function PreviewPage({
               <source src={downloadUrl} type={file.mime_type} />
             </video>
           </div>
-        )}
-        {category === "pdf" && (
-          <iframe
-            src={downloadUrl}
-            className="w-full max-w-5xl h-[80vh] rounded-lg"
-            title={file.name}
-          />
         )}
         {category === "audio" && (
           <div className="text-center">

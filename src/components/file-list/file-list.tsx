@@ -126,15 +126,29 @@ export function FileList({ files }: FileListProps) {
                   />
                 </TableCell>
                 <TableCell className="py-2.5">
-                  <button
-                    className="flex items-center gap-3 text-left group-hover:text-foreground transition-colors"
-                    onClick={() => setPreviewFileId(file.id)}
-                  >
-                    <FileThumbnail file={file} />
-                    <span className="text-sm font-medium truncate max-w-[300px]">
-                      {file.name}
-                    </span>
-                  </button>
+                  {getFileCategory(file.mime_type) === "pdf" ? (
+                    <a
+                      href={`/api/download/${file.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 text-left group-hover:text-foreground transition-colors"
+                    >
+                      <FileThumbnail file={file} />
+                      <span className="text-sm font-medium truncate max-w-[300px]">
+                        {file.name}
+                      </span>
+                    </a>
+                  ) : (
+                    <button
+                      className="flex items-center gap-3 text-left group-hover:text-foreground transition-colors"
+                      onClick={() => setPreviewFileId(file.id)}
+                    >
+                      <FileThumbnail file={file} />
+                      <span className="text-sm font-medium truncate max-w-[300px]">
+                        {file.name}
+                      </span>
+                    </button>
+                  )}
                 </TableCell>
                 <TableCell className="hidden lg:table-cell text-[13px] text-muted-foreground">
                   —

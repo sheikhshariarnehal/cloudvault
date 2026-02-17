@@ -32,6 +32,20 @@ export function FileRow({ file }: FileRowProps) {
   const category = getFileCategory(file.mime_type);
   const { icon: Icon, color } = iconMap[category];
 
+  if (category === "pdf") {
+    return (
+      <a
+        href={`/api/download/${file.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 w-full text-left p-2 rounded-lg hover:bg-muted transition-colors"
+      >
+        <Icon className={`h-5 w-5 flex-shrink-0 ${color}`} />
+        <span className="text-sm font-medium truncate">{file.name}</span>
+      </a>
+    );
+  }
+
   return (
     <button
       onClick={() => setPreviewFileId(file.id)}
