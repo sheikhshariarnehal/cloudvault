@@ -28,7 +28,7 @@ interface FileContextMenuProps {
 
 export function FileContextMenu({ file }: FileContextMenuProps) {
   const { updateFile, removeFile } = useFilesStore();
-  const { setPreviewFileId, setRenameTarget, setRenameModalOpen } = useUIStore();
+  const { setPreviewFileId, setRenameTarget, setRenameModalOpen, setShareFileId, setShareModalOpen } = useUIStore();
 
   const handlePreview = () => setPreviewFileId(file.id);
 
@@ -52,6 +52,11 @@ export function FileContextMenu({ file }: FileContextMenuProps) {
     } catch (error) {
       console.error("Failed to star file:", error);
     }
+  };
+
+  const handleShare = () => {
+    setShareFileId(file.id);
+    setShareModalOpen(true);
   };
 
   const handleCopy = async () => {
@@ -112,7 +117,7 @@ export function FileContextMenu({ file }: FileContextMenuProps) {
           {file.is_starred ? "Unstar" : "Star"}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={handleShare}>
           <Link className="h-4 w-4 mr-2" /> Share
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleCopy}>

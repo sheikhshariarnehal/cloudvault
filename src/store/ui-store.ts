@@ -7,6 +7,8 @@ interface UIState {
   newFolderModalOpen: boolean;
   renameModalOpen: boolean;
   renameTarget: { id: string; name: string; type: "file" | "folder" } | null;
+  shareModalOpen: boolean;
+  shareFileId: string | null;
   isOnline: boolean;
   openFilePicker: (() => void) | null;
 
@@ -17,6 +19,8 @@ interface UIState {
   setNewFolderModalOpen: (open: boolean) => void;
   setRenameModalOpen: (open: boolean) => void;
   setRenameTarget: (target: { id: string; name: string; type: "file" | "folder" } | null) => void;
+  setShareModalOpen: (open: boolean) => void;
+  setShareFileId: (id: string | null) => void;
   setIsOnline: (online: boolean) => void;
   setOpenFilePicker: (fn: (() => void) | null) => void;
 }
@@ -28,6 +32,8 @@ export const useUIStore = create<UIState>((set) => ({
   newFolderModalOpen: false,
   renameModalOpen: false,
   renameTarget: null,
+  shareModalOpen: false,
+  shareFileId: null,
   isOnline: true,
   openFilePicker: null,
 
@@ -38,6 +44,8 @@ export const useUIStore = create<UIState>((set) => ({
   setNewFolderModalOpen: (open) => set({ newFolderModalOpen: open }),
   setRenameModalOpen: (open) => set({ renameModalOpen: open }),
   setRenameTarget: (target) => set({ renameTarget: target }),
+  setShareModalOpen: (open) => set({ shareModalOpen: open }),
+  setShareFileId: (id) => set({ shareFileId: id }),
   setIsOnline: (online) => set({ isOnline: online }),
   setOpenFilePicker: (fn) => set({ openFilePicker: fn }),
 }));

@@ -13,6 +13,7 @@ import { UploadProgress } from "@/components/upload/upload-progress";
 import { PreviewModal } from "@/components/preview/preview-modal";
 import { NewFolderModal } from "@/components/modals/new-folder-modal";
 import { RenameModal } from "@/components/modals/rename-modal";
+import { ShareModal } from "@/components/modals/share-modal";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 export default function DashboardLayout({
@@ -21,7 +22,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { user, guestSessionId } = useAuth();
-  const { setFiles, setFolders, setIsLoading } = useFilesStore();
+  const { setFiles, setFolders, setIsLoading, currentFolderId } = useFilesStore();
   const { sidebarOpen, setSidebarOpen, isOnline, setIsOnline } = useUIStore();
 
   // Set up realtime subscriptions
@@ -81,7 +82,7 @@ export default function DashboardLayout({
   }, [setIsOnline]);
 
   return (
-    <UploadZone>
+    <UploadZone folderId={currentFolderId}>
       <div className="flex h-screen bg-gray-50">
         {/* Desktop Sidebar */}
         <div className="hidden md:block w-[260px] flex-shrink-0">
@@ -117,6 +118,7 @@ export default function DashboardLayout({
         <PreviewModal />
         <NewFolderModal />
         <RenameModal />
+        <ShareModal />
       </div>
     </UploadZone>
   );

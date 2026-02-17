@@ -17,7 +17,7 @@ export default function FolderPage({
 }) {
   const { id } = use(params);
   const { files, folders, setCurrentFolderId } = useFilesStore();
-  const { setUploadModalOpen } = useUIStore();
+  const { openFilePicker } = useUIStore();
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
 
   const folderFiles = files.filter((f) => f.folder_id === id);
@@ -89,7 +89,7 @@ export default function FolderPage({
             <p className="text-muted-foreground text-sm mb-4">
               Upload files or create a subfolder to get started
             </p>
-            <Button onClick={() => setUploadModalOpen(true)}>
+            <Button onClick={() => openFilePicker?.()}>
               <Upload className="h-4 w-4 mr-2" />
               Upload Files
             </Button>
