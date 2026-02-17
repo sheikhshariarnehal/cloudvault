@@ -40,13 +40,13 @@ export function FileCard({ file }: FileCardProps) {
   return (
     <button
       onClick={() => setPreviewFileId(file.id)}
-      className="flex flex-col items-center gap-2 p-4 rounded-xl border bg-white hover:shadow-md transition-shadow text-center w-full"
+      className="flex flex-col items-center gap-2.5 p-4 rounded-xl border bg-white hover:shadow-md hover:border-gray-300 transition-all duration-150 text-center w-full group"
     >
-      <div className={`p-4 rounded-xl ${bg}`}>
-        <Icon className={`h-8 w-8 ${color}`} />
+      <div className={`p-3.5 rounded-xl ${bg} transition-transform group-hover:scale-105`}>
+        <Icon className={`h-7 w-7 ${color}`} />
       </div>
-      <p className="text-sm font-medium truncate w-full">{file.name}</p>
-      <p className="text-xs text-muted-foreground uppercase">
+      <p className="text-[13px] font-medium truncate w-full leading-tight">{file.name}</p>
+      <p className="text-[11px] text-muted-foreground uppercase font-medium tracking-wider">
         {file.mime_type.split("/")[1]?.split(".").pop() || "file"}
       </p>
     </button>

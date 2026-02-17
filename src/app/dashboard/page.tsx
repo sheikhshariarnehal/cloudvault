@@ -70,20 +70,20 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Welcome back, {displayName}</h1>
-          <p className="text-muted-foreground">
-            Welcome back! Let&apos;s continue your activity on the dashboard.
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">Welcome back, {displayName}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Let&apos;s continue your activity on the dashboard.
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" className="h-9 text-[13px]">
+                <Plus className="h-4 w-4 mr-1.5" />
                 Create
               </Button>
             </DropdownMenuTrigger>
@@ -102,27 +102,29 @@ export default function DashboardPage() {
           <Button
             variant="outline"
             size="sm"
+            className="h-9 text-[13px]"
             onClick={() => openFilePicker?.()}
           >
-            <Upload className="h-4 w-4 mr-2" />
-            Upload or drop
+            <Upload className="h-4 w-4 mr-1.5" />
+            <span className="hidden xs:inline">Upload</span>
           </Button>
 
           <Button
             variant="outline"
             size="sm"
+            className="h-9 text-[13px] hidden sm:flex"
             onClick={() => setNewFolderModalOpen(true)}
           >
-            <FolderPlus className="h-4 w-4 mr-2" />
-            Create folder
+            <FolderPlus className="h-4 w-4 mr-1.5" />
+            Folder
           </Button>
 
           {/* View mode toggle */}
-          <div className="flex items-center border rounded-md">
+          <div className="flex items-center border rounded-lg overflow-hidden">
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
               size="icon"
-              className="h-8 w-8"
+              className="h-9 w-9 rounded-none"
               onClick={() => setViewMode("grid")}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -130,7 +132,7 @@ export default function DashboardPage() {
             <Button
               variant={viewMode === "list" ? "secondary" : "ghost"}
               size="icon"
-              className="h-8 w-8"
+              className="h-9 w-9 rounded-none"
               onClick={() => setViewMode("list")}
             >
               <List className="h-4 w-4" />
@@ -142,7 +144,7 @@ export default function DashboardPage() {
       {/* Folders Section */}
       {filteredFolders.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-3">Folders</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Folders</h2>
           <FolderGrid folders={filteredFolders} />
         </section>
       )}
@@ -150,7 +152,7 @@ export default function DashboardPage() {
       {/* Suggested from your activity */}
       {!searchQuery && files.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-3">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             Suggested from your activity
           </h2>
           <SuggestedFiles files={recentFiles.slice(0, 4)} />
@@ -161,10 +163,10 @@ export default function DashboardPage() {
       <section>
         <Tabs defaultValue="recent" className="w-full">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">Your Files</h2>
-            <TabsList>
-              <TabsTrigger value="recent">Recent</TabsTrigger>
-              <TabsTrigger value="starred">Starred</TabsTrigger>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Your Files</h2>
+            <TabsList className="h-8">
+              <TabsTrigger value="recent" className="text-xs px-3 h-7">Recent</TabsTrigger>
+              <TabsTrigger value="starred" className="text-xs px-3 h-7">Starred</TabsTrigger>
             </TabsList>
           </div>
 

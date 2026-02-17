@@ -61,19 +61,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md space-y-8">
+    <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-8">
+      <div className="w-full max-w-[420px] space-y-6">
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Cloud className="h-10 w-10 text-primary" />
-            <h1 className="text-3xl font-bold">CloudVault</h1>
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <Cloud className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl font-bold tracking-tight">CloudVault</h1>
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Sign in to access your files
           </p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border p-8 space-y-6">
+        <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-8 space-y-5">
           <form onSubmit={handleEmailLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

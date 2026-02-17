@@ -83,33 +83,35 @@ export default function DashboardLayout({
 
   return (
     <UploadZone folderId={currentFolderId}>
-      <div className="flex h-screen bg-gray-50">
-        {/* Desktop Sidebar */}
-        <div className="hidden md:block w-[260px] flex-shrink-0">
+      <div className="flex h-dvh bg-gray-50/50 overflow-hidden">
+        {/* Desktop Sidebar — fixed, full height */}
+        <aside className="hidden lg:flex w-[260px] flex-shrink-0">
           <Sidebar />
-        </div>
+        </aside>
 
-        {/* Mobile Sidebar */}
+        {/* Mobile / Tablet Sidebar */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="p-0 w-[260px] md:hidden">
+          <SheetContent side="left" className="p-0 w-[280px] lg:hidden">
             <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
             <Sidebar />
           </SheetContent>
         </Sheet>
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0">
           {/* Offline Banner */}
           {!isOnline && (
-            <div className="bg-yellow-500 text-white text-center py-1 text-sm font-medium">
-              You are offline. Changes will sync when you reconnect.
+            <div className="bg-amber-500 text-white text-center py-1.5 text-xs font-medium tracking-wide">
+              You are offline — changes will sync when you reconnect.
             </div>
           )}
 
           <TopBar />
 
-          <main className="flex-1 overflow-y-auto p-4 md:p-6">
-            {children}
+          <main className="flex-1 overflow-y-auto">
+            <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+              {children}
+            </div>
           </main>
         </div>
 

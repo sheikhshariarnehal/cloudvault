@@ -46,17 +46,17 @@ export function StorageMeter() {
   );
 
   return (
-    <div className="space-y-3 p-3 rounded-xl bg-gray-50">
+    <div className="space-y-2.5 p-3 rounded-xl bg-gray-50/80 border border-gray-100">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">Storage</span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs font-semibold">Storage</span>
+        <span className="text-[11px] text-muted-foreground font-medium">
           {formatFileSize(breakdown.total)} of {formatFileSize(storageLimit)}
         </span>
       </div>
 
-      <Progress value={usedPercent} className="h-2" />
+      <Progress value={usedPercent} className="h-1.5" />
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-1.5">
         {[
           { label: "Photo", size: breakdown.photo, color: STORAGE_COLORS.photo },
           { label: "Video", size: breakdown.video, color: STORAGE_COLORS.video },
@@ -71,16 +71,16 @@ export function StorageMeter() {
             color: STORAGE_COLORS.free,
           },
         ].map((item) => (
-          <div key={item.label} className="flex items-center gap-2">
+          <div key={item.label} className="flex items-center gap-1.5">
             <div
-              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+              className="w-2 h-2 rounded-full flex-shrink-0"
               style={{ backgroundColor: item.color }}
             />
             <div className="min-w-0">
-              <p className="text-xs text-muted-foreground truncate">
+              <p className="text-[10px] text-muted-foreground truncate leading-tight">
                 {item.label}
               </p>
-              <p className="text-xs font-medium">{formatFileSize(item.size)}</p>
+              <p className="text-[11px] font-medium leading-tight">{formatFileSize(item.size)}</p>
             </div>
           </div>
         ))}

@@ -38,37 +38,37 @@ export function FolderGrid({ folders }: FolderGridProps) {
   if (folders.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
       {folders.map((folder) => (
         <div
           key={folder.id}
-          className="group bg-white rounded-xl border p-4 hover:shadow-md transition-shadow"
+          className="group bg-white rounded-xl border p-3.5 hover:shadow-md hover:border-gray-300 transition-all duration-150"
         >
-          <div className="flex items-start justify-between">
+          <div className="flex items-center justify-between">
             <Link
               href={`/dashboard/folder/${folder.id}`}
               className="flex items-center gap-3 flex-1 min-w-0"
             >
               <div
-                className="p-2 rounded-lg"
+                className="p-2 rounded-lg transition-transform group-hover:scale-105"
                 style={{
-                  backgroundColor: `${folder.color || "#EAB308"}20`,
+                  backgroundColor: `${folder.color || "#3B82F6"}15`,
                 }}
               >
                 <Folder
-                  className="h-6 w-6"
-                  style={{ color: folder.color || "#EAB308" }}
-                  fill={folder.color || "#EAB308"}
+                  className="h-5 w-5"
+                  style={{ color: folder.color || "#3B82F6" }}
+                  fill={folder.color || "#3B82F6"}
                 />
               </div>
-              <span className="text-sm font-medium truncate">
+              <span className="text-[13px] font-medium truncate">
                 {folder.name}
               </span>
             </Link>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-muted transition-opacity">
+                <button className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-gray-100 transition-all">
                   <MoreVertical className="h-4 w-4 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>

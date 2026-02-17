@@ -71,18 +71,18 @@ export function FileList({ files }: FileListProps) {
     <div className="bg-white rounded-xl border overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="hover:bg-transparent">
             <TableHead className="w-10">
               <Checkbox
                 checked={allSelected}
                 onCheckedChange={handleSelectAll}
               />
             </TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead className="hidden md:table-cell">Shared By</TableHead>
-            <TableHead className="hidden sm:table-cell">File Size</TableHead>
-            <TableHead>Modified</TableHead>
-            <TableHead className="w-10">Action</TableHead>
+            <TableHead className="text-xs font-semibold">Name</TableHead>
+            <TableHead className="hidden lg:table-cell text-xs font-semibold">Shared By</TableHead>
+            <TableHead className="hidden sm:table-cell text-xs font-semibold">Size</TableHead>
+            <TableHead className="hidden sm:table-cell text-xs font-semibold">Modified</TableHead>
+            <TableHead className="w-10 text-xs font-semibold"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -91,34 +91,34 @@ export function FileList({ files }: FileListProps) {
             const { icon: Icon, color } = iconMap[category];
 
             return (
-              <TableRow key={file.id} className="cursor-pointer">
-                <TableCell>
+              <TableRow key={file.id} className="cursor-pointer group">
+                <TableCell className="py-2.5">
                   <Checkbox
                     checked={selectedFiles.includes(file.id)}
                     onCheckedChange={() => toggleFileSelection(file.id)}
                   />
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-2.5">
                   <button
-                    className="flex items-center gap-3 text-left"
+                    className="flex items-center gap-2.5 text-left group-hover:text-foreground transition-colors"
                     onClick={() => setPreviewFileId(file.id)}
                   >
-                    <Icon className={`h-5 w-5 flex-shrink-0 ${color}`} />
-                    <span className="text-sm font-medium truncate max-w-[200px]">
+                    <Icon className={`h-4 w-4 flex-shrink-0 ${color}`} />
+                    <span className="text-[13px] font-medium truncate max-w-[300px]">
                       {file.name}
                     </span>
                   </button>
                 </TableCell>
-                <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                <TableCell className="hidden lg:table-cell text-[13px] text-muted-foreground">
                   —
                 </TableCell>
-                <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                <TableCell className="hidden sm:table-cell text-[13px] text-muted-foreground">
                   {formatFileSize(file.size_bytes)}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
+                <TableCell className="hidden sm:table-cell text-[13px] text-muted-foreground">
                   {formatDate(file.updated_at)}
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-2.5">
                   <FileContextMenu file={file} />
                 </TableCell>
               </TableRow>
