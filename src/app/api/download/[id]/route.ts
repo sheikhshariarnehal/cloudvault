@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { downloadFromTelegram } from "@/lib/telegram/download";
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+
+    // Fetch file record
+    const { data: file, error } = await supabase
+      .from("files")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !file) {
+      return NextResponse.json({ error: "File not found" }, { status: 404 });
+    }
+
+    // Download from Telegram
+    const { stream, contentType } = await downloadFromTelegram(
+      file.telegram_file_id
+    );
+
+    const isDownload =
+      request.nextUrl.searchParams.get("download") === "true";
+
+    const headers: HeadersInit = {
+      "Content-Type": contentType,
+      "Cache-Control": "private, max-age=3600",
+    };
+
+    if (isDownload) {
+      headers["Content-Disposition"] = `attachment; filename="${encodeURIComponent(file.original_name)}"`;
+    } else {
+      headers["Content-Disposition"] = `inline; filename="${encodeURIComponent(file.original_name)}"`;
+    }
+
+    return new NextResponse(stream, { headers });
+  } catch (error) {
+    console.error("Download error:", error);
+    return NextResponse.json(
+      { error: "Download failed" },
+      { status: 500 }
+    );
+  }
+}
