@@ -79,7 +79,8 @@ export async function GET(
 
       // Download from Telegram
       const { stream } = await downloadFromTelegram(
-        file.telegram_file_id
+        file.telegram_file_id,
+        file.mime_type || "application/octet-stream"
       );
 
       return new NextResponse(stream, {
@@ -96,7 +97,8 @@ export async function GET(
 
     if (isPreview) {
       const { stream } = await downloadFromTelegram(
-        file.telegram_file_id
+        file.telegram_file_id,
+        file.mime_type || "application/octet-stream"
       );
 
       return new NextResponse(stream, {
