@@ -2,9 +2,8 @@ services:
   - type: web
     name: cloudvault-backend
     runtime: node
-    rootDir: cloudvault-backend
-    buildCommand: npm install --include=dev && npm run build
-    startCommand: npm start
+    buildCommand: cd cloudvault-backend && npm install --include=dev && npm run build
+    startCommand: cd cloudvault-backend && npm start
     envVars:
       - key: NODE_ENV
         value: production
