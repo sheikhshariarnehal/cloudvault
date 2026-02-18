@@ -24,7 +24,12 @@ export function createApp(): express.Express {
   // JSON body parser (for non-file JSON bodies only)
   app.use(express.json({ limit: "1mb" }));
 
-  // API key guard (skips /health)
+  // Public root — no auth required
+  app.get("/", (_req, res) => {
+    res.json({ service: "CloudVault Backend", status: "ok", version: "1.0.0" });
+  });
+
+  // API key guard (skips /health and /upload/progress/*)
   app.use(apiKeyMiddleware);
 
   // Routes
