@@ -1,10 +1,8 @@
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { Api } from "telegram/tl";
-import { CustomFile } from "telegram/client/uploads";
 import { PassThrough } from "stream";
 import bigInt from "big-integer";
-import * as fs from "fs";
 import { config } from "../config/env";
 import type { UploadResult } from "../types";
 
@@ -47,28 +45,33 @@ function getChatId(): string {
 
 /**
  * Upload a file from disk to Telegram and return identifiers.
+ * Uses sendFile directly with the file path — GramJS resolves the correct
+ * InputFile vs InputFileBig variant, preventing FILE_PARTS_INVALID on large files.
+ * @param onProgress Called with 0–100 as Telegram receives each chunk.
  */
 export async function uploadFile(
   filePath: string,
   fileName: string,
-  mimeType: string
+  _mimeType: string,
+  onProgress?: (pct: number) => void
 ): Promise<UploadResult> {
   const chatId = getChatId();
-  const fileSize = fs.statSync(filePath).size;
 
-  // Create a CustomFile so GramJS streams from disk instead of loading into memory
-  const customFile = new CustomFile(fileName, fileSize, filePath);
-
-  const inputFile = await client.uploadFile({
-    file: customFile,
-    workers: 4,
-  });
-
+  // Pass the path string directly; GramJS reads the file, picks the right
+  // part count / file class, and sends it in one atomic operation.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const message = await client.sendFile(chatId, {
-    file: inputFile,
+    file: filePath,
     caption: fileName,
     forceDocument: true,
-  });
+    workers: 4,
+    onProgress: onProgress
+      ? (fraction: number) => onProgress(Math.round(fraction * 100))
+      : undefined,
+    attributes: [
+      new Api.DocumentAttributeFilename({ fileName }),
+    ],
+  } as any);
 
   // Extract identifiers from the sent message
   const media = message.media as Api.MessageMediaDocument | undefined;
@@ -77,16 +80,7 @@ export async function uploadFile(
   const file_id = document?.id?.toString() ?? "";
   const message_id = message.id;
 
-  // Attempt to extract thumbnail URL (for images that got a thumb)
-  let thumbnail_url: string | null = null;
-  if (document?.thumbs && document.thumbs.length > 0) {
-    // Thumbnails are stored as PhotoSize on the document; we don't have a
-    // public URL from Telegram, so we leave this null. The frontend can
-    // generate its own thumbnail or fetch via the download endpoint.
-    thumbnail_url = null;
-  }
-
-  return { file_id, message_id, thumbnail_url };
+  return { file_id, message_id, thumbnail_url: null };
 }
 
 /**

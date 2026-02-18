@@ -46,7 +46,7 @@ export function UploadProgress() {
                 <>
                   <Progress value={item.progress} className="h-1.5 mt-1.5" />
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {item.progress < 50
+                    {item.progress < 40
                       ? "Uploading…"
                       : item.progress < 100
                       ? "Saving to Telegram…"

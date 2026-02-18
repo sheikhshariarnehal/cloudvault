@@ -10,8 +10,10 @@ export function apiKeyMiddleware(
   res: Response,
   next: NextFunction
 ): void {
-  // Allow health check without auth
-  if (req.path === "/health") {
+  // Allow health check and SSE progress stream without API-key auth.
+  // The progress uploadId UUID acts as its own secret (only the uploading
+  // client knows it), and EventSource cannot send custom headers.
+  if (req.path === "/health" || req.path.startsWith("/upload/progress/")) {
     next();
     return;
   }

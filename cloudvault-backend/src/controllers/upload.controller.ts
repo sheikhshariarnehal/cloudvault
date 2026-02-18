@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import * as fs from "fs/promises";
 import * as telegramService from "../services/telegram.service";
 import * as supabaseService from "../services/supabase.service";
+import * as progressService from "../services/progress.service";
 import type { FileInsert } from "../types";
 
 export async function uploadController(
@@ -34,12 +35,22 @@ export async function uploadController(
       guestSessionId,
     });
 
-    // 1. Upload to Telegram
+    // 1. Upload to Telegram — emit progress to any SSE subscriber
+    const uploadId = (req.headers["x-upload-id"] as string) ?? "";
+    const progressEmitter = uploadId
+      ? progressService.createProgressEmitter(uploadId)
+      : null;
+
     const telegramResult = await telegramService.uploadFile(
       req.file.path,
       req.file.originalname,
-      req.file.mimetype
+      req.file.mimetype,
+      progressEmitter
+        ? (pct) => progressEmitter.emit("progress", pct)
+        : undefined
     );
+
+    if (uploadId) progressService.deleteProgressEmitter(uploadId);
 
     console.log("[Upload] Telegram upload complete:", telegramResult);
 

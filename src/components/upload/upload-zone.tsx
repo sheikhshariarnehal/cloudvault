@@ -55,39 +55,48 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
         if (attempt === 1) {
           // First attempt: use XHR for progress tracking
-          // Progress is split into two phases:
-          //   Phase 1 (0–50%): bytes travelling browser → Express  (XHR upload events)
-          //   Phase 2 (50–95%): Express uploading to Telegram        (smooth animation)
-          //   Done  (100%):    response received, Supabase row saved
-          const xhr = new XMLHttpRequest();
-          let telegramProgressInterval: ReturnType<typeof setInterval> | null = null;
+          // Progress phases:
+          //   Phase 1 (0–40%):  real bytes browser → Express  (XHR upload events)
+          //   Phase 2 (40–99%): real GramJS progress via SSE  (server-sent events)
+          //   Done   (100%):    response received, Supabase row saved
 
-          // Phase 1 – track actual byte transfer, mapped to 0–50
+          // Unique ID lets the SSE endpoint pair with the right upload
+          const uploadId = uuidv4();
+          const xhr = new XMLHttpRequest();
+          let progressSource: EventSource | null = null;
+
+          // Phase 1 – track actual byte transfer, mapped to 0–40
           xhr.upload.addEventListener("progress", (e) => {
             if (e.lengthComputable) {
-              const transferPct = Math.round((e.loaded / e.total) * 50);
+              const transferPct = Math.round((e.loaded / e.total) * 40);
               updateUploadProgress(queueId, transferPct);
             }
           });
 
-          // Phase 2 – once all bytes are sent, animate 50→95 slowly
+          // Phase 2 – bytes are at Express; subscribe to real GramJS progress via SSE
           xhr.upload.addEventListener("load", () => {
-            updateUploadProgress(queueId, 50);
-            let current = 50;
-            telegramProgressInterval = setInterval(() => {
-              // Slow logarithmic crawl: approaches 95 but never reaches it
-              const remaining = 95 - current;
-              current += Math.max(0.5, remaining * 0.04);
-              updateUploadProgress(queueId, Math.min(95, Math.round(current)));
-            }, 300);
+            updateUploadProgress(queueId, 40);
+            progressSource = new EventSource(
+              `${BACKEND_URL}/upload/progress/${uploadId}`
+            );
+            progressSource.onmessage = (evt) => {
+              const pct = parseInt(evt.data, 10);
+              if (!isNaN(pct)) {
+                // Map GramJS 0–100 → UI 40–99 so there's always room for the
+                // final "100" that fires only when the full response arrives
+                const uiPct = 40 + Math.round(pct * 0.59);
+                updateUploadProgress(queueId, Math.min(99, uiPct));
+              }
+            };
           });
 
           const response = await new Promise<string>((resolve, reject) => {
             xhr.open("POST", `${BACKEND_URL}/upload`);
             xhr.setRequestHeader("X-API-Key", API_KEY);
+            xhr.setRequestHeader("X-Upload-Id", uploadId);
             xhr.responseType = "text";
             xhr.onload = () => {
-              if (telegramProgressInterval) clearInterval(telegramProgressInterval);
+              if (progressSource) { progressSource.close(); progressSource = null; }
               if (xhr.status >= 200 && xhr.status < 300) {
                 updateUploadProgress(queueId, 100);
                 resolve(xhr.responseText);
@@ -101,7 +110,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
               }
             };
             xhr.onerror = () => {
-              if (telegramProgressInterval) clearInterval(telegramProgressInterval);
+              if (progressSource) { progressSource.close(); progressSource = null; }
               reject(new Error("Upload failed - network error"));
             };
             xhr.send(uploadData);
@@ -111,36 +120,59 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
           addFile(data.file);
           updateUploadStatus(queueId, "success");
         } else {
-          // Retry attempts: use fetch with animated progress
-          updateUploadProgress(queueId, 10);
-          let current = 10;
-          const retryInterval = setInterval(() => {
-            const remaining = 95 - current;
-            current += Math.max(0.5, remaining * 0.04);
-            updateUploadProgress(queueId, Math.min(95, Math.round(current)));
-          }, 300);
+          // Retry attempts: also use XHR + SSE for real progress
+          const uploadId = uuidv4();
+          const xhr = new XMLHttpRequest();
+          let progressSource: EventSource | null = null;
 
-          try {
-            const response = await fetch(`${BACKEND_URL}/upload`, {
-              method: "POST",
-              headers: { "X-API-Key": API_KEY },
-              body: uploadData,
-            });
-            clearInterval(retryInterval);
-
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+          xhr.upload.addEventListener("progress", (e) => {
+            if (e.lengthComputable) {
+              updateUploadProgress(queueId, Math.round((e.loaded / e.total) * 40));
             }
+          });
 
-            updateUploadProgress(queueId, 100);
-            const data = await response.json();
-            addFile(data.file);
-            updateUploadStatus(queueId, "success");
-          } catch (err) {
-            clearInterval(retryInterval);
-            throw err;
-          }
+          xhr.upload.addEventListener("load", () => {
+            updateUploadProgress(queueId, 40);
+            progressSource = new EventSource(
+              `${BACKEND_URL}/upload/progress/${uploadId}`
+            );
+            progressSource.onmessage = (evt) => {
+              const pct = parseInt(evt.data, 10);
+              if (!isNaN(pct)) {
+                updateUploadProgress(queueId, Math.min(99, 40 + Math.round(pct * 0.59)));
+              }
+            };
+          });
+
+          const response = await new Promise<string>((resolve, reject) => {
+            xhr.open("POST", `${BACKEND_URL}/upload`);
+            xhr.setRequestHeader("X-API-Key", API_KEY);
+            xhr.setRequestHeader("X-Upload-Id", uploadId);
+            xhr.responseType = "text";
+            xhr.onload = () => {
+              if (progressSource) { progressSource.close(); progressSource = null; }
+              if (xhr.status >= 200 && xhr.status < 300) {
+                updateUploadProgress(queueId, 100);
+                resolve(xhr.responseText);
+              } else {
+                try {
+                  const errorData = JSON.parse(xhr.responseText);
+                  reject(new Error(errorData.error || `Upload failed with status ${xhr.status}`));
+                } catch {
+                  reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+              }
+            };
+            xhr.onerror = () => {
+              if (progressSource) { progressSource.close(); progressSource = null; }
+              reject(new Error("Upload failed - network error"));
+            };
+            xhr.send(uploadData);
+          });
+
+          const data = JSON.parse(response);
+          addFile(data.file);
+          updateUploadStatus(queueId, "success");
         }
       } catch (error) {
         const message =
