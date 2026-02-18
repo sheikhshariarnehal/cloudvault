@@ -1,0 +1,29 @@
+# ──────────────────────────────────────────────────────────────
+# CloudVault Backend – Environment Variables
+# ──────────────────────────────────────────────────────────────
+
+# Server
+PORT=3001
+
+# Shared secret – must match MTPROTO_API_KEY in the Next.js frontend .env
+API_KEY=cloudvault-secret-2026
+
+# Telegram MTProto credentials – from https://my.telegram.org
+TELEGRAM_API_ID=10261766
+TELEGRAM_API_HASH=8265fba1f5c16951c59b3404d598049c
+
+# Telegram session string – run `npm run auth` to generate this
+TELEGRAM_SESSION=1BQANOTEuMTA4LjU2LjEzMQG7uRJgI7C0OBmPIF17rEWDgSTFxiLVyd61I7F3ylefmncHbDbbfsyGeTIX5G0XSpg9AbY/pXh+RypWgPP4OouMwKA2fQXR5UCFRBo8i9224kFicSzyZ/gaBKlQMoL0IiP4DF/GWQCal57InnJFPfR47IuTEo4yiIf9ubOXGA467pmOdjQwK31gX9oWtljiF5Uk36jv+3ipkNqTjBe+7U+3jvnVhrAlOC7kh0rRgaClMGCqYkEElKcJ8327NeJSr8sz84CaPXnXtBwBVwPr1e4hRSJ+FMkmKWJxgO7nKya0YQQBzKFkyCFmernXyB7yDhqyGtVzzUHaUTr8EoB2byM8sg==
+
+# Target chat for file storage ('me' = Saved Messages, or a channel/group ID)
+TELEGRAM_CHAT_ID=me
+
+# Supabase – use the SERVICE ROLE key (bypasses RLS)
+SUPABASE_URL=https://zcigqsiovqqldlsnwiqd.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjaWdxc2lvdnFxbGRsc253aXFkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTI3MzMzOSwiZXhwIjoyMDg2ODQ5MzM5fQ.7hCE-ko_Oz2dOCSs_DX_lMU6sPcLaSFNMDIvk_MSM5c
+
+# CORS – your Vercel frontend URL (no trailing slash)
+ALLOWED_ORIGIN=http://localhost:3000
+
+# Temp directory for multer disk storage
+TEMP_DIR=C:/tmp/cloudvault
