@@ -39,7 +39,8 @@ export async function GET(
 
     // Download from Telegram
     const { stream, contentType } = await downloadFromTelegram(
-      file.telegram_file_id
+      file.telegram_message_id,
+      file.mime_type || "application/octet-stream"
     );
 
     const isDownload =

@@ -9,6 +9,9 @@ import { validateFile } from "@/types/file.types";
 import { v4 as uuidv4 } from "uuid";
 import { Upload } from "lucide-react";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_MTPROTO_BACKEND_URL!;
+const API_KEY = process.env.NEXT_PUBLIC_MTPROTO_API_KEY!;
+
 interface UploadZoneProps {
   children: ReactNode;
   folderId?: string | null;
@@ -34,12 +37,6 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
     updateUploadStatus(queueId, "uploading");
 
-    const formData = new FormData();
-    formData.append("file", file);
-    if (targetFolderId) formData.append("folder_id", targetFolderId);
-    if (user?.id) formData.append("user_id", user.id);
-    if (guestSessionId) formData.append("guest_session_id", guestSessionId);
-
     console.log("Starting upload:", {
       fileName: file.name,
       fileSize: file.size,
@@ -58,20 +55,41 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
         if (attempt === 1) {
           // First attempt: use XHR for progress tracking
+          // Progress is split into two phases:
+          //   Phase 1 (0–50%): bytes travelling browser → Express  (XHR upload events)
+          //   Phase 2 (50–95%): Express uploading to Telegram        (smooth animation)
+          //   Done  (100%):    response received, Supabase row saved
           const xhr = new XMLHttpRequest();
+          let telegramProgressInterval: ReturnType<typeof setInterval> | null = null;
 
+          // Phase 1 – track actual byte transfer, mapped to 0–50
           xhr.upload.addEventListener("progress", (e) => {
             if (e.lengthComputable) {
-              const pct = Math.round((e.loaded / e.total) * 100);
-              updateUploadProgress(queueId, pct);
+              const transferPct = Math.round((e.loaded / e.total) * 50);
+              updateUploadProgress(queueId, transferPct);
             }
           });
 
+          // Phase 2 – once all bytes are sent, animate 50→95 slowly
+          xhr.upload.addEventListener("load", () => {
+            updateUploadProgress(queueId, 50);
+            let current = 50;
+            telegramProgressInterval = setInterval(() => {
+              // Slow logarithmic crawl: approaches 95 but never reaches it
+              const remaining = 95 - current;
+              current += Math.max(0.5, remaining * 0.04);
+              updateUploadProgress(queueId, Math.min(95, Math.round(current)));
+            }, 300);
+          });
+
           const response = await new Promise<string>((resolve, reject) => {
-            xhr.open("POST", "/api/upload");
+            xhr.open("POST", `${BACKEND_URL}/upload`);
+            xhr.setRequestHeader("X-API-Key", API_KEY);
             xhr.responseType = "text";
             xhr.onload = () => {
+              if (telegramProgressInterval) clearInterval(telegramProgressInterval);
               if (xhr.status >= 200 && xhr.status < 300) {
+                updateUploadProgress(queueId, 100);
                 resolve(xhr.responseText);
               } else {
                 try {
@@ -82,7 +100,10 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
                 }
               }
             };
-            xhr.onerror = () => reject(new Error("Upload failed - network error"));
+            xhr.onerror = () => {
+              if (telegramProgressInterval) clearInterval(telegramProgressInterval);
+              reject(new Error("Upload failed - network error"));
+            };
             xhr.send(uploadData);
           });
 
@@ -91,8 +112,9 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
           updateUploadStatus(queueId, "success");
         } else {
           // Retry attempts: use fetch
-          const response = await fetch("/api/upload", {
+          const response = await fetch(`${BACKEND_URL}/upload`, {
             method: "POST",
+            headers: { "X-API-Key": API_KEY },
             body: uploadData,
           });
 
