@@ -125,6 +125,18 @@ const ALLOWED_MIME_TYPES = [
   "application/x-bzip2",
   "application/x-compressed",
   "application/x-compress",
+
+  // Executables & Installers
+  "application/x-msdownload",      // .exe, .dll
+  "application/x-msdos-program",   // .exe (alternate)
+  "application/x-executable",
+  "application/x-deb",
+  "application/x-rpm",
+  "application/vnd.android.package-archive", // .apk
+  "application/x-apple-diskimage", // .dmg
+  "application/x-ms-installer",    // .msi
+  "application/x-sh",
+  "application/x-bat",
   
   // Text & Code
   "text/plain",
@@ -166,8 +178,10 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
   if (file.size > MAX_FILE_SIZE) {
     return { valid: false, error: `File size exceeds the 2GB limit` };
   }
-  if (!ALLOWED_MIME_TYPES.includes(file.type) && file.type !== "") {
-    return { valid: false, error: `File type "${file.type}" is not supported` };
+  // Allow any MIME type – this is general-purpose cloud storage.
+  // Unknown/empty types (e.g. some executables) are still accepted.
+  if (file.type !== "" && !ALLOWED_MIME_TYPES.includes(file.type)) {
+    console.warn(`[CloudVault] Unrecognised MIME type "${file.type}" – uploading anyway.`);
   }
   return { valid: true };
 }

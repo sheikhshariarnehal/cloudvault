@@ -43,7 +43,16 @@ export function UploadProgress() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{item.file.name}</p>
               {item.status === "uploading" && (
-                <Progress value={item.progress} className="h-1.5 mt-1.5" />
+                <>
+                  <Progress value={item.progress} className="h-1.5 mt-1.5" />
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {item.progress < 50
+                      ? "Uploading…"
+                      : item.progress < 100
+                      ? "Saving to Telegram…"
+                      : "Finishing…"}
+                  </p>
+                </>
               )}
               {item.status === "error" && (
                 <p className="text-xs text-destructive mt-1">{item.error}</p>

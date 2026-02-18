@@ -111,21 +111,36 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
           addFile(data.file);
           updateUploadStatus(queueId, "success");
         } else {
-          // Retry attempts: use fetch
-          const response = await fetch(`${BACKEND_URL}/upload`, {
-            method: "POST",
-            headers: { "X-API-Key": API_KEY },
-            body: uploadData,
-          });
+          // Retry attempts: use fetch with animated progress
+          updateUploadProgress(queueId, 10);
+          let current = 10;
+          const retryInterval = setInterval(() => {
+            const remaining = 95 - current;
+            current += Math.max(0.5, remaining * 0.04);
+            updateUploadProgress(queueId, Math.min(95, Math.round(current)));
+          }, 300);
 
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+          try {
+            const response = await fetch(`${BACKEND_URL}/upload`, {
+              method: "POST",
+              headers: { "X-API-Key": API_KEY },
+              body: uploadData,
+            });
+            clearInterval(retryInterval);
+
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+            }
+
+            updateUploadProgress(queueId, 100);
+            const data = await response.json();
+            addFile(data.file);
+            updateUploadStatus(queueId, "success");
+          } catch (err) {
+            clearInterval(retryInterval);
+            throw err;
           }
-
-          const data = await response.json();
-          addFile(data.file);
-          updateUploadStatus(queueId, "success");
         }
       } catch (error) {
         const message =
