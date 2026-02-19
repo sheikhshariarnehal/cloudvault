@@ -191,12 +191,17 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     noKeyboard: true,
   });
 
-  const { setOpenFilePicker } = useUIStore();
+  const { setOpenFilePicker, setUploadFiles } = useUIStore();
 
   useEffect(() => {
     setOpenFilePicker(open);
     return () => setOpenFilePicker(null);
   }, [open, setOpenFilePicker]);
+
+  useEffect(() => {
+    setUploadFiles(onDrop);
+    return () => setUploadFiles(null);
+  }, [onDrop, setUploadFiles]);
 
   return (
     <div {...getRootProps()} className="relative">

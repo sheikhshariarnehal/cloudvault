@@ -195,7 +195,7 @@ export function PreviewModal() {
         <div className="w-full h-full flex items-center justify-center">
           {fileUrl && (
             <>
-              {isImage && <ImagePreview src={fileUrl} alt={file.name} />}
+              {isImage && <ImagePreview src={fileUrl} alt={file.name} fallbackSrc={file.thumbnail_url} />}
               {category === "pdf" && (
                 <div className="w-full h-full">
                   <PdfPreview src={fileUrl} />

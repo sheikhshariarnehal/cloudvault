@@ -2,9 +2,10 @@
 
 import { SearchBar } from "@/components/top-bar/search-bar";
 import { UserMenu } from "@/components/top-bar/user-menu";
+import { NotificationPopover } from "@/components/top-bar/notification-popover";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/store/ui-store";
-import { Bell, Menu, UserPlus } from "lucide-react";
+import { Menu, UserPlus } from "lucide-react";
 
 export function TopBar() {
   const { toggleSidebar } = useUIStore();
@@ -28,15 +29,7 @@ export function TopBar() {
 
       {/* Right actions */}
       <div className="flex items-center gap-2 ml-auto">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative h-10 w-10 hover:bg-gray-100"
-          aria-label="Notifications"
-        >
-          <Bell className="h-[19px] w-[19px]" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
-        </Button>
+        <NotificationPopover />
 
         <Button
           variant="default"

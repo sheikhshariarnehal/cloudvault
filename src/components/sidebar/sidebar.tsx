@@ -1,16 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useFilesStore } from "@/store/files-store";
+import { useUIStore } from "@/store/ui-store";
 import { StorageMeter } from "@/components/storage/storage-meter";
 import { FolderTree } from "@/components/sidebar/folder-tree";
 import { NavItem } from "@/components/sidebar/nav-item";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Cloud,
   FolderOpen,
@@ -20,6 +27,10 @@ import {
   Trash2,
   Settings,
   Crown,
+  Plus,
+  FolderPlus,
+  Upload,
+  FolderUp,
 } from "lucide-react";
 
 const navItems = [
@@ -35,10 +46,14 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, isGuest } = useAuth();
   const { folders } = useFilesStore();
+  const { openFilePicker, setNewFolderModalOpen, uploadFiles } = useUIStore();
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
-  const displayName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || "Guest";
-  const email = user?.email || "Guest mode";
-  const avatarUrl = user?.user_metadata?.avatar_url;
+  const handleFolderUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) uploadFiles?.(files);
+    e.target.value = "";
+  };
 
   return (
     <div className="flex flex-col h-full w-full bg-white border-r border-gray-200">
@@ -52,25 +67,61 @@ export function Sidebar() {
 
       <Separator />
 
-      {/* User Profile */}
-      <div className="flex items-center gap-3 px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer">
-        <Avatar className="h-10 w-10 ring-2 ring-gray-100">
-          <AvatarImage src={avatarUrl} />
-          <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-sm font-bold">
-            {displayName.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold truncate text-gray-900">{displayName}</p>
-            {isGuest && (
-              <Badge variant="secondary" className="text-[10px] px-2 py-0.5 font-medium">
-                Guest
-              </Badge>
-            )}
-          </div>
-          <p className="text-xs text-gray-500 truncate">{email}</p>
-        </div>
+      {/* + New Button */}
+      <div className="px-4 py-3 shrink-0">
+        <input
+          ref={folderInputRef}
+          type="file"
+          // @ts-ignore
+          webkitdirectory=""
+          multiple
+          className="hidden"
+          onChange={handleFolderUpload}
+        />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="w-fit h-10 px-5 rounded-2xl shadow-md hover:shadow-lg border border-gray-200 bg-white text-gray-700 font-medium text-sm gap-2 transition-shadow"
+            >
+              <Plus className="h-4 w-4" />
+              New
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56 py-1">
+            <DropdownMenuItem
+              className="gap-3 py-2.5 px-3 cursor-pointer"
+              onClick={() => setNewFolderModalOpen(true)}
+            >
+              <div className="flex items-center justify-center w-8 h-8 rounded bg-gray-100">
+                <FolderPlus className="h-4 w-4 text-gray-600" />
+              </div>
+              <span className="text-sm">New folder</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              className="gap-3 py-2.5 px-3 cursor-pointer"
+              onClick={() => openFilePicker?.()}
+            >
+              <div className="flex items-center justify-center w-8 h-8 rounded bg-gray-100">
+                <Upload className="h-4 w-4 text-gray-600" />
+              </div>
+              <span className="text-sm">File upload</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              className="gap-3 py-2.5 px-3 cursor-pointer"
+              onClick={() => folderInputRef.current?.click()}
+            >
+              <div className="flex items-center justify-center w-8 h-8 rounded bg-gray-100">
+                <FolderUp className="h-4 w-4 text-gray-600" />
+              </div>
+              <span className="text-sm">Folder upload</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Separator />
