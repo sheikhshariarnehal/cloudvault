@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
+import { uploadToBackend } from "@/lib/telegram/upload";
 import { createClient } from "@/lib/supabase/server";
-import { uploadToTelegram } from "@/lib/telegram/upload";
 
 // Configure route to handle large file uploads
 export const maxDuration = 300; // 5 minutes
@@ -43,57 +43,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert File to Buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Upload to Telegram
-    const telegramResult = await uploadToTelegram(
-      buffer,
+    // Stream the File directly to TDLib service — no ArrayBuffer conversion
+    const telegramResult = await uploadToBackend(
+      file,
       file.name,
-      file.type || "application/octet-stream"
+      file.type || "application/octet-stream",
+      {
+        userId,
+        guestSessionId,
+        folderId,
+      }
     );
 
-    // Save file record to Supabase
+    // Insert file record into Supabase now that we have the Telegram IDs
     const supabase = await createClient();
-
-    const fileRecord = {
-      user_id: userId,
-      guest_session_id: guestSessionId,
-      folder_id: folderId || null,
-      name: file.name,
-      original_name: file.name,
-      mime_type: file.type || "application/octet-stream",
-      size_bytes: file.size,
-      telegram_file_id: telegramResult.file_id,
-      telegram_message_id: telegramResult.message_id,
-      tdlib_file_id: telegramResult.tdlib_file_id || null,
-      thumbnail_url: telegramResult.thumbnail_url,
-    };
-
-    const { data, error } = await supabase
+    const { data: fileRecord, error: dbError } = await supabase
       .from("files")
-      .insert(fileRecord)
+      .insert({
+        user_id: userId || null,
+        guest_session_id: guestSessionId || null,
+        folder_id: folderId || null,
+        name: file.name,
+        original_name: file.name,
+        mime_type: file.type || "application/octet-stream",
+        size_bytes: file.size,
+        telegram_file_id: telegramResult.file_id,
+        telegram_message_id: telegramResult.message_id,
+        tdlib_file_id: telegramResult.tdlib_file_id || null,
+        thumbnail_url: telegramResult.thumbnail_data || null,
+      })
       .select()
       .single();
 
-    if (error) {
-      console.error("Supabase insert error:", error);
+    if (dbError || !fileRecord) {
+      console.error("Supabase insert failed:", dbError);
       return NextResponse.json(
-        { error: "Failed to save file record" },
+        { error: `Database record creation failed: ${dbError?.message}` },
         { status: 500 }
       );
     }
 
-    // Update user storage
-    if (userId) {
-      await supabase.rpc("increment_storage", {
-        user_id_param: userId,
-        bytes_param: file.size,
-      });
-    }
-
-    return NextResponse.json({ file: data }, { status: 201 });
+    return NextResponse.json({ file: fileRecord }, { status: 201 });
   } catch (error) {
     console.error("Upload error:", error);
     return NextResponse.json(

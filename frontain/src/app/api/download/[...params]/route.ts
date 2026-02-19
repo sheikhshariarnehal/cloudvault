@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { downloadFromTelegram } from "@/lib/telegram/download";
+import { downloadFromTelegram, TelegramDownloadError } from "@/lib/telegram/download";
 
 export async function GET(
   request: NextRequest,
@@ -28,9 +28,10 @@ export async function GET(
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 
-    // Download from Telegram
+    // Download from Telegram via TDLib service using the remote file_id
     const { stream, contentType } = await downloadFromTelegram(
-      file.telegram_file_id
+      file.telegram_file_id,
+      file.mime_type || "application/octet-stream"
     );
 
     const isDownload =
@@ -52,10 +53,12 @@ export async function GET(
 
     return new NextResponse(stream, { headers });
   } catch (error) {
+    if (error instanceof TelegramDownloadError) {
+      const status = error.statusCode === 404 || error.statusCode === 410 ? 404 : 502;
+      const msg = status === 404 ? "File not found on storage" : "Storage service error";
+      return NextResponse.json({ error: msg }, { status });
+    }
     console.error("Download error:", error);
-    return NextResponse.json(
-      { error: "Download failed" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Download failed" }, { status: 500 });
   }
 }

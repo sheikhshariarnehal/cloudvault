@@ -1,141 +1,103 @@
-/**
- * Telegram file operations via TDLib microservice.
+﻿/**
+ * Telegram file operations via the TDLib MTProto microservice.
  *
- * Instead of calling the Telegram Bot API directly, we route all
- * file operations through the CloudVault TDLib service which uses
- * MTProto protocol for better performance and 2GB download support.
+ * All file I/O is routed through the CloudVault TDLib service which
+ * uses TDLib MTProto for 2GB upload/download support.
+ * Supabase DB inserts are handled in the Next.js API routes (not here).
  */
 
-const TDLIB_SERVICE_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
-const TDLIB_SERVICE_API_KEY = process.env.TDLIB_SERVICE_API_KEY || "";
+const BACKEND_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
+const API_KEY = process.env.TDLIB_SERVICE_API_KEY || "";
 
-interface TelegramUploadResult {
+/** Raw response from the TDLib service''s POST /api/upload endpoint. */
+export interface TDLibUploadResponse {
+  /** Telegram Bot API remote file_id (string, for getFile / download) */
   file_id: string;
-  tdlib_file_id?: number;
+  /** TDLib local numeric file ID */
+  tdlib_file_id: number;
+  /** Telegram message ID in the channel */
   message_id: number;
-  thumbnail_url: string | null;
+  /** Inline base64 data URI thumbnail, or null */
+  thumbnail_data: string | null;
+  /** File size in bytes as reported by Telegram */
+  file_size: number;
 }
 
 /**
- * Build authorization headers for the TDLib microservice
+ * Build authorization headers for the TDLib service.
  */
 function getServiceHeaders(): Record<string, string> {
   return {
-    Authorization: `Bearer ${TDLIB_SERVICE_API_KEY}`,
+    "X-API-Key": API_KEY,
   };
 }
 
 /**
  * Upload a file to Telegram via the TDLib microservice.
- * The microservice handles MTProto upload to the configured channel.
+ * Returns the raw Telegram upload info - the caller is responsible
+ * for inserting a record into Supabase.
  */
-export async function uploadToTelegram(
-  fileBuffer: Buffer,
+export async function uploadToBackend(
+  file: File | Blob,
   fileName: string,
-  mimeType: string
-): Promise<TelegramUploadResult> {
+  mimeType: string,
+  options?: {
+    userId?: string | null;
+    guestSessionId?: string | null;
+    folderId?: string | null;
+    uploadId?: string;
+  }
+): Promise<TDLibUploadResponse> {
   const formData = new FormData();
-  const blob = new Blob([new Uint8Array(fileBuffer)], { type: mimeType });
-  formData.append("file", blob, fileName);
-  formData.append("mime_type", mimeType);
+  formData.append("file", file, fileName);
+  if (options?.userId) formData.append("user_id", options.userId);
+  if (options?.guestSessionId) formData.append("guest_session_id", options.guestSessionId);
+  if (options?.folderId) formData.append("folder_id", options.folderId);
 
-  const response = await fetch(`${TDLIB_SERVICE_URL}/api/upload`, {
+  const headers: Record<string, string> = { ...getServiceHeaders() };
+  if (options?.uploadId) headers["X-Upload-Id"] = options.uploadId;
+
+  const response = await fetch(`${BACKEND_URL}/api/upload`, {
     method: "POST",
-    headers: getServiceHeaders(),
+    headers,
     body: formData,
   });
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`TDLib upload failed: ${error}`);
+    throw new Error(`Backend upload failed: ${error}`);
   }
 
-  const result = await response.json();
-
-  return {
-    file_id: result.file_id,
-    tdlib_file_id: result.tdlib_file_id,
-    message_id: result.message_id,
-    // thumbnail_data is a base64 data URI (permanent, never expires)
-    thumbnail_url: result.thumbnail_data || null,
-  };
+  return response.json() as Promise<TDLibUploadResponse>;
 }
 
 /**
- * Get a persistent thumbnail for a file via TDLib microservice.
- * Returns a base64 data URI that never expires (unlike Bot API URLs).
+ * Upload a file buffer to Telegram via the TDLib microservice.
+ * Returns raw Telegram upload info; caller inserts the Supabase record.
  */
-export async function getTelegramThumbnail(
-  remoteFileId: string
-): Promise<string | null> {
-  try {
-    const response = await fetch(
-      `${TDLIB_SERVICE_URL}/api/thumbnail/${encodeURIComponent(remoteFileId)}?format=base64`,
-      { headers: getServiceHeaders() }
-    );
-
-    if (!response.ok) return null;
-
-    const result = await response.json();
-    return result.thumbnail || null;
-  } catch {
-    return null;
+export async function uploadToTelegram(
+  fileBuffer: Buffer,
+  fileName: string,
+  mimeType: string,
+  options?: {
+    userId?: string | null;
+    guestSessionId?: string | null;
+    folderId?: string | null;
   }
+): Promise<TDLibUploadResponse> {
+  const blob = new Blob([new Uint8Array(fileBuffer)], { type: mimeType });
+  return uploadToBackend(blob, fileName, mimeType, options);
 }
 
 /**
- * Get a thumbnail using the message ID (more reliable for media).
- */
-export async function getThumbnailFromMessage(
-  chatId: string,
-  messageId: number
-): Promise<string | null> {
-  try {
-    const response = await fetch(
-      `${TDLIB_SERVICE_URL}/api/thumbnail/from-message`,
-      {
-        method: "POST",
-        headers: {
-          ...getServiceHeaders(),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ chat_id: chatId, message_id: messageId }),
-      }
-    );
-
-    if (!response.ok) return null;
-
-    const result = await response.json();
-    return result.thumbnail || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Delete a file's message from the Telegram channel.
- * Called when a user permanently deletes a file.
+ * Delete a file''s message from the Telegram channel.
  */
 export async function deleteFromTelegram(
   chatId: string,
   messageId: number
 ): Promise<boolean> {
-  try {
-    const response = await fetch(
-      `${TDLIB_SERVICE_URL}/api/message/${encodeURIComponent(chatId)}/${messageId}`,
-      {
-        method: "DELETE",
-        headers: getServiceHeaders(),
-      }
-    );
-
-    if (!response.ok) return false;
-
-    const result = await response.json();
-    return result.success === true;
-  } catch {
-    return false;
-  }
+  console.warn("[deleteFromTelegram] Not implemented in current backend");
+  return false;
 }
 
 /**
@@ -145,39 +107,13 @@ export async function bulkDeleteFromTelegram(
   chatId: string,
   messageIds: number[]
 ): Promise<{ deleted: number; failed: number }> {
-  try {
-    const response = await fetch(
-      `${TDLIB_SERVICE_URL}/api/message/cleanup`,
-      {
-        method: "POST",
-        headers: {
-          ...getServiceHeaders(),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ chat_id: chatId, message_ids: messageIds }),
-      }
-    );
-
-    if (!response.ok) {
-      return { deleted: 0, failed: messageIds.length };
-    }
-
-    const result = await response.json();
-    return {
-      deleted: result.deleted_count || 0,
-      failed: result.failed_count || 0,
-    };
-  } catch {
-    return { deleted: 0, failed: messageIds.length };
-  }
+  console.warn("[bulkDeleteFromTelegram] Not implemented in current backend");
+  return { deleted: 0, failed: messageIds.length };
 }
 
 /**
  * @deprecated Use downloadFromTelegram() from download.ts instead.
- * Kept for backward compatibility — resolves a file URL via TDLib service.
  */
 export async function getTelegramFileUrl(fileId: string): Promise<string> {
-  // With TDLib, we don't use direct URLs anymore.
-  // This returns the TDLib service download endpoint URL.
-  return `${TDLIB_SERVICE_URL}/api/download/${encodeURIComponent(fileId)}`;
+  return `${BACKEND_URL}/api/download/${encodeURIComponent(fileId)}`;
 }

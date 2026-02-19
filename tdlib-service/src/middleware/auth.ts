@@ -2,7 +2,9 @@ import { Request, Response, NextFunction } from "express";
 
 /**
  * Middleware to verify API key authentication.
- * Expects: Authorization: Bearer <TDLIB_SERVICE_API_KEY>
+ * Accepts either:
+ *   - Authorization: Bearer <TDLIB_SERVICE_API_KEY>
+ *   - X-API-Key: <TDLIB_SERVICE_API_KEY>
  */
 export function authMiddleware(
   req: Request,
@@ -17,14 +19,22 @@ export function authMiddleware(
     return;
   }
 
+  // Try X-API-Key header first, then Authorization: Bearer
+  const xApiKey = req.headers["x-api-key"] as string | undefined;
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Missing or invalid Authorization header" });
-    return;
+  let token: string | undefined;
+
+  if (xApiKey) {
+    token = xApiKey;
+  } else if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
   }
 
-  const token = authHeader.slice(7);
+  if (!token) {
+    res.status(401).json({ error: "Missing X-API-Key or Authorization header" });
+    return;
+  }
 
   if (token !== apiKey) {
     res.status(403).json({ error: "Invalid API key" });

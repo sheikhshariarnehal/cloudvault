@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { downloadFromTelegram } from "@/lib/telegram/download";
+import { downloadFromTelegram, TelegramDownloadError } from "@/lib/telegram/download";
 
 function getServiceClient() {
   return createClient(
@@ -77,9 +77,10 @@ export async function GET(
         .update({ download_count: shareLink.download_count + 1 })
         .eq("id", shareLink.id);
 
-      // Download from Telegram
+      // Download from Telegram via TDLib service using the remote file_id
       const { stream } = await downloadFromTelegram(
-        file.telegram_file_id
+        file.telegram_file_id,
+        file.mime_type || "application/octet-stream"
       );
 
       return new NextResponse(stream, {
@@ -96,7 +97,8 @@ export async function GET(
 
     if (isPreview) {
       const { stream } = await downloadFromTelegram(
-        file.telegram_file_id
+        file.telegram_file_id,
+        file.mime_type || "application/octet-stream"
       );
 
       return new NextResponse(stream, {
@@ -124,6 +126,11 @@ export async function GET(
       },
     });
   } catch (error) {
+    if (error instanceof TelegramDownloadError) {
+      const status = error.statusCode === 404 || error.statusCode === 410 ? 404 : 502;
+      const msg = status === 404 ? "File not found on storage" : "Storage service error";
+      return NextResponse.json({ error: msg }, { status });
+    }
     console.error("Share link error:", error);
     return NextResponse.json(
       { error: "Failed to process share link" },

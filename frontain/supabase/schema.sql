@@ -30,8 +30,7 @@ CREATE TABLE IF NOT EXISTS public.files (
   size_bytes BIGINT NOT NULL,
   telegram_file_id TEXT NOT NULL,
   telegram_message_id BIGINT NOT NULL,
-  tdlib_file_id INTEGER,                   -- TDLib numeric file ID (faster lookups, skip getRemoteFile)
-  thumbnail_url TEXT,                      -- Now stores base64 data URI (permanent) or legacy URL
+  thumbnail_url TEXT,
   is_starred BOOLEAN DEFAULT FALSE,
   is_trashed BOOLEAN DEFAULT FALSE,
   trashed_at TIMESTAMPTZ,

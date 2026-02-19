@@ -166,8 +166,5 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
   if (file.size > MAX_FILE_SIZE) {
     return { valid: false, error: `File size exceeds the 2GB limit` };
   }
-  if (!ALLOWED_MIME_TYPES.includes(file.type) && file.type !== "") {
-    return { valid: false, error: `File type "${file.type}" is not supported` };
-  }
   return { valid: true };
 }

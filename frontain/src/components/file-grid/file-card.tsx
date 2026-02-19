@@ -64,7 +64,7 @@ export function FileCard({ file }: FileCardProps) {
 
   return (
     <div
-      className="group flex flex-col rounded-lg border border-[#dadce0] bg-white hover:border-[#174ea6] hover:shadow-[0_1px_3px_0_rgba(60,64,67,0.3),0_4px_8px_3px_rgba(60,64,67,0.15)] transition-all duration-200 overflow-hidden cursor-pointer h-[200px]"
+      className="group flex flex-col rounded-lg border border-[#dadce0] bg-white hover:border-[#174ea6] hover:shadow-[0_1px_3px_0_rgba(60,64,67,0.3),0_4px_8px_3px_rgba(60,64,67,0.15)] transition-[box-shadow,border-color] duration-200 overflow-hidden cursor-pointer h-[200px]"
     >
       {/* ===== TOP BAR: icon + name + ⋮ ===== */}
       <div className="flex items-center gap-2 px-3 h-10 min-h-[40px] max-h-[40px] min-w-0 flex-shrink-0">

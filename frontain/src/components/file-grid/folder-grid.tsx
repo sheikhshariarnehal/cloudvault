@@ -61,7 +61,7 @@ export function FolderGrid({ folders }: FolderGridProps) {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-gray-100 transition-all duration-150">
+              <button className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-gray-100 transition-[opacity,background-color] duration-150">
                 <MoreVertical className="h-4 w-4 text-[#5f6368]" />
               </button>
             </DropdownMenuTrigger>

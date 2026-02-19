@@ -1,48 +1,45 @@
-/**
- * Download files from Telegram via the TDLib microservice.
- *
- * The TDLib service downloads files using MTProto protocol,
- * which supports files up to 2GB (vs Bot API's 20MB getFile limit).
+﻿/**
+ * Download files from Telegram via the TDLib MTProto microservice.
  */
 
-const TDLIB_SERVICE_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
-const TDLIB_SERVICE_API_KEY = process.env.TDLIB_SERVICE_API_KEY || "";
+const BACKEND_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
+const API_KEY = process.env.TDLIB_SERVICE_API_KEY || "";
+
+/** Custom error that carries the HTTP status code returned by the backend. */
+export class TelegramDownloadError extends Error {
+  constructor(message: string, public readonly statusCode: number) {
+    super(message);
+    this.name = "TelegramDownloadError";
+  }
+}
 
 /**
- * Download a file from Telegram via the TDLib microservice.
- * Returns a ReadableStream that can be piped directly to the response.
+ * Download a file from Telegram via the TDLib backend service.
  *
- * Supports files up to 2GB (MTProto protocol, no Bot API getFile limits).
+ * @param fileId     The Telegram remote file_id string (telegram_file_id from DB)
+ * @param mimeType   The file''s MIME type for the Content-Type header
  */
 export async function downloadFromTelegram(
   fileId: string,
-  options?: {
-    fileName?: string;
-    mimeType?: string;
-    inline?: boolean;
-  }
+  mimeType: string
 ): Promise<{
   stream: ReadableStream;
   contentType: string;
   contentLength?: number;
 }> {
-  const params = new URLSearchParams();
-  if (options?.fileName) params.set("filename", options.fileName);
-  if (options?.mimeType) params.set("mime_type", options.mimeType);
-  if (options?.inline) params.set("inline", "true");
-
-  const url = `${TDLIB_SERVICE_URL}/api/download/${encodeURIComponent(fileId)}${params.toString() ? `?${params}` : ""}`;
+  const url = `${BACKEND_URL}/api/download/${encodeURIComponent(fileId)}`;
 
   const response = await fetch(url, {
     headers: {
-      Authorization: `Bearer ${TDLIB_SERVICE_API_KEY}`,
+      "X-API-Key": API_KEY,
     },
   });
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Failed to download file from TDLib service: ${errorText}`
+    throw new TelegramDownloadError(
+      `Failed to download file from backend: ${errorText}`,
+      response.status
     );
   }
 
@@ -50,34 +47,7 @@ export async function downloadFromTelegram(
 
   return {
     stream: response.body!,
-    contentType:
-      response.headers.get("content-type") || "application/octet-stream",
+    contentType: mimeType || response.headers.get("content-type") || "application/octet-stream",
     contentLength: contentLength ? parseInt(contentLength, 10) : undefined,
   };
-}
-
-/**
- * Check the download/cache status of a file in the TDLib service.
- * Useful for pre-warming the cache before streaming to users.
- */
-export async function getDownloadStatus(fileId: string): Promise<{
-  is_complete: boolean;
-  is_downloading: boolean;
-  downloaded_size: number;
-  size: number;
-}> {
-  const response = await fetch(
-    `${TDLIB_SERVICE_URL}/api/download/status/${encodeURIComponent(fileId)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${TDLIB_SERVICE_API_KEY}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error("Failed to check download status");
-  }
-
-  return response.json();
 }
