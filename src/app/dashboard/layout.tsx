@@ -86,6 +86,16 @@ export default function DashboardLayout({
     };
   }, [setIsOnline]);
 
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [sidebarOpen]);
+
   return (
     <UploadZone folderId={currentFolderId}>
       <div className="flex h-dvh bg-gray-50 overflow-hidden">

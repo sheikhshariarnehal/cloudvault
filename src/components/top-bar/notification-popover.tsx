@@ -1,6 +1,7 @@
 "use client";
 
 import { useFilesStore } from "@/store/files-store";
+import { useAuth } from "@/app/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -39,6 +40,7 @@ interface Notification {
 
 export function NotificationPopover() {
   const { uploadQueue, files } = useFilesStore();
+  const { isGuest } = useAuth();
   const [seen, setSeen] = useState<Set<string>>(new Set());
 
   const notifications = useMemo<Notification[]>(() => {
@@ -97,7 +99,10 @@ export function NotificationPopover() {
 
   const unseenCount = notifications.filter((n) => !seen.has(n.id)).length;
   const activeUploads = uploadQueue.filter((i) => i.status === "uploading").length;
-  const hasUnseen = unseenCount > 0;
+  // Only show the red dot when there are active uploads or unseen upload-related notifications
+  // Don't show it for guests who just have static file-list entries
+  const hasUploadActivity = uploadQueue.length > 0;
+  const showBadge = hasUploadActivity && (activeUploads > 0 || unseenCount > 0);
 
   const handleOpen = (open: boolean) => {
     if (open) {
@@ -123,7 +128,7 @@ export function NotificationPopover() {
           aria-label="Notifications"
         >
           <Bell className="h-[19px] w-[19px]" />
-          {(hasUnseen || activeUploads > 0) && (
+          {showBadge && (
             <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
           )}
         </Button>

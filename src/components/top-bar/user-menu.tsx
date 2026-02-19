@@ -37,18 +37,31 @@ export function UserMenu() {
           </Avatar>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-52">
         <div className="px-2 py-1.5">
           <p className="text-sm font-medium">{displayName}</p>
-          <p className="text-xs text-muted-foreground">
-            {user?.email || "Guest mode"}
-          </p>
+          {!isGuest && user?.email && (
+            <p className="text-xs text-muted-foreground">
+              {user.email}
+            </p>
+          )}
         </div>
         <DropdownMenuSeparator />
         {isGuest ? (
-          <DropdownMenuItem onClick={() => router.push("/auth/login")}>
-            <User className="h-4 w-4 mr-2" /> Sign In
-          </DropdownMenuItem>
+          <>
+            <div className="px-2 py-1.5">
+              <p className="text-xs text-muted-foreground">
+                You&apos;re browsing as a guest. Sign in to save your files permanently.
+              </p>
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/auth/login")}>
+              <User className="h-4 w-4 mr-2" /> Sign In
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/auth/signup")}>
+              <User className="h-4 w-4 mr-2" /> Sign Up
+            </DropdownMenuItem>
+          </>
         ) : (
           <>
             <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>

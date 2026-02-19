@@ -35,10 +35,10 @@ import {
 
 const navItems = [
   { href: "/dashboard", label: "All Files", icon: FolderOpen },
-  { href: "/dashboard/recent", label: "Photo", icon: Image },
-  { href: "/dashboard/starred", label: "Favorite", icon: Star },
-  { href: "/dashboard/shared", label: "Shared Files", icon: Users },
-  { href: "/dashboard/trash", label: "Delete Files", icon: Trash2 },
+  { href: "/dashboard/recent", label: "Recent", icon: Image },
+  { href: "/dashboard/starred", label: "Starred", icon: Star },
+  { href: "/dashboard/shared", label: "Shared Files", icon: Users, badge: "Soon" },
+  { href: "/dashboard/trash", label: "Trash", icon: Trash2 },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
@@ -135,6 +135,7 @@ export function Sidebar() {
             label={item.label}
             icon={item.icon}
             isActive={pathname === item.href}
+            badge={item.badge}
           />
         ))}
 
@@ -154,13 +155,13 @@ export function Sidebar() {
         <StorageMeter />
       </div>
 
-      {/* Upgrade Button */}
+      {/* Upgrade / Sign Up Button */}
       {(isGuest || !user) && (
         <div className="px-4 pb-4">
           <Link href="/auth/signup">
             <Button className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md hover:shadow-lg transition-all h-10 text-sm font-semibold">
               <Crown className="h-4 w-4 mr-2" />
-              Upgrade to Pro
+              Sign Up for Full Access
             </Button>
           </Link>
         </div>

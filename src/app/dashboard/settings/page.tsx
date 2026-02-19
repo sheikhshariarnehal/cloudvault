@@ -58,7 +58,14 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1">
               <Label>Email</Label>
-              <Input defaultValue={user?.email || ""} disabled />
+              {isGuest ? (
+                <div className="flex items-center gap-2">
+                  <Input value="" disabled placeholder="No email — guest account" className="text-muted-foreground" />
+                  <Badge variant="outline" className="shrink-0 text-xs">Guest</Badge>
+                </div>
+              ) : (
+                <Input defaultValue={user?.email || ""} disabled />
+              )}
             </div>
           </div>
 
