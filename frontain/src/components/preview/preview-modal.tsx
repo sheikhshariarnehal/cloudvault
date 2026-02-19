@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
 import { ImagePreview } from "@/components/preview/image-preview";
+import { PdfPreview } from "@/components/preview/pdf-preview";
 import { VideoPreview } from "@/components/preview/video-preview";
 import {
   Download,
@@ -36,15 +37,10 @@ export function PreviewModal() {
   const category = file ? getFileCategory(file.mime_type) : null;
   const isImage = category === "image";
 
-  // If a PDF is set for preview, open it in a new browser tab and clear the preview
+  // Build the file URL when the preview file changes
   useEffect(() => {
     if (!previewFileId || !file) {
       setFileUrl(null);
-      return;
-    }
-    if (getFileCategory(file.mime_type) === "pdf") {
-      window.open(getFileUrl(previewFileId, file.name), "_blank");
-      setPreviewFileId(null);
       return;
     }
     setFileUrl(getFileUrl(previewFileId, file.name));
@@ -200,6 +196,11 @@ export function PreviewModal() {
           {fileUrl && (
             <>
               {isImage && <ImagePreview src={fileUrl} alt={file.name} />}
+              {category === "pdf" && (
+                <div className="w-full h-full">
+                  <PdfPreview src={fileUrl} />
+                </div>
+              )}
               {category === "video" && (
                 <div className="max-w-5xl w-full px-8">
                   <VideoPreview src={fileUrl} />
