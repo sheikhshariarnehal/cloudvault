@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/store/ui-store";
 import { useAuth } from "@/app/providers/auth-provider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Menu, UserPlus } from "lucide-react";
+import { Menu, Upload, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export function TopBar() {
-  const { toggleSidebar } = useUIStore();
+  const { toggleSidebar, openFilePicker } = useUIStore();
   const { isGuest, user } = useAuth();
   const router = useRouter();
 
@@ -34,6 +34,16 @@ export function TopBar() {
 
       {/* Right actions */}
       <div className="flex items-center gap-2 ml-auto">
+        {/* Mobile upload button — visible only on small screens */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden h-10 w-10 hover:bg-gray-100"
+          onClick={() => openFilePicker?.()}
+        >
+          <Upload className="h-5 w-5" />
+        </Button>
+
         <NotificationPopover />
 
         {isGuest || !user ? (

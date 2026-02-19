@@ -1,0 +1,230 @@
+version: "2"
+type: frontend
+tech_stack:
+  - TypeScript
+  - Next.js 16 (App Router)
+  - React 19
+  - Tailwind CSS 4
+  - Radix UI (shadcn/ui components)
+  - Zustand (state management)
+  - Supabase (auth + database)
+  - react-dropzone (file upload)
+  - lucide-react (icons)
+routes:
+  - path: /auth/login
+    file: src/app/auth/login/page.tsx
+    auth_required: false
+    description: User login page with email/password, magic link, or Google OAuth
+  - path: /auth/signup
+    file: src/app/auth/signup/page.tsx
+    auth_required: false
+    description: User signup page with email/password
+  - path: /auth/callback
+    file: src/app/auth/callback/route.ts
+    auth_required: false
+    description: OAuth callback handler
+  - path: /auth/migrate
+    file: src/app/auth/migrate/page.tsx
+    auth_required: false
+    description: Guest-to-user migration page
+  - path: /dashboard
+    file: src/app/dashboard/page.tsx
+    auth_required: false
+    description: Main dashboard showing files, folders, upload buttons. Works for both authenticated users and guests.
+  - path: /dashboard/folder/[id]
+    file: src/app/dashboard/folder/[id]/page.tsx
+    auth_required: false
+    description: Folder contents view with breadcrumbs
+  - path: /dashboard/recent
+    file: src/app/dashboard/recent/page.tsx
+    auth_required: false
+    description: Recently accessed files
+  - path: /dashboard/starred
+    file: src/app/dashboard/starred/page.tsx
+    auth_required: false
+    description: Starred/favorited files
+  - path: /dashboard/shared
+    file: src/app/dashboard/shared/page.tsx
+    auth_required: false
+    description: Shared files listing
+  - path: /dashboard/trash
+    file: src/app/dashboard/trash/page.tsx
+    auth_required: false
+    description: Trashed files with restore/permanent delete
+  - path: /dashboard/settings
+    file: src/app/dashboard/settings/page.tsx
+    auth_required: false
+    description: User settings page
+  - path: /share/[token]
+    file: src/app/share/[token]/page.tsx
+    auth_required: false
+    description: Public shared file view
+  - path: /preview/[id]
+    file: src/app/preview/[id]/page.tsx
+    auth_required: false
+    description: Full-page file preview
+  - path: /file/[...params]
+    file: src/app/file/[...params]/route.ts
+    auth_required: false
+    description: File download/stream endpoint
+features:
+  - name: File Upload (Mobile)
+    description: Upload files from mobile devices via file picker or drag-and-drop. On mobile, the primary interaction is tapping an Upload button which triggers a hidden file input via react-dropzone's open() method stored in UI store.
+    files:
+      - src/components/upload/upload-zone.tsx
+      - src/components/upload/upload-progress.tsx
+      - src/app/api/upload/route.ts
+      - src/store/ui-store.ts
+      - src/store/files-store.ts
+      - src/types/file.types.ts
+      - src/app/dashboard/page.tsx
+      - src/app/dashboard/layout.tsx
+      - src/components/sidebar/sidebar.tsx
+    entry_route: /dashboard
+    user_interactions:
+      - Tap the Upload button in the dashboard header
+      - Tap Create dropdown then Upload File menu item
+      - Tap + New button in sidebar then File upload menu item
+      - Select file(s) from the mobile file picker dialog
+      - See upload progress in the fixed bottom-right progress panel
+      - See success checkmark or error message after upload
+      - Drag and drop files onto the dashboard area (desktop only)
+    api_calls:
+      - method: POST
+        endpoint: /api/upload
+    auth_required: false
+  - name: Folder Upload (Mobile)
+    description: Upload entire folders. Uses webkitdirectory attribute which is not supported on iOS Safari and many Android browsers.
+    files:
+      - src/components/sidebar/sidebar.tsx
+      - src/components/upload/upload-zone.tsx
+    entry_route: /dashboard
+    user_interactions:
+      - Tap + New in sidebar then Folder upload
+      - Select folder from file picker (if supported)
+    api_calls:
+      - method: POST
+        endpoint: /api/upload
+    auth_required: false
+  - name: File Management
+    description: Rename, star, trash, restore, and permanently delete files
+    files:
+      - src/components/context-menu/file-context-menu.tsx
+      - src/store/files-store.ts
+      - src/app/api/files/route.ts
+    entry_route: /dashboard
+    user_interactions:
+      - Right-click or long-press on a file to open context menu
+      - Click rename option and enter new name
+      - Click star/unstar toggle
+      - Click move to trash
+      - In trash view, click restore or delete permanently
+    api_calls:
+      - method: PATCH
+        endpoint: /api/files
+      - method: DELETE
+        endpoint: /api/files
+    auth_required: false
+  - name: Folder Management
+    description: Create, rename, and navigate folders
+    files:
+      - src/components/modals/new-folder-modal.tsx
+      - src/app/api/folders/route.ts
+      - src/app/dashboard/folder/[id]/page.tsx
+    entry_route: /dashboard
+    user_interactions:
+      - Click Create dropdown then New Folder
+      - Enter folder name in modal dialog
+      - Click Create button to submit
+      - Navigate into folders by clicking them
+    api_calls:
+      - method: POST
+        endpoint: /api/folders
+      - method: PATCH
+        endpoint: /api/folders
+    auth_required: false
+  - name: File Preview
+    description: Preview files in a modal or full-page view
+    files:
+      - src/components/preview/preview-modal.tsx
+      - src/app/preview/[id]/page.tsx
+    entry_route: /dashboard
+    user_interactions:
+      - Click on a file card to open preview modal
+      - View image, video, audio, or PDF inline
+      - Download file from preview
+      - Navigate to full-page preview
+    api_calls:
+      - method: GET
+        endpoint: /api/download
+    auth_required: false
+  - name: File Sharing
+    description: Generate shareable public links for files
+    files:
+      - src/components/modals/share-modal.tsx
+      - src/app/api/share/route.ts
+      - src/app/share/[token]/page.tsx
+    entry_route: /dashboard
+    user_interactions:
+      - Open context menu on a file
+      - Click Share option
+      - Copy generated share link
+      - Set expiry or download limits
+    api_calls:
+      - method: POST
+        endpoint: /api/share
+      - method: GET
+        endpoint: /api/share/[token]
+    auth_required: false
+  - name: Authentication
+    description: User login, signup, and guest mode
+    files:
+      - src/app/auth/login/page.tsx
+      - src/app/auth/signup/page.tsx
+      - src/app/providers/auth-provider.tsx
+      - src/middleware.ts
+    entry_route: /auth/login
+    user_interactions:
+      - Fill email and password fields
+      - Click Sign In button
+      - Click Sign Up link to go to signup
+      - Click Google OAuth button
+      - Continue as guest (auto-assigned session)
+    api_calls:
+      - method: POST
+        endpoint: /auth/v1/token (Supabase Auth)
+    auth_required: false
+  - name: Search
+    description: Client-side search/filter for files and folders
+    files:
+      - src/components/top-bar/top-bar.tsx
+      - src/store/files-store.ts
+    entry_route: /dashboard
+    user_interactions:
+      - Click search input in top bar
+      - Type search query
+      - See filtered file and folder results
+    api_calls: []
+    auth_required: false
+known_limitations:
+  - issue: Folder upload uses webkitdirectory attribute which is unsupported on iOS Safari and most Android browsers
+    location: src/components/sidebar/sidebar.tsx
+    impact: Folder upload silently fails or shows no folder picker on mobile devices
+  - issue: Upload progress panel is fixed at w-80 (320px) with no responsive sizing
+    location: src/components/upload/upload-progress.tsx
+    impact: May overflow or be clipped on small mobile screens (< 360px width)
+  - issue: Upload progress panel does not account for safe-area-inset-bottom
+    location: src/components/upload/upload-progress.tsx
+    impact: Panel may be hidden behind iOS home indicator or Android navigation bar
+  - issue: No camera capture option for mobile photo uploads
+    location: src/components/upload/upload-zone.tsx
+    impact: Users cannot directly take photos to upload, must use file picker
+  - issue: Empty state text references drag and drop which is desktop-only
+    location: src/app/dashboard/page.tsx
+    impact: Confusing UX on mobile where drag-and-drop is not available
+  - issue: No chunked upload for large files on mobile
+    location: src/components/upload/upload-zone.tsx
+    impact: Large file uploads may crash mobile browser tabs due to memory constraints
+  - issue: react-dropzone open() may not trigger file picker on some mobile browsers without direct user gesture
+    location: src/components/upload/upload-zone.tsx
+    impact: File picker may fail to open on mobile when triggered through indirect event chain (store → callback)

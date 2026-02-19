@@ -1,0 +1,752 @@
+# ============================================================================
+# CloudVault Frontend — Code Summary
+# Generated: 2026-02-20
+# ============================================================================
+
+project:
+  name: CloudVault
+  description: >
+    Modern cloud storage web application powered by Telegram (TDLib MTProto)
+    as the file storage backend with Supabase for auth and metadata.
+  version: "0.1.0"
+
+# ============================================================================
+# Tech Stack
+# ============================================================================
+tech_stack:
+  language: TypeScript
+  runtime: Node.js
+  framework: Next.js 16.1.6 (App Router)
+  react: React 19.2.3
+  ui_library: Radix UI (radix-ui v1.4.3) + shadcn/ui components
+  styling: Tailwind CSS v4 + tw-animate-css
+  state_management: Zustand 5.0.11
+  auth: Supabase Auth (@supabase/ssr, @supabase/auth-helpers-nextjs)
+  database: Supabase (PostgreSQL) with Realtime subscriptions
+  file_storage_backend: Telegram TDLib MTProto microservice
+  icons: Lucide React
+  fonts: Geist Sans + Geist Mono (Google Fonts)
+  drag_and_drop: react-dropzone v15
+  virtualization: react-window v2.2.7
+  utilities:
+    - clsx + tailwind-merge (class merging)
+    - class-variance-authority (component variants)
+    - uuid (guest session IDs)
+  dev_tools:
+    - ESLint 9 + eslint-config-next
+    - shadcn CLI v3.8.5
+    - PostCSS with @tailwindcss/postcss
+
+# ============================================================================
+# Routes
+# ============================================================================
+routes:
+  # --- Root ---
+  - path: /
+    file: src/app/page.tsx
+    auth_required: false
+    description: >
+      Root page. Server-side redirects to /dashboard immediately.
+
+  # --- Auth ---
+  - path: /auth/login
+    file: src/app/auth/login/page.tsx
+    auth_required: false
+    description: >
+      Login page. Supports email/password, magic link (OTP), Google OAuth,
+      and guest mode. Redirects to /dashboard on success.
+      Links to /auth/signup and /auth/migrate.
+
+  - path: /auth/signup
+    file: src/app/auth/signup/page.tsx
+    auth_required: false
+    description: >
+      Sign-up page. Supports email/password registration with display name
+      and Google OAuth. Sends email verification link. Requires accepting
+      terms and conditions.
+
+  - path: /auth/callback
+    file: src/app/auth/callback/route.ts
+    auth_required: false
+    description: >
+      OAuth callback route handler. Exchanges auth code for session via
+      Supabase, then redirects to /dashboard. Used by Google OAuth and
+      email verification links.
+
+  - path: /auth/migrate
+    file: src/app/auth/migrate/page.tsx
+    auth_required: false
+    description: >
+      Guest-to-user file migration page. Shows count of guest files and
+      allows migrating them to the authenticated user account, or skipping
+      to start fresh. Updates user_id on files and folders in Supabase.
+
+  # --- Dashboard ---
+  - path: /dashboard
+    file: src/app/dashboard/page.tsx
+    layout: src/app/dashboard/layout.tsx
+    auth_required: false  # works for both authenticated users and guests
+    description: >
+      Main dashboard / "All Files" view. Shows welcome message, root-level
+      folders and files with optional search filtering. Supports grid/list
+      view toggle. Contains Suggested Files section, tabbed view (All Files,
+      Starred, Recent). Create dropdown (New Folder, Upload File).
+
+  - path: /dashboard/folder/[id]
+    file: src/app/dashboard/folder/[id]/page.tsx
+    auth_required: false  # works for both authenticated users and guests
+    description: >
+      Folder detail view with breadcrumb navigation. Shows sub-folders and
+      files within the folder. Supports Create/Upload actions and grid/list
+      view toggle. Sets currentFolderId in store for uploads.
+
+  - path: /dashboard/recent
+    file: src/app/dashboard/recent/page.tsx
+    auth_required: false
+    description: >
+      Recently modified files view. Shows up to 50 most recently updated
+      files sorted by updated_at descending. Supports grid/list view.
+
+  - path: /dashboard/starred
+    file: src/app/dashboard/starred/page.tsx
+    auth_required: false
+    description: >
+      Starred/favorited files view. Filters files where is_starred=true.
+      Supports grid/list view.
+
+  - path: /dashboard/shared
+    file: src/app/dashboard/shared/page.tsx
+    auth_required: false
+    description: >
+      Shared files placeholder page. Displays "Coming in Phase 2" message.
+      Currently non-functional — no shared file listing implemented.
+
+  - path: /dashboard/trash
+    file: src/app/dashboard/trash/page.tsx
+    auth_required: false
+    description: >
+      Trash view. Loads trashed files directly from Supabase (not from store).
+      Supports "Empty Trash" action which permanently deletes all trashed files.
+      Shows 30-day auto-delete notice.
+
+  - path: /dashboard/settings
+    file: src/app/dashboard/settings/page.tsx
+    auth_required: false
+    description: >
+      Account settings page. Displays profile info (avatar, display name,
+      email), security section (change password), and notifications placeholder.
+      Guest users see limited/disabled fields.
+
+  # --- Public / Shared ---
+  - path: /share/[token]
+    file: src/app/share/[token]/page.tsx
+    auth_required: false
+    description: >
+      Public share page. Resolves share token via /api/share/[token] API.
+      Displays file preview (image, video, audio, PDF) with download button.
+      Google Drive-style dark UI. No auth required — anyone with the link
+      can view and download.
+
+  - path: /preview/[id]
+    file: src/app/preview/[id]/page.tsx
+    auth_required: true  # requires Supabase session to fetch file record
+    description: >
+      Server-rendered file preview page. Fetches file from Supabase by ID.
+      Redirects PDFs to Chrome's built-in viewer. Renders image/video/audio
+      previews with download button. Dark themed Google Drive-style UI.
+
+  # --- File Serving ---
+  - path: /file/[...params]
+    file: src/app/file/[...params]/route.ts
+    auth_required: false  # no auth check — URL token acts as authorization
+    description: >
+      File streaming API route. Decodes base64url token to UUID, fetches file
+      record from Supabase, streams file from Telegram TDLib backend. Supports
+      ?download=true for attachment disposition. Clean URL format:
+      /file/{shortToken}/{filename}. 5-minute max duration for large files.
+
+# ============================================================================
+# API Routes
+# ============================================================================
+api_routes:
+  - path: /api/upload
+    file: src/app/api/upload/route.ts
+    method: POST
+    auth_required: false  # requires user_id or guest_session_id in body
+    description: >
+      File upload endpoint. Accepts multipart form data (file, folder_id,
+      user_id, guest_session_id). Validates 2GB max size. Streams file to
+      TDLib microservice, then inserts file record into Supabase with
+      telegram_file_id, telegram_message_id, tdlib_file_id, thumbnail_url.
+      5-minute max duration.
+
+  - path: /api/download/[...params]
+    file: src/app/api/download/[...params]/route.ts
+    method: GET
+    auth_required: false
+    description: >
+      Legacy file download route. Fetches file by UUID from Supabase,
+      streams from Telegram via TDLib. Supports ?download=true for
+      attachment disposition. Superseded by /file/[...params] route.
+
+  - path: /api/files
+    file: src/app/api/files/route.ts
+    methods: [GET, PATCH, POST]
+    auth_required: false  # requires user_id or guest_session_id
+    description: >
+      File CRUD API. GET lists files with filters (folder_id, starred,
+      trashed). PATCH updates files (rename, star, trash, move). POST
+      with action:"copy" duplicates a file record.
+
+  - path: /api/folders
+    file: src/app/api/folders/route.ts
+    methods: [GET, POST, PATCH, DELETE]
+    auth_required: false  # requires user_id or guest_session_id
+    description: >
+      Folder CRUD API. POST creates folder (name, color, parent_id).
+      GET lists folders. PATCH updates (rename, move, trash, color).
+      DELETE permanently removes a folder.
+
+  - path: /api/share
+    file: src/app/api/share/route.ts
+    method: POST
+    auth_required: false  # requires userId or guestSessionId
+    description: >
+      Creates a share link for a file. Generates random 16-byte hex token.
+      For guest users, auto-creates a user record in Supabase. Verifies
+      file ownership. Uses Supabase service role client to bypass RLS.
+
+  - path: /api/share/[token]
+    file: src/app/api/share/[token]/route.ts
+    method: GET
+    auth_required: false
+    description: >
+      Resolves share token. Returns file metadata for the share page.
+      Supports ?download=true and ?preview=true query params to stream
+      the file directly. Checks link expiry and max download limits.
+      Increments download_count on download.
+
+# ============================================================================
+# Features
+# ============================================================================
+features:
+  - name: Authentication
+    description: >
+      Multi-mode auth system supporting email/password login, magic link
+      (OTP) email, Google OAuth, and guest mode. Guest sessions use UUID
+      stored in localStorage with 90-day expiry. AuthProvider context wraps
+      the entire app and provides user, guestSessionId, isGuest, signOut.
+    relevant_files:
+      - src/app/providers/auth-provider.tsx
+      - src/lib/guest-session.ts
+      - src/lib/supabase/client.ts
+      - src/lib/supabase/server.ts
+      - src/middleware.ts
+      - src/app/auth/login/page.tsx
+      - src/app/auth/signup/page.tsx
+      - src/app/auth/callback/route.ts
+      - src/app/auth/migrate/page.tsx
+    entry_routes:
+      - /auth/login
+      - /auth/signup
+    user_interactions:
+      - Email/password form submission
+      - Magic link request
+      - Google OAuth button
+      - Guest mode button
+      - Sign out from user menu
+    api_calls:
+      - supabase.auth.signInWithPassword
+      - supabase.auth.signInWithOtp
+      - supabase.auth.signInWithOAuth (Google)
+      - supabase.auth.signUp
+      - supabase.auth.exchangeCodeForSession
+      - supabase.auth.getSession
+      - supabase.auth.signOut
+    auth_required: false
+
+  - name: Guest Mode
+    description: >
+      Allows unauthenticated users to use the app with full file management.
+      Creates a UUID-based guest session stored in localStorage with 90-day
+      expiry. Guest files can be migrated to a real account. Guest users see
+      "Sign Up for Full Access" prompts in sidebar.
+    relevant_files:
+      - src/lib/guest-session.ts
+      - src/app/providers/auth-provider.tsx
+      - src/app/auth/migrate/page.tsx
+      - src/components/sidebar/sidebar.tsx
+    entry_routes:
+      - /auth/login (Guest mode button)
+      - /dashboard (auto-creates guest session if not authenticated)
+    user_interactions:
+      - Click "Continue as Guest" on login page
+      - Migrate files after signing up
+      - Skip migration
+    api_calls:
+      - localStorage get/set for guest session
+      - supabase.from("files").update (migration)
+      - supabase.from("folders").update (migration)
+    auth_required: false
+
+  - name: File Upload
+    description: >
+      Multi-file upload with drag-and-drop, folder upload, progress tracking,
+      and retry logic (up to 6 attempts with rate-limit backoff). Files are
+      streamed to the TDLib microservice, then metadata is stored in Supabase.
+      Upload zone wraps the entire dashboard. File picker accessible from
+      sidebar, top-bar, and dashboard action buttons.
+    relevant_files:
+      - src/components/upload/upload-zone.tsx
+      - src/components/upload/upload-progress.tsx
+      - src/lib/telegram/upload.ts
+      - src/app/api/upload/route.ts
+      - src/types/file.types.ts (validateFile, ALLOWED_MIME_TYPES)
+      - src/store/files-store.ts (uploadQueue)
+    entry_routes:
+      - /dashboard
+      - /dashboard/folder/[id]
+    user_interactions:
+      - Drag and drop files onto dashboard
+      - Click "Upload" button in header or sidebar
+      - Click "File upload" or "Folder upload" in sidebar New menu
+      - View upload progress in bottom-right floating panel
+      - Dismiss or clear upload queue
+    api_calls:
+      - POST /api/upload (multipart form data)
+      - TDLib service POST /api/upload
+    auth_required: false
+    constraints:
+      - Max file size 2GB
+      - 5-minute upload timeout
+      - Rate-limit retry with exponential backoff
+
+  - name: File Download
+    description: >
+      File download via TDLib microservice streaming. Clean URLs using
+      base64url-encoded UUIDs. Supports inline viewing and attachment download.
+    relevant_files:
+      - src/lib/telegram/download.ts
+      - src/lib/utils.ts (encodeFileToken, decodeFileToken, getFileUrl)
+      - src/app/file/[...params]/route.ts
+      - src/app/api/download/[...params]/route.ts
+    entry_routes:
+      - /file/[token]/[filename]
+      - /api/download/[id]/[filename]
+    user_interactions:
+      - Click download button in file context menu
+      - Click download button in preview modal
+      - Click download on share page
+    api_calls:
+      - GET /file/[token]/[filename]?download=true
+      - TDLib service GET /api/download/[fileId]
+    auth_required: false
+
+  - name: File Management
+    description: >
+      Full file CRUD operations — rename, star/unstar, trash/restore,
+      copy, move to folder. Realtime sync via Supabase Postgres Changes.
+    relevant_files:
+      - src/app/api/files/route.ts
+      - src/store/files-store.ts
+      - src/components/context-menu/file-context-menu.tsx
+      - src/lib/realtime/use-realtime-files.ts
+    entry_routes:
+      - /dashboard
+      - /dashboard/folder/[id]
+    user_interactions:
+      - Right-click / three-dot context menu on file
+      - Star/unstar toggle
+      - Rename via modal
+      - Move to trash
+      - Copy file
+    api_calls:
+      - PATCH /api/files (rename, star, trash, move)
+      - POST /api/files (copy)
+    auth_required: false
+
+  - name: Folder Management
+    description: >
+      Create, rename, trash, and navigate folders. Supports nested folders
+      with parent_id. Color-coded folders with 8 preset colors. Folder tree
+      in sidebar. Breadcrumb navigation in folder views.
+    relevant_files:
+      - src/app/api/folders/route.ts
+      - src/components/modals/new-folder-modal.tsx
+      - src/components/modals/rename-modal.tsx
+      - src/components/sidebar/folder-tree.tsx
+      - src/components/context-menu/folder-context-menu.tsx
+      - src/app/dashboard/folder/[id]/page.tsx
+    entry_routes:
+      - /dashboard
+      - /dashboard/folder/[id]
+    user_interactions:
+      - Click "New Folder" in Create dropdown or sidebar
+      - Name folder and select color
+      - Navigate via sidebar folder tree or breadcrumbs
+      - Rename/delete folder via context menu
+    api_calls:
+      - POST /api/folders (create)
+      - PATCH /api/folders (rename, color, trash)
+      - GET /api/folders (list)
+    auth_required: false
+
+  - name: File Preview
+    description: >
+      In-app file preview modal and full-page preview. Supports images
+      (with zoom/pan via PreviewClient), video, audio, and PDF. Image
+      navigation with arrow keys and prev/next buttons. Share and print
+      actions from preview. Dark themed overlay.
+    relevant_files:
+      - src/components/preview/preview-modal.tsx
+      - src/components/preview/image-preview.tsx
+      - src/components/preview/video-preview.tsx
+      - src/components/preview/pdf-preview.tsx
+      - src/app/preview/[id]/page.tsx
+      - src/app/preview/[id]/preview-client.tsx
+    entry_routes:
+      - /preview/[id] (full-page, server-rendered)
+      - /dashboard (modal preview)
+    user_interactions:
+      - Click file card/row to open preview modal
+      - Arrow keys to navigate between images
+      - Download, share, print buttons
+      - Escape or click overlay to close
+    api_calls:
+      - GET /file/[token]/[filename] (streams file for preview)
+    auth_required: false (modal), true (full-page /preview/[id])
+
+  - name: File Sharing
+    description: >
+      Generate shareable public links for files. Links use random hex
+      tokens. Share page displays file preview with download option.
+      Supports link expiry and max download limits (checked server-side).
+    relevant_files:
+      - src/components/modals/share-modal.tsx
+      - src/app/api/share/route.ts
+      - src/app/api/share/[token]/route.ts
+      - src/app/share/[token]/page.tsx
+    entry_routes:
+      - /share/[token] (public share page)
+    user_interactions:
+      - Click "Share" in file context menu or preview modal
+      - Copy generated share link
+      - Public user views shared file and downloads
+    api_calls:
+      - POST /api/share (create share link)
+      - GET /api/share/[token] (resolve + metadata)
+      - GET /api/share/[token]?download=true (download)
+      - GET /api/share/[token]?preview=true (inline preview)
+    auth_required: false
+
+  - name: Search
+    description: >
+      Client-side file and folder search. Filters both files and folders
+      by name (case-insensitive contains match). Search bar in top-bar
+      updates the searchQuery in files store.
+    relevant_files:
+      - src/components/top-bar/search-bar.tsx
+      - src/store/files-store.ts (searchQuery)
+      - src/app/dashboard/page.tsx (filtering logic)
+    entry_routes:
+      - /dashboard
+    user_interactions:
+      - Type in search bar
+      - Results filter in real-time
+    api_calls: []  # Client-side only
+    auth_required: false
+
+  - name: View Mode Toggle
+    description: >
+      Switch between grid view and list view for file display. Persisted
+      in Zustand store (not persisted across sessions).
+    relevant_files:
+      - src/store/files-store.ts (viewMode)
+      - src/components/file-grid/file-card.tsx
+      - src/components/file-grid/folder-grid.tsx
+      - src/components/file-list/file-list.tsx
+      - src/components/file-list/file-row.tsx
+    entry_routes:
+      - /dashboard
+      - /dashboard/folder/[id]
+      - /dashboard/recent
+      - /dashboard/starred
+    user_interactions:
+      - Click grid/list toggle buttons
+    api_calls: []
+    auth_required: false
+
+  - name: Realtime Sync
+    description: >
+      Live updates via Supabase Realtime Postgres Changes. Subscribes to
+      INSERT, UPDATE, DELETE events on files and folders tables filtered
+      by user_id or guest_session_id. Automatically updates Zustand store.
+    relevant_files:
+      - src/lib/realtime/use-realtime-files.ts
+      - src/app/dashboard/layout.tsx
+    entry_routes:
+      - /dashboard (all sub-routes via layout)
+    user_interactions: []  # Automatic background sync
+    api_calls:
+      - Supabase Realtime channel subscriptions
+    auth_required: false
+
+  - name: Storage Meter
+    description: >
+      Visual storage usage breakdown in sidebar. Calculates per-category
+      usage (photo, video, document, other) from files in store. Shows
+      progress bar with 100GB default limit. Configurable via
+      NEXT_PUBLIC_MAX_GUEST_STORAGE_BYTES env var.
+    relevant_files:
+      - src/components/storage/storage-meter.tsx
+    entry_routes:
+      - /dashboard (sidebar)
+    user_interactions:
+      - Visual only
+    api_calls: []
+    auth_required: false
+
+  - name: Sidebar Navigation
+    description: >
+      Left sidebar with brand, New button (create folder, file upload,
+      folder upload), navigation links, folder tree, storage meter, and
+      sign-up CTA for guests. Responsive — uses Radix Sheet on mobile.
+    relevant_files:
+      - src/components/sidebar/sidebar.tsx
+      - src/components/sidebar/nav-item.tsx
+      - src/components/sidebar/folder-tree.tsx
+      - src/components/storage/storage-meter.tsx
+    entry_routes:
+      - /dashboard (all sub-routes)
+    nav_items:
+      - { href: /dashboard, label: All Files, icon: FolderOpen }
+      - { href: /dashboard/recent, label: Recent, icon: Image }
+      - { href: /dashboard/starred, label: Starred, icon: Star }
+      - { href: /dashboard/shared, label: Shared Files, icon: Users, badge: "Soon" }
+      - { href: /dashboard/trash, label: Trash, icon: Trash2 }
+      - { href: /dashboard/settings, label: Settings, icon: Settings }
+    user_interactions:
+      - Click nav items
+      - Expand/collapse folder tree
+      - New button dropdown
+      - Hamburger menu on mobile
+    api_calls: []
+    auth_required: false
+
+  - name: Top Bar
+    description: >
+      Header bar with hamburger menu (mobile only), search bar, notification
+      popover, invite member button, and user menu dropdown.
+    relevant_files:
+      - src/components/top-bar/top-bar.tsx
+      - src/components/top-bar/search-bar.tsx
+      - src/components/top-bar/user-menu.tsx
+      - src/components/top-bar/notification-popover.tsx
+    entry_routes:
+      - /dashboard (all sub-routes)
+    user_interactions:
+      - Toggle mobile sidebar
+      - Search files
+      - View notifications
+      - User menu (sign out, etc.)
+      - Invite member button
+    api_calls: []
+    auth_required: false
+
+  - name: Offline Detection
+    description: >
+      Monitors online/offline status via browser events. Shows amber
+      banner when offline. Tracked in UI store (isOnline).
+    relevant_files:
+      - src/app/dashboard/layout.tsx
+      - src/store/ui-store.ts (isOnline)
+    entry_routes:
+      - /dashboard (all sub-routes)
+    user_interactions:
+      - Automatic visual banner
+    api_calls: []
+    auth_required: false
+
+  - name: Suggested Files
+    description: >
+      Shows suggested/recent files section on the main dashboard.
+    relevant_files:
+      - src/components/suggested-files/suggested-files.tsx
+    entry_routes:
+      - /dashboard
+    user_interactions:
+      - Click to preview
+    api_calls: []
+    auth_required: false
+
+# ============================================================================
+# Middleware
+# ============================================================================
+middleware:
+  file: src/middleware.ts
+  description: >
+    Next.js middleware that refreshes the Supabase auth session on every
+    request. Creates a server Supabase client, calls getUser() to refresh
+    the JWT if expired, and passes cookies through. Does NOT enforce
+    auth redirects — all route protection is client-side.
+  matcher: >
+    All routes except: _next/static, _next/image, favicon.ico, /api/upload,
+    /api/download, /file/, and static assets (svg, png, jpg, jpeg, gif, webp).
+
+# ============================================================================
+# State Management
+# ============================================================================
+stores:
+  - name: useFilesStore
+    file: src/store/files-store.ts
+    description: >
+      Central file/folder state. Manages files array, folders array,
+      upload queue, view mode (grid/list), selected files, current folder
+      ID, loading state, and search query. Provides CRUD actions for
+      files, folders, and upload queue items.
+    state_shape:
+      files: DbFile[]
+      folders: DbFolder[]
+      uploadQueue: UploadQueueItem[]
+      viewMode: grid | list
+      selectedFiles: string[]
+      currentFolderId: string | null
+      isLoading: boolean
+      searchQuery: string
+
+  - name: useUIStore
+    file: src/store/ui-store.ts
+    description: >
+      UI-specific state. Controls modal visibility (upload, new folder,
+      rename, share, preview), sidebar open state, online status, and
+      function references for file picker and upload triggers.
+    state_shape:
+      sidebarOpen: boolean
+      uploadModalOpen: boolean
+      previewFileId: string | null
+      newFolderModalOpen: boolean
+      renameModalOpen: boolean
+      renameTarget: "{ id, name, type } | null"
+      shareModalOpen: boolean
+      shareFileId: string | null
+      isOnline: boolean
+      openFilePicker: function | null
+      uploadFiles: function | null
+
+# ============================================================================
+# Modals
+# ============================================================================
+modals:
+  - name: NewFolderModal
+    file: src/components/modals/new-folder-modal.tsx
+    trigger: useUIStore.newFolderModalOpen
+    description: >
+      Dialog to create a new folder. Input for folder name and 8 preset
+      color options. Creates folder via POST /api/folders.
+
+  - name: RenameModal
+    file: src/components/modals/rename-modal.tsx
+    trigger: useUIStore.renameModalOpen
+    description: >
+      Dialog to rename a file or folder. Sends PATCH to /api/files or
+      /api/folders depending on the target type.
+
+  - name: ShareModal
+    file: src/components/modals/share-modal.tsx
+    trigger: useUIStore.shareModalOpen
+    description: >
+      Dialog to generate and copy a shareable link. Calls POST /api/share
+      to create a share token. Displays the link with copy-to-clipboard.
+
+  - name: PreviewModal
+    file: src/components/preview/preview-modal.tsx
+    trigger: useUIStore.previewFileId
+    description: >
+      Full-screen overlay preview for images, videos, audio, and PDFs.
+      Supports keyboard navigation (arrows for images, Escape to close),
+      download, share, and print. Image navigation with prev/next buttons.
+
+  - name: UploadProgress
+    file: src/components/upload/upload-progress.tsx
+    trigger: filesStore.uploadQueue.length > 0
+    description: >
+      Fixed bottom-right panel showing active upload queue with progress
+      bars, status indicators, and dismiss/clear actions.
+
+# ============================================================================
+# Types
+# ============================================================================
+types:
+  file: src/types/file.types.ts
+  database: src/types/database.types.ts
+  key_types:
+    - DbFile: Database file row type
+    - DbFolder: Database folder row type
+    - DbUser: Database user row type
+    - DbSharedLink: Database shared link row type
+    - FileInsert: File insert type
+    - FolderInsert: Folder insert type
+    - ViewMode: grid | list
+    - FileCategory: image | video | audio | document | pdf | archive | other
+    - UploadQueueItem: "{ id, file, folderId, progress, status, error? }"
+    - BreadcrumbItem: "{ id, name }"
+  utility_functions:
+    - getFileCategory(mimeType): Categorizes MIME types into FileCategory
+    - getFileExtension(filename): Extracts file extension
+    - formatFileSize(bytes): Human-readable file size (B/KB/MB/GB/TB)
+    - formatDate(dateString): Formatted date string
+    - validateFile(file): Validates file size (max 2GB)
+  constraints:
+    max_file_size: 2GB
+    allowed_mime_types: >
+      Images (jpeg, png, gif, webp, svg, bmp, tiff, ico, avif),
+      Videos (mp4, webm, mov, avi, mkv, mpeg),
+      Audio (mp3, wav, ogg, webm, aac, m4a, flac),
+      Documents (pdf, docx, xlsx, pptx, rtf, odt, ods, odp),
+      Archives (zip, rar, 7z, gzip, tar, bzip2),
+      Text/Code (plain, markdown, csv, html, css, js, ts, json,
+      xml, sql, python, java, c, c++, csharp, php, ruby, go, rust,
+      swift, kotlin, yaml),
+      Others (octet-stream)
+
+# ============================================================================
+# Component Tree (Dashboard)
+# ============================================================================
+component_tree:
+  root_layout:
+    file: src/app/layout.tsx
+    providers: [AuthProvider, TooltipProvider]
+  dashboard_layout:
+    file: src/app/dashboard/layout.tsx
+    components:
+      - Sidebar (desktop: aside, mobile: Sheet)
+      - TopBar
+      - UploadZone (wraps children)
+      - UploadProgress (fixed overlay)
+      - PreviewModal (full-screen overlay)
+      - NewFolderModal
+      - RenameModal
+      - ShareModal
+      - Offline banner (conditional)
+
+# ============================================================================
+# Known Limitations
+# ============================================================================
+known_limitations:
+  - Shared Files page (/dashboard/shared) is a placeholder — "Coming in Phase 2"
+  - Notification settings marked as "coming soon"
+  - Save Changes button on settings page has no backend implementation
+  - Invite member button is non-functional (just navigates to signup for guests)
+  - Change Password button on settings page has no implementation
+  - deleteFromTelegram and bulkDeleteFromTelegram are not implemented in TDLib
+  - File deletion only soft-deletes (moves to trash in DB), no Telegram message deletion
+  - Search is client-side only — won't work for files not loaded in store
+  - View mode preference is not persisted across sessions (in-memory Zustand only)
+  - No per-user storage quota enforcement — DEFAULT_STORAGE_LIMIT is display-only
+  - No email notification system
+  - No file versioning or history
+  - No folder sharing (only individual file sharing)
+  - Guest session files are not automatically cleaned up on expiry
+  - No drag-and-drop file reordering or moving between folders
+  - No bulk file operations UI (select multiple + action)
+  - Middleware does not enforce auth redirects — unauthenticated users can access all routes

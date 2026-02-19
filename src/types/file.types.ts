@@ -85,6 +85,8 @@ const ALLOWED_MIME_TYPES = [
   "image/tiff",
   "image/x-icon",
   "image/avif",
+  "image/heic",
+  "image/heif",
   
   // Videos
   "video/mp4",

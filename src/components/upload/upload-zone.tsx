@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { useDropzone } from "react-dropzone";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useFilesStore } from "@/store/files-store";
@@ -191,10 +191,35 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     noKeyboard: true,
   });
 
+  // Mobile-friendly file input ref — avoids iOS Safari issue where
+  // programmatic .click() on a display:none input is silently ignored.
+  const mobileFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleMobileFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length > 0) {
+        onDrop(files);
+      }
+      // Reset so the same file can be re-selected
+      if (e.target) e.target.value = "";
+    },
+    [onDrop]
+  );
+
   const { setOpenFilePicker, setUploadFiles } = useUIStore();
 
   useEffect(() => {
-    setOpenFilePicker(open);
+    // Store a function that clicks the mobile-friendly input directly.
+    // This preserves user-gesture context on iOS Safari / Android Chrome.
+    setOpenFilePicker(() => {
+      if (mobileFileInputRef.current) {
+        mobileFileInputRef.current.click();
+      } else {
+        // Fallback to react-dropzone's open() (works on desktop)
+        open();
+      }
+    });
     return () => setOpenFilePicker(null);
   }, [open, setOpenFilePicker]);
 
@@ -206,6 +231,27 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   return (
     <div {...getRootProps()} className="relative">
       <input {...getInputProps()} />
+      {/* Mobile-friendly hidden file input: uses opacity+positioning
+          instead of display:none so iOS Safari allows .click() */}
+      <input
+        ref={mobileFileInputRef}
+        type="file"
+        multiple
+        onChange={handleMobileFileSelect}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "1px",
+          height: "1px",
+          opacity: 0.01,
+          overflow: "hidden",
+          zIndex: -1,
+          pointerEvents: "none",
+        }}
+        tabIndex={-1}
+        aria-hidden="true"
+      />
       {isDragActive && (
         <div className="fixed inset-0 z-50 bg-primary/10 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-white rounded-2xl shadow-xl p-12 text-center border-2 border-dashed border-primary">
