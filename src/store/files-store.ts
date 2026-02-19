@@ -44,7 +44,7 @@ export const useFilesStore = create<FilesState>((set) => ({
   files: [],
   folders: [],
   uploadQueue: [],
-  viewMode: "grid",
+  viewMode: "list",
   selectedFiles: [],
   currentFolderId: null,
   isLoading: true,
