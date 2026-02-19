@@ -80,7 +80,8 @@ export async function GET(
       // Download from Telegram via TDLib service using the remote file_id
       const { stream } = await downloadFromTelegram(
         file.telegram_file_id,
-        file.mime_type || "application/octet-stream"
+        file.mime_type || "application/octet-stream",
+        file.telegram_message_id,
       );
 
       return new NextResponse(stream, {
@@ -98,7 +99,8 @@ export async function GET(
     if (isPreview) {
       const { stream } = await downloadFromTelegram(
         file.telegram_file_id,
-        file.mime_type || "application/octet-stream"
+        file.mime_type || "application/octet-stream",
+        file.telegram_message_id,
       );
 
       return new NextResponse(stream, {

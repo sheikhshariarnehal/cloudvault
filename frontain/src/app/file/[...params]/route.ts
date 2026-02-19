@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { downloadFromTelegram, TelegramDownloadError } from "@/lib/telegram/download";
 import { decodeFileToken } from "@/lib/utils";
 
+// Allow up to 5 minutes — TDLib must fully download the file from Telegram before streaming
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ params: string[] }> }
@@ -38,9 +42,10 @@ export async function GET(
     }
 
     // Download from Telegram via TDLib service using the remote file_id
-    const { stream, contentType } = await downloadFromTelegram(
+    const { stream, contentType, contentLength } = await downloadFromTelegram(
       file.telegram_file_id,
-      file.mime_type || "application/octet-stream"
+      file.mime_type || "application/octet-stream",
+      file.telegram_message_id,
     );
 
     const isDownload =
@@ -52,7 +57,13 @@ export async function GET(
     const headers: HeadersInit = {
       "Content-Type": finalContentType,
       "Cache-Control": "private, max-age=3600",
+      "Accept-Ranges": "bytes",
     };
+
+    // Forward Content-Length so browsers know the download size
+    if (contentLength) {
+      headers["Content-Length"] = String(contentLength);
+    }
 
     if (isDownload) {
       headers["Content-Disposition"] = `attachment; filename="${encodeURIComponent(file.original_name)}"`;
@@ -63,11 +74,14 @@ export async function GET(
     return new NextResponse(stream, { headers });
   } catch (error) {
     if (error instanceof TelegramDownloadError) {
+      console.error(`[File Route] TDLib download error (HTTP ${error.statusCode}):`, error.message);
       const status = error.statusCode === 404 || error.statusCode === 410 ? 404 : 502;
-      const msg = status === 404 ? "File not found on storage" : "Storage service error";
+      const msg = status === 404
+        ? "File not found on storage"
+        : `Storage service error: ${error.message}`;
       return NextResponse.json({ error: msg }, { status });
     }
-    console.error("Download error:", error);
+    console.error("[File Route] Unexpected download error:", error);
     return NextResponse.json({ error: "Download failed" }, { status: 500 });
   }
 }

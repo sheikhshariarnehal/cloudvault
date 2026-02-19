@@ -47,6 +47,17 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       hasGuestSession: !!guestSessionId,
     });
 
+    // Carries Telegram rate-limit info through the error chain
+    class RateLimitError extends Error {
+      retryAfter: number;
+      constructor(message: string, retryAfter: number) {
+        super(message);
+        this.retryAfter = retryAfter;
+      }
+    }
+
+    const MAX_ATTEMPTS = 6; // allow enough retries to outlast a rate-limit window
+
     const attemptUpload = async (attempt: number): Promise<void> => {
       try {
         // Rebuild FormData for each attempt to avoid consumed body issues
@@ -76,7 +87,16 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
               } else {
                 try {
                   const errorData = JSON.parse(xhr.responseText);
-                  reject(new Error(errorData.error || `Upload failed with status ${xhr.status}`));
+                  if (xhr.status === 429) {
+                    const retryAfter = errorData.retry_after ??
+                      parseInt(xhr.getResponseHeader("Retry-After") || "30", 10);
+                    reject(new RateLimitError(
+                      errorData.error || `Rate limited. Retry after ${retryAfter}s`,
+                      retryAfter
+                    ));
+                  } else {
+                    reject(new Error(errorData.error || `Upload failed with status ${xhr.status}`));
+                  }
                 } catch {
                   reject(new Error(`Upload failed with status ${xhr.status}`));
                 }
@@ -98,6 +118,14 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
+            if (response.status === 429) {
+              const retryAfter = errorData.retry_after ??
+                parseInt(response.headers.get("Retry-After") || "30", 10);
+              throw new RateLimitError(
+                errorData.error || `Rate limited. Retry after ${retryAfter}s`,
+                retryAfter
+              );
+            }
             throw new Error(errorData.error || `Upload failed with status ${response.status}`);
           }
 
@@ -109,14 +137,21 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
         const message =
           error instanceof Error ? error.message : "Upload failed";
 
-        if (attempt >= 4) {
+        if (attempt >= MAX_ATTEMPTS) {
           console.error("Upload error:", message, error);
           updateUploadStatus(queueId, "error", message);
           return;
         }
 
-        // Exponential backoff before retry
-        const delay = Math.pow(2, attempt) * 1000;
+        let delay: number;
+        if (error instanceof RateLimitError) {
+          // Honour the server's Retry-After, plus a small jitter
+          delay = (error.retryAfter + Math.random() * 2) * 1000;
+          console.warn(`[Upload] Rate limited by Telegram – waiting ${error.retryAfter}s before retry (attempt ${attempt}/${MAX_ATTEMPTS})`);
+        } else {
+          // Exponential backoff for non-rate-limit errors
+          delay = Math.pow(2, attempt) * 1000;
+        }
         await new Promise((res) => setTimeout(res, delay));
         await attemptUpload(attempt + 1);
       }

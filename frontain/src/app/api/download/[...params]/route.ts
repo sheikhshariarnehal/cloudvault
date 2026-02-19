@@ -31,7 +31,8 @@ export async function GET(
     // Download from Telegram via TDLib service using the remote file_id
     const { stream, contentType } = await downloadFromTelegram(
       file.telegram_file_id,
-      file.mime_type || "application/octet-stream"
+      file.mime_type || "application/octet-stream",
+      file.telegram_message_id,
     );
 
     const isDownload =

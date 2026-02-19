@@ -18,6 +18,8 @@ export function ImagePreview({ src, alt }: ImagePreviewProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleZoomIn = useCallback(() => {
@@ -80,6 +82,15 @@ export function ImagePreview({ src, alt }: ImagePreviewProps) {
     }
   }, [zoom]);
 
+  // Reset load state when src changes (navigating between images)
+  useEffect(() => {
+    setIsLoaded(false);
+    setHasError(false);
+    setRetryKey(0);
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
+  }, [src]);
+
   const zoomPercent = Math.round(zoom * 100);
 
   return (
@@ -98,22 +109,42 @@ export function ImagePreview({ src, alt }: ImagePreviewProps) {
         }}
       >
         {/* Loading spinner */}
-        {!isLoaded && (
+        {!isLoaded && !hasError && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-10 h-10 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           </div>
         )}
+
+        {/* Error state */}
+        {hasError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/60">
+            <svg className="w-16 h-16 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <p className="text-sm font-medium">Failed to load image</p>
+            <button
+              onClick={() => { setHasError(false); setIsLoaded(false); setRetryKey(k => k + 1); }}
+              className="text-xs text-[#8ab4f8] hover:text-[#aecbfa] underline"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
         <img
+          key={retryKey}
           src={src}
           alt={alt}
           className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${
-            isLoaded ? "opacity-100" : "opacity-0"
+            isLoaded && !hasError ? "opacity-100" : "opacity-0"
           }`}
           style={{
             transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
             transition: isDragging ? "none" : "transform 0.2s ease",
           }}
-          onLoad={() => setIsLoaded(true)}
+          onLoad={() => { setIsLoaded(true); setHasError(false); }}
+          onError={() => { setHasError(true); setIsLoaded(false); }}
           onDoubleClick={handleDoubleClick}
           draggable={false}
         />

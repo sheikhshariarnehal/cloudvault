@@ -18,16 +18,23 @@ export class TelegramDownloadError extends Error {
  *
  * @param fileId     The Telegram remote file_id string (telegram_file_id from DB)
  * @param mimeType   The file''s MIME type for the Content-Type header
+ * @param messageId  Optional Telegram message ID (for file-reference refresh)
  */
 export async function downloadFromTelegram(
   fileId: string,
-  mimeType: string
+  mimeType: string,
+  messageId?: number | null,
 ): Promise<{
   stream: ReadableStream;
   contentType: string;
   contentLength?: number;
 }> {
-  const url = `${BACKEND_URL}/api/download/${encodeURIComponent(fileId)}`;
+  const params = new URLSearchParams();
+  if (messageId) {
+    params.set("message_id", String(messageId));
+  }
+  const qs = params.toString();
+  const url = `${BACKEND_URL}/api/download/${encodeURIComponent(fileId)}${qs ? `?${qs}` : ""}`;
 
   const response = await fetch(url, {
     headers: {

@@ -188,6 +188,13 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
       return;
     }
 
+    // Safety net: reject numeric-only file IDs (TDLib internal IDs stored by mistake)
+    if (!fileInfo.remoteFileId || /^\d+$/.test(fileInfo.remoteFileId)) {
+      console.error("[Upload] Got invalid numeric-only file_id — aborting:", fileInfo.remoteFileId);
+      res.status(500).json({ error: "Telegram returned an invalid file ID. Please retry." });
+      return;
+    }
+
     // Try to get thumbnail as base64 data URI
     let thumbnailData: string | null = null;
     if (fileInfo.thumbnailFileId) {
@@ -224,10 +231,18 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
 
     const errMsg = err instanceof Error ? err.message : String(err);
 
-    // Surface Telegram FLOOD_WAIT clearly so the client can retry
-    const floodMatch = errMsg.match(/FLOOD_WAIT[_\s](\d+)/i);
+    // Surface Telegram rate-limit errors clearly so the client can retry.
+    // TDLib may report this as FLOOD_WAIT_N or as [429]: Too Many Requests: retry after N
+    const floodMatch =
+      errMsg.match(/FLOOD_WAIT[_\s](\d+)/i) ||
+      errMsg.match(/retry after (\d+)/i) ||
+      errMsg.match(/\[429\]/i);
     if (floodMatch) {
-      const waitSec = parseInt(floodMatch[1], 10);
+      // Try to extract the wait seconds from whichever pattern matched
+      const retryMatch = errMsg.match(/(\d+)\s*$/) ||
+        errMsg.match(/retry after (\d+)/i) ||
+        errMsg.match(/FLOOD_WAIT[_\s](\d+)/i);
+      const waitSec = retryMatch ? parseInt(retryMatch[1], 10) : 30;
       res
         .status(429)
         .set("Retry-After", String(waitSec))
