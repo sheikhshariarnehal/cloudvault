@@ -97,6 +97,16 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
       "application/octet-stream";
     const fileName = uploadedFile.originalname;
 
+    // Guard: reject 0-byte files before handing to TDLib
+    const fileStats = fs.statSync(localFilePath);
+    if (fileStats.size === 0) {
+      cleanupTempFile(localFilePath);
+      console.error(`[Upload] File is 0 bytes after multer write: ${localFilePath}`);
+      res.status(400).json({ error: "Uploaded file is empty — upload may have been interrupted" });
+      return;
+    }
+    console.log(`[Upload] File received: ${fileName} (${fileStats.size} bytes) → ${localFilePath}`);
+
     // Build the appropriate input message content based on MIME type
     const caption = { _: "formattedText" as const, text: fileName };
     const inputFile = { _: "inputFileLocal" as const, path: localFilePath };
@@ -165,20 +175,48 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
       }
     }
 
-    // Acquire a concurrency slot — prevents Telegram FLOOD_WAIT by limiting
-    // the number of simultaneous sendMessage calls to MAX_CONCURRENT.
-    await acquireUploadSlot();
-    let message: Record<string, unknown>;
-    try {
-      // Send message to the channel
-      message = await client.invoke(sendParams);
-    } finally {
-      releaseUploadSlot();
+    // ── Helper: invoke sendMessage with concurrency slot management ─────────
+    async function invokeWithSlot(
+      params: Parameters<typeof client.invoke>[0]
+    ): Promise<Record<string, unknown>> {
+      await acquireUploadSlot();
+      try {
+        return await client.invoke(params) as Record<string, unknown>;
+      } finally {
+        releaseUploadSlot();
+      }
     }
 
-    // Wait for the message to be sent (TDLib sends asynchronously)
-    // We need to wait for the message to get its final state with file IDs
-    const sentMessage = await waitForMessageSent(client, message);
+    // ── Helper: send and wait, with document fallback on image rejection ─────
+    const isMediaRejection = (msg: string) =>
+      msg.includes("IMAGE_PROCESS_FAILED") ||
+      msg.includes("PHOTO_INVALID_DIMENSIONS") ||
+      msg.includes("MEDIA_INVALID");
+
+    const documentFallbackParams = {
+      _: "sendMessage" as const,
+      chat_id: parseInt(channelId, 10),
+      input_message_content: {
+        _: "inputMessageDocument" as const,
+        document: inputFile,
+        caption: { _: "formattedText" as const, text: fileName },
+      },
+    };
+
+    let sentMessage: Record<string, unknown>;
+    try {
+      const pending = await invokeWithSlot(sendParams);
+      sentMessage = await waitForMessageSent(client, pending);
+    } catch (sendErr) {
+      const sendErrMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+      if (isMediaRejection(sendErrMsg)) {
+        console.warn(`[Upload] Media rejected by Telegram (${sendErrMsg}), retrying as document...`);
+        const pending = await invokeWithSlot(documentFallbackParams);
+        sentMessage = await waitForMessageSent(client, pending);
+      } else {
+        throw sendErr;
+      }
+    }
 
     // Extract file info from the sent message
     const fileInfo = extractFileInfo(sentMessage);
