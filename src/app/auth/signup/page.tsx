@@ -34,7 +34,7 @@ export default function SignUpPage() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -43,6 +43,14 @@ export default function SignUpPage() {
         },
       });
       if (error) throw error;
+
+      // If user is auto-confirmed (session exists), redirect to dashboard directly
+      if (data.session) {
+        router.push("/dashboard");
+        return;
+      }
+
+      // Otherwise, show email verification message
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed");

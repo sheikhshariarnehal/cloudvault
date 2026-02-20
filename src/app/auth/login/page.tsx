@@ -93,7 +93,7 @@ export default function LoginPage() {
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
                   <Link
-                    href="/auth/migrate"
+                    href="/auth/forgot-password"
                     className="text-xs text-primary hover:underline"
                   >
                     Forgot password?
