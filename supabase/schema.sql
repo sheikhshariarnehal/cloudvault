@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS public.files (
   telegram_file_id TEXT NOT NULL,
   telegram_message_id BIGINT NOT NULL,
   thumbnail_url TEXT,
+  file_hash TEXT,
   is_starred BOOLEAN DEFAULT FALSE,
   is_trashed BOOLEAN DEFAULT FALSE,
   trashed_at TIMESTAMPTZ,
@@ -77,6 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_files_user_id ON public.files(user_id);
 CREATE INDEX IF NOT EXISTS idx_files_guest_session ON public.files(guest_session_id);
 CREATE INDEX IF NOT EXISTS idx_files_folder_id ON public.files(folder_id);
 CREATE INDEX IF NOT EXISTS idx_files_is_trashed ON public.files(is_trashed);
+CREATE INDEX IF NOT EXISTS idx_files_file_hash ON public.files(file_hash) WHERE file_hash IS NOT NULL AND is_trashed = FALSE;
 CREATE INDEX IF NOT EXISTS idx_folders_user_id ON public.folders(user_id);
 CREATE INDEX IF NOT EXISTS idx_folders_guest_session ON public.folders(guest_session_id);
 CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON public.folders(parent_id);

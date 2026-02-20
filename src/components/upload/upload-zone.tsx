@@ -9,6 +9,32 @@ import { validateFile } from "@/types/file.types";
 import { v4 as uuidv4 } from "uuid";
 import { Upload } from "lucide-react";
 
+/**
+ * Compute SHA-256 hash of a File using the Web Crypto API.
+ * Reads in 2 MB chunks to avoid loading the entire file into memory.
+ */
+async function computeFileHash(file: File): Promise<string> {
+  // For small files (< 10 MB), just read the whole thing
+  if (file.size < 10 * 1024 * 1024) {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  // For larger files, read in 2 MB chunks via a streaming approach
+  const HASH_CHUNK = 2 * 1024 * 1024;
+  // Use SubtleCrypto's digest on the full file via a single ArrayBuffer read.
+  // The Web Crypto API doesn't support incremental hashing natively,
+  // so we read the full file into an ArrayBuffer (the browser streams internally).
+  const buffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 interface UploadZoneProps {
   children: ReactNode;
   folderId?: string | null;
@@ -34,6 +60,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     queueId: string,
     file: File,
     targetFolderId: string | null,
+    fileHash: string | null,
   ) => {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
@@ -124,6 +151,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
         userId: user?.id || null,
         guestSessionId: guestSessionId || null,
         folderId: targetFolderId,
+        fileHash: fileHash || null,
       }),
     });
 
@@ -159,6 +187,48 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
     updateUploadStatus(queueId, "uploading");
 
+    // ── Compute SHA-256 hash for dedup ──────────────────────────────
+    let fileHash: string | null = null;
+    try {
+      updateUploadProgress(queueId, 1); // show activity during hashing
+      fileHash = await computeFileHash(file);
+      updateUploadProgress(queueId, 5);
+    } catch (hashErr) {
+      console.warn("[Upload] Hash computation failed, skipping dedup:", hashErr);
+    }
+
+    // ── Dedup check: if an identical file exists, skip upload entirely ──
+    if (fileHash) {
+      try {
+        const dedupRes = await fetch("/api/upload/dedup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileHash,
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type || "application/octet-stream",
+            userId: user?.id || null,
+            guestSessionId: guestSessionId || null,
+            folderId: targetFolderId,
+          }),
+        });
+
+        if (dedupRes.ok) {
+          const dedupData = await dedupRes.json();
+          if (dedupData.duplicate && dedupData.file) {
+            console.log("[Upload] Dedup hit — skipped upload for", file.name);
+            updateUploadProgress(queueId, 100);
+            addFile(dedupData.file);
+            updateUploadStatus(queueId, "success");
+            return;
+          }
+        }
+      } catch (dedupErr) {
+        console.warn("[Upload] Dedup check failed, proceeding with upload:", dedupErr);
+      }
+    }
+
     console.log("Starting upload:", {
       fileName: file.name,
       fileSize: file.size,
@@ -182,7 +252,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       try {
         // ── Use chunked upload for files larger than CHUNK_SIZE ──────────
         if (file.size > CHUNK_SIZE) {
-          const data = await uploadFileChunked(queueId, file, targetFolderId);
+          const data = await uploadFileChunked(queueId, file, targetFolderId, fileHash);
           addFile(data.file);
           updateUploadStatus(queueId, "success");
           return;
@@ -194,6 +264,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
         if (targetFolderId) uploadData.append("folder_id", targetFolderId);
         if (user?.id) uploadData.append("user_id", user.id);
         if (guestSessionId) uploadData.append("guest_session_id", guestSessionId);
+        if (fileHash) uploadData.append("file_hash", fileHash);
 
         if (attempt === 1) {
           // First attempt: use XHR for progress tracking

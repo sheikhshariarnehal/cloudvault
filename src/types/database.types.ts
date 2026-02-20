@@ -60,7 +60,9 @@ export interface Database {
           size_bytes: number;
           telegram_file_id: string;
           telegram_message_id: number;
+          tdlib_file_id: number | null;
           thumbnail_url: string | null;
+          file_hash: string | null;
           is_starred: boolean;
           is_trashed: boolean;
           trashed_at: string | null;
@@ -78,7 +80,9 @@ export interface Database {
           size_bytes: number;
           telegram_file_id: string;
           telegram_message_id: number;
+          tdlib_file_id?: number | null;
           thumbnail_url?: string | null;
+          file_hash?: string | null;
           is_starred?: boolean;
           is_trashed?: boolean;
           trashed_at?: string | null;
@@ -96,7 +100,9 @@ export interface Database {
           size_bytes?: number;
           telegram_file_id?: string;
           telegram_message_id?: number;
+          tdlib_file_id?: number | null;
           thumbnail_url?: string | null;
+          file_hash?: string | null;
           is_starred?: boolean;
           is_trashed?: boolean;
           trashed_at?: string | null;

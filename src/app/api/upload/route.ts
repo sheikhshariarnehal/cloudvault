@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     const folderId = formData.get("folder_id") as string | null;
     const userId = formData.get("user_id") as string | null;
     const guestSessionId = formData.get("guest_session_id") as string | null;
+    const fileHash = formData.get("file_hash") as string | null;
 
     console.log("Upload request:", { 
       hasFile: !!file, 
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
         telegram_message_id: telegramResult.message_id,
         tdlib_file_id: telegramResult.tdlib_file_id || null,
         thumbnail_url: telegramResult.thumbnail_data || null,
+        file_hash: fileHash || null,
       })
       .select()
       .single();
