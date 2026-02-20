@@ -37,7 +37,7 @@ export default function TrashPage() {
         .eq("is_trashed", true)
         .order("trashed_at", { ascending: false });
 
-      setTrashedFiles(data || []);
+      setTrashedFiles((data as unknown as DbFile[]) || []);
       setIsLoading(false);
     };
 
