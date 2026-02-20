@@ -45,10 +45,11 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   const { addToUploadQueue, updateUploadStatus, updateUploadProgress, addFile } =
     useFilesStore();
 
-  // 3.5 MB chunks — fits under Vercel's 4.5 MB limit for fallback path
-  // 3 parallel × 3.5 MB = 10.5 MB effective bandwidth (same as single 10 MB)
-  const CHUNK_SIZE = 3.5 * 1024 * 1024;
-  const PARALLEL_CHUNKS = 3; // upload 3 chunks simultaneously
+  // 10 MB chunks — go direct to TDLib (bypasses Vercel 4.5 MB limit entirely)
+  // 5 parallel × 10 MB = 50 MB effective bandwidth per batch
+  // 1.7 GB file = 170 chunks instead of 497 → ~3-5 min instead of 15-20 min
+  const CHUNK_SIZE = 10 * 1024 * 1024;
+  const PARALLEL_CHUNKS = 5;
 
   /**
    * Chunked upload for large files (> CHUNK_SIZE).
@@ -96,31 +97,15 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       chunkForm.append("uploadId", uploadId);
       chunkForm.append("chunkIndex", String(i));
 
-      // Try direct backend first, fall back to Vercel proxy
-      const directUrl = chunkEndpoint;
-      let success = false;
-
-      if (directUrl) {
-        try {
-          const res = await fetch(directUrl, { method: "POST", body: chunkForm });
-          if (res.ok) success = true;
-        } catch {
-          // Direct failed (CORS/network) — will fallback below
-        }
+      // Direct upload to TDLib service (bypasses Vercel 4.5MB limit)
+      if (!directUrl) {
+        throw new Error("No direct chunk endpoint available. Set NEXT_PUBLIC_TDLIB_CHUNK_URL.");
       }
 
-      if (!success) {
-        // Fallback: send through Vercel proxy
-        const fallbackForm = new FormData();
-        fallbackForm.append("chunk", file.slice(start, end), `chunk_${i}`);
-        fallbackForm.append("uploadId", uploadId);
-        fallbackForm.append("chunkIndex", String(i));
-
-        const res = await fetch("/api/upload/chunk", { method: "POST", body: fallbackForm });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `Chunk ${i} failed`);
-        }
+      const res = await fetch(directUrl, { method: "POST", body: chunkForm });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Chunk ${i} failed with status ${res.status}`);
       }
 
       completedChunks++;
