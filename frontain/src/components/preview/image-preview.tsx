@@ -6,19 +6,21 @@ import { ZoomIn, ZoomOut } from "lucide-react";
 interface ImagePreviewProps {
   src: string;
   alt: string;
+  fallbackSrc?: string | null;
 }
 
 const ZOOM_STEP = 0.25;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
 
-export function ImagePreview({ src, alt }: ImagePreviewProps) {
+export function ImagePreview({ src, alt, fallbackSrc }: ImagePreviewProps) {
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -86,6 +88,7 @@ export function ImagePreview({ src, alt }: ImagePreviewProps) {
   useEffect(() => {
     setIsLoaded(false);
     setHasError(false);
+    setUsingFallback(false);
     setRetryKey(0);
     setZoom(1);
     setPosition({ x: 0, y: 0 });
@@ -116,7 +119,7 @@ export function ImagePreview({ src, alt }: ImagePreviewProps) {
         )}
 
         {/* Error state */}
-        {hasError && (
+        {hasError && !usingFallback && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/60">
             <svg className="w-16 h-16 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -134,7 +137,7 @@ export function ImagePreview({ src, alt }: ImagePreviewProps) {
 
         <img
           key={retryKey}
-          src={src}
+          src={usingFallback && fallbackSrc ? fallbackSrc : src}
           alt={alt}
           className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${
             isLoaded && !hasError ? "opacity-100" : "opacity-0"
@@ -144,11 +147,33 @@ export function ImagePreview({ src, alt }: ImagePreviewProps) {
             transition: isDragging ? "none" : "transform 0.2s ease",
           }}
           onLoad={() => { setIsLoaded(true); setHasError(false); }}
-          onError={() => { setHasError(true); setIsLoaded(false); }}
+          onError={() => {
+            if (!usingFallback && fallbackSrc) {
+              setUsingFallback(true);
+              setHasError(false);
+              setIsLoaded(false);
+            } else {
+              setHasError(true);
+              setIsLoaded(false);
+            }
+          }}
           onDoubleClick={handleDoubleClick}
           draggable={false}
         />
       </div>
+
+      {/* Fallback quality banner */}
+      {usingFallback && isLoaded && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#2d2e30]/90 backdrop-blur rounded-full px-4 py-2 shadow-lg z-10">
+          <span className="text-xs text-white/70">Showing thumbnail preview</span>
+          <button
+            onClick={() => { setUsingFallback(false); setHasError(false); setIsLoaded(false); setRetryKey(k => k + 1); }}
+            className="text-xs text-[#8ab4f8] hover:text-[#aecbfa] font-medium"
+          >
+            Load full image
+          </button>
+        </div>
+      )}
 
       {/* Bottom zoom controls - Google Drive style */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-[#2d2e30] rounded-full px-2 py-1 shadow-lg z-10">

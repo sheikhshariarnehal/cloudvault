@@ -16,12 +16,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Plus,
   Upload,
   FolderPlus,
   LayoutGrid,
   List,
-  FileText,
   Loader2,
 } from "lucide-react";
 
@@ -93,9 +98,9 @@ export default function DashboardPage() {
                 <FolderPlus className="h-4 w-4 mr-2" />
                 New Folder
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FileText className="h-4 w-4 mr-2" />
-                New Document
+              <DropdownMenuItem onClick={() => openFilePicker?.()}>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload File
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -110,35 +115,37 @@ export default function DashboardPage() {
             <span className="hidden xs:inline">Upload</span>
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-10 text-sm font-medium hidden sm:flex shadow-sm hover:shadow"
-            onClick={() => setNewFolderModalOpen(true)}
-          >
-            <FolderPlus className="h-4 w-4 mr-2" />
-            Folder
-          </Button>
-
           {/* View mode toggle */}
-          <div className="flex items-center border rounded-lg overflow-hidden shadow-sm bg-white">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-10 w-10 rounded-none"
-              onClick={() => setViewMode("grid")}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-10 w-10 rounded-none"
-              onClick={() => setViewMode("list")}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
+          <TooltipProvider>
+            <div className="flex items-center border rounded-lg overflow-hidden shadow-sm bg-white">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === "grid" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-10 w-10 rounded-none"
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Grid view</p></TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === "list" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-10 w-10 rounded-none"
+                    onClick={() => setViewMode("list")}
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>List view</p></TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
       </div>
 

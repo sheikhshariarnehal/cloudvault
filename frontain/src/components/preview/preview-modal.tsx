@@ -195,7 +195,7 @@ export function PreviewModal() {
         <div className="w-full h-full flex items-center justify-center">
           {fileUrl && (
             <>
-              {isImage && <ImagePreview src={fileUrl} alt={file.name} />}
+              {isImage && <ImagePreview src={fileUrl} alt={file.name} fallbackSrc={file.thumbnail_url} />}
               {category === "pdf" && (
                 <div className="w-full h-full">
                   <PdfPreview src={fileUrl} />
@@ -223,8 +223,11 @@ export function PreviewModal() {
                   <p className="text-lg font-medium mb-2 text-white">
                     {file.name}
                   </p>
+                  <p className="text-sm text-white/50 mb-1">
+                    {file.mime_type}
+                  </p>
                   <p className="text-sm text-white/50 mb-6">
-                    Preview not available for this file type
+                    Preview is not available for this file type. Download the file to view it.
                   </p>
                   <button
                     onClick={handleDownload}

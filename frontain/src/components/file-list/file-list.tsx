@@ -88,11 +88,11 @@ export function FileList({ files }: FileListProps) {
 
   if (files.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
         <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
         <h3 className="text-lg font-semibold">No files yet</h3>
         <p className="text-muted-foreground text-sm">
-          Upload files or create a folder to get started
+          Drag & drop files here, or use the Upload button to get started
         </p>
       </div>
     );

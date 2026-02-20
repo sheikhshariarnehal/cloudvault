@@ -1,14 +1,22 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useFilesStore } from "@/store/files-store";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 
 export function SearchBar() {
-  const { setSearchQuery } = useFilesStore();
+  const { searchQuery, setSearchQuery } = useFilesStore();
   const [localQuery, setLocalQuery] = useState("");
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // Sync local state when store is cleared externally (e.g. sidebar nav click)
+  useEffect(() => {
+    if (searchQuery === "" && localQuery !== "") {
+      setLocalQuery("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   const handleSearch = useCallback(
     (value: string) => {

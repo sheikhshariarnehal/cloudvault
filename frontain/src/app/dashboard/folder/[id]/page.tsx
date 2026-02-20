@@ -7,7 +7,19 @@ import { FileList } from "@/components/file-list/file-list";
 import { FileCard } from "@/components/file-grid/file-card";
 import { FolderGrid } from "@/components/file-grid/folder-grid";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, FolderOpen, Upload } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ChevronRight, FolderOpen, Upload, Plus, FolderPlus, LayoutGrid, List } from "lucide-react";
 import Link from "next/link";
 import type { BreadcrumbItem } from "@/types/file.types";
 
@@ -17,8 +29,8 @@ export default function FolderPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { files, folders, viewMode, setCurrentFolderId } = useFilesStore();
-  const { openFilePicker } = useUIStore();
+  const { files, folders, viewMode, setViewMode, setCurrentFolderId } = useFilesStore();
+  const { openFilePicker, setNewFolderModalOpen } = useUIStore();
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
 
   const folderFiles = files.filter((f) => f.folder_id === id);
@@ -68,6 +80,69 @@ export default function FolderPage({
         ))}
       </nav>
 
+      {/* Action Toolbar */}
+      <div className="flex items-center gap-2.5">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-10 text-sm font-medium shadow-sm hover:shadow">
+              <Plus className="h-4 w-4 mr-2" />
+              Create
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => setNewFolderModalOpen(true)}>
+              <FolderPlus className="h-4 w-4 mr-2" />
+              New Folder
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openFilePicker?.()}>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload File
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-10 text-sm font-medium shadow-sm hover:shadow"
+          onClick={() => openFilePicker?.()}
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          <span className="hidden xs:inline">Upload</span>
+        </Button>
+
+        <TooltipProvider>
+          <div className="flex items-center border rounded-lg overflow-hidden shadow-sm bg-white ml-auto">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === "grid" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-10 w-10 rounded-none"
+                  onClick={() => setViewMode("grid")}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Grid view</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === "list" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-10 w-10 rounded-none"
+                  onClick={() => setViewMode("list")}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>List view</p></TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
+      </div>
+
       {/* Subfolders */}
       {subFolders.length > 0 && (
         <section>
@@ -92,11 +167,11 @@ export default function FolderPage({
         </section>
       ) : (
         subFolders.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
             <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold">This folder is empty</h3>
             <p className="text-muted-foreground text-sm mb-4">
-              Upload files or create a subfolder to get started
+              Drag & drop files here, or click Upload to add files
             </p>
             <Button onClick={() => openFilePicker?.()}>
               <Upload className="h-4 w-4 mr-2" />

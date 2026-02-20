@@ -1,0 +1,1222 @@
+[
+  {
+    "id": "TC001",
+    "title": "User sees a clear entry point to Folder upload from the sidebar + New menu",
+    "description": "Verifies the discoverability of the Folder upload action in the + New menu on the dashboard.",
+    "category": "Folder Upload (Desktop where supported)",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the sidebar is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"+ New\" button in the sidebar"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Folder upload\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the \"+ New\" menu is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Restore a trashed file and confirm it returns to the dashboard",
+    "description": "Verifies restoring a file from Trash returns it to the main dashboard listing.",
+    "category": "File Management (Rename, Star, Trash, Restore, Delete)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard/trash"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard/trash\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify at least one trashed file row is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Restore\" for a trashed file"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Restored\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Dashboard\" in the sidebar navigation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the restored file is visible in the file list"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Permanently delete a trashed file and confirm it is removed from Trash",
+    "description": "Verifies permanently deleting a file from Trash removes it from the Trash list after confirming the action.",
+    "category": "File Management (Rename, Star, Trash, Restore, Delete)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard/trash"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard/trash\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify at least one trashed file row is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Delete permanently\" for a trashed file"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Delete permanently\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Confirm\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Permanently deleted\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the deleted file is not visible in the trash list"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Create a new folder from the Dashboard root",
+    "description": "Verifies a user can create a folder using the Create > New Folder modal and see it listed in the current view.",
+    "category": "Folder Management (Create, Rename, Navigate)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Create\" dropdown button"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"New Folder\" option"
+      },
+      {
+        "type": "action",
+        "description": "Type \"E2E Test Folder\" into the folder name field"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Create\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"E2E Test Folder\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Prevent folder creation when the name is blank",
+    "description": "Verifies the New Folder modal blocks creation and shows a visible validation message when the name is empty.",
+    "category": "Folder Management (Create, Rename, Navigate)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Create\" dropdown button"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"New Folder\" option"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Create\" button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Folder name\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"required\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Cancel folder creation from the New Folder modal",
+    "description": "Verifies a user can close the New Folder modal without creating a folder and the folder does not appear in the list.",
+    "category": "Folder Management (Create, Rename, Navigate)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"Create\" dropdown button"
+      },
+      {
+        "type": "action",
+        "description": "Click on the \"New Folder\" option"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Folder Should Not Be Created\" into the folder name field"
+      },
+      {
+        "type": "action",
+        "description": "Press \"Escape\" key"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"New Folder\" is not visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Folder Should Not Be Created\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Open supported file preview in modal and see preview UI",
+    "description": "Verifies that clicking a supported file opens the preview modal and shows inline preview controls.",
+    "category": "File Preview (Modal and Full-Page)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Upload\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on a file card that appears to be an image (for example, a thumbnail image file)"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Download\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Preview\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Close\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Open full-page preview from preview modal",
+    "description": "Verifies that the user can navigate from the preview modal to the full-page preview route.",
+    "category": "File Preview (Modal and Full-Page)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on a file card that appears to be previewable (for example, an image with a thumbnail)"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Download\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Open full page\" (or \"Full preview\") in the preview modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/preview/\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Preview\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Close preview modal returns to dashboard file list",
+    "description": "Verifies the modal can be closed and the user returns to the dashboard list view.",
+    "category": "File Preview (Modal and Full-Page)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on a file card that appears to be previewable"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Download\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Close\" in the preview modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Upload\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Full-page preview route shows preview page shell for a file opened via modal",
+    "description": "Verifies the full-page preview remains usable when reached from the modal and shows basic preview actions.",
+    "category": "File Preview (Modal and Full-Page)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on a file card that appears to be previewable"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Open full page\" (or \"Full preview\") in the preview modal"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/preview/\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Download\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Preview\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Create a public share link with default settings",
+    "description": "Verifies a user can open the Share dialog from a file context menu and create a share link successfully.",
+    "category": "File Sharing (Token-based Links)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Dashboard\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on a file item in the file list to focus/select it"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"More\" or \"Actions\" button for the selected file to open the context menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Share\" in the context menu"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Share\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Create link\" or \"Create\" in the Share dialog"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Link created\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Create a share link with an expiry set",
+    "description": "Verifies a user can set an expiry option (if available) and still create a share link.",
+    "category": "File Sharing (Token-based Links)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on a file item in the file list to focus/select it"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"More\" or \"Actions\" button for the selected file to open the context menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Share\" in the context menu"
+      },
+      {
+        "type": "action",
+        "description": "Select an expiry option (for example \"1 day\" or \"7 days\") from the expiry dropdown"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Create link\" or \"Create\" in the Share dialog"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Link created\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Copy link\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Create a share link with a max downloads limit set",
+    "description": "Verifies a user can set a maximum downloads limit (if available) and still create a share link.",
+    "category": "File Sharing (Token-based Links)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on a file item in the file list to focus/select it"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"More\" or \"Actions\" button for the selected file to open the context menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Share\" in the context menu"
+      },
+      {
+        "type": "action",
+        "description": "Fill \"1\" into the \"Max downloads\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Create link\" or \"Create\" in the Share dialog"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Link created\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Copy link\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Open a share link and view public file metadata",
+    "description": "Verifies a token-based share page can be accessed without login and shows the shared file details.",
+    "category": "File Sharing (Token-based Links)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on a file item in the file list to focus/select it"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"More\" or \"Actions\" button for the selected file to open the context menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Share\" in the context menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Create link\" or \"Create\" in the Share dialog"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"/share/\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click the visible share link text (the \"/share/...\" link) to open the share page in the same tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/share/\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Download\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Validate max downloads field rejects invalid input",
+    "description": "Verifies the Share dialog prevents creating a link when max downloads is invalid (for example zero or non-numeric).",
+    "category": "File Sharing (Token-based Links)",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on a file item in the file list to focus/select it"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"More\" or \"Actions\" button for the selected file to open the context menu"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Share\" in the context menu"
+      },
+      {
+        "type": "action",
+        "description": "Fill \"0\" into the \"Max downloads\" field"
+      },
+      {
+        "type": "action",
+        "description": "Click \"Create link\" or \"Create\" in the Share dialog"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Max downloads\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Link created\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Search filters items in the dashboard as the user types",
+    "description": "Verifies that typing in the dashboard search box filters visible files and folders in realtime.",
+    "category": "Search (Client-side filter)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Search\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Search\" input in the top bar"
+      },
+      {
+        "type": "action",
+        "description": "Type \"a\" into the search input"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"a\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Type \"b\" into the search input"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"ab\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Search with no matching results shows an empty state",
+    "description": "Verifies that a query with no matches shows a no-results empty state on the dashboard.",
+    "category": "Search (Client-side filter)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Search\" input in the top bar"
+      },
+      {
+        "type": "action",
+        "description": "Type \"zzzz_no_results_123\" into the search input"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"No results\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"zzzz_no_results_123\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Clearing the search restores the full dashboard list",
+    "description": "Verifies that removing the search query returns the dashboard list back to the unfiltered state.",
+    "category": "Search (Client-side filter)",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Search\" input in the top bar"
+      },
+      {
+        "type": "action",
+        "description": "Type \"test\" into the search input"
+      },
+      {
+        "type": "action",
+        "description": "Press \"Escape\" key"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"test\" is not visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Search\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Search trims leading and trailing spaces in the query",
+    "description": "Verifies that searching with leading/trailing spaces behaves like the trimmed query.",
+    "category": "Search (Client-side filter)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Search\" input in the top bar"
+      },
+      {
+        "type": "action",
+        "description": "Type \"   report   \" into the search input"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"report\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"No results\" is not visible"
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Search is case-insensitive for matching visible item names",
+    "description": "Verifies that changing the letter case in the query still returns the same matching items.",
+    "category": "Search (Client-side filter)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Search\" input in the top bar"
+      },
+      {
+        "type": "action",
+        "description": "Type \"Doc\" into the search input"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Doc\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Press \"Escape\" key"
+      },
+      {
+        "type": "action",
+        "description": "Type \"doc\" into the search input"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"doc\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Search query persists while staying on the dashboard view",
+    "description": "Verifies that the typed search query remains visible and continues filtering until cleared.",
+    "category": "Search (Client-side filter)",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Search\" input in the top bar"
+      },
+      {
+        "type": "action",
+        "description": "Type \"2026\" into the search input"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"2026\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on a non-interactive empty area of the dashboard page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"2026\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC022",
+    "title": "Search handles special characters without breaking the UI",
+    "description": "Verifies that entering special characters does not crash the UI and shows no-results state when appropriate.",
+    "category": "Search (Client-side filter)",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Search\" input in the top bar"
+      },
+      {
+        "type": "action",
+        "description": "Type \"[](){}.*+?^$|\" into the search input"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"[](){}.*+?^$|\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"No results\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC023",
+    "title": "My Drive: switch between Grid and List view and see the view update",
+    "description": "Verifies the My Drive dashboard renders and the grid/list toggle changes the visible layout.",
+    "category": "Dashboard Views & Navigation",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"My Drive\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Grid view toggle\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"List view toggle\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"List\" view toggle"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"List layout\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Grid\" view toggle"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Grid layout\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC024",
+    "title": "My Drive: view preference persists after navigating away and returning",
+    "description": "Verifies the selected grid/list view preference remains when moving between dashboard views and returning to My Drive.",
+    "category": "Dashboard Views & Navigation",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"List\" view toggle"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"List layout\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Recent\" in the dashboard navigation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard/recent\""
+      },
+      {
+        "type": "action",
+        "description": "Click on \"My Drive\" in the dashboard navigation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"List layout\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC025",
+    "title": "Recent: open Recent view and verify it renders a recent files list",
+    "description": "Verifies the Recent dashboard view loads and shows a list of recently updated files.",
+    "category": "Dashboard Views & Navigation",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard/recent"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Recent\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Recent files list\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"File row or file card\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC026",
+    "title": "Starred: open Starred view and verify it renders starred items section",
+    "description": "Verifies the Starred dashboard view loads and shows starred files section or list area.",
+    "category": "Dashboard Views & Navigation",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard/starred"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Starred\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Starred items list\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"File row or file card\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC027",
+    "title": "Shared: open Shared view and verify it renders shared items with share status",
+    "description": "Verifies the Shared dashboard view loads and shows items that have active share links (or the shared listing area).",
+    "category": "Dashboard Views & Navigation",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard/shared"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Shared\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Shared items list\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Share link indicator\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC028",
+    "title": "Trash: restore an item from Trash and verify it is removed from Trash list",
+    "description": "Verifies a trashed item can be restored from the Trash view and no longer appears in the trashed listing.",
+    "category": "Dashboard Views & Navigation",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard/trash"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Trash\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Trashed items list\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Restore\" for the first trashed item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Restored\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Trashed items list\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC029",
+    "title": "Trash: permanently delete an item and confirm it disappears from Trash list",
+    "description": "Verifies a trashed item can be permanently deleted from Trash and is removed from the listing after confirmation.",
+    "category": "Dashboard Views & Navigation",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard/trash"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Trash\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Trashed items list\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Delete permanently\" for the first trashed item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Confirm delete\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Confirm\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Deleted\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"Trashed items list\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC030",
+    "title": "Settings: update a preference and save successfully",
+    "description": "Verifies the Settings page loads, a preference can be changed, and a save confirmation appears.",
+    "category": "Dashboard Views & Navigation",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /dashboard/settings"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Settings\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"User profile section\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Preference\" option toggle"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Save\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Saved\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC031",
+    "title": "Storage meter is visible on the Dashboard sidebar",
+    "description": "Verifies the storage usage meter is shown in the sidebar on the main dashboard.",
+    "category": "Storage Meter & Quota",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"Storage\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"storage usage meter\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"used\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"limit\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC032",
+    "title": "Storage meter shows numeric usage and limit values",
+    "description": "Verifies the sidebar meter displays readable numeric values for used storage and total quota.",
+    "category": "Storage Meter & Quota",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"storage usage meter\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"0\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"KB\" is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify text \"MB\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC033",
+    "title": "Storage meter persists when navigating to Recent",
+    "description": "Verifies the storage usage meter remains available in the sidebar after navigating to another dashboard section.",
+    "category": "Storage Meter & Quota",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"storage usage meter\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Recent\" in the sidebar"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard/recent\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"storage usage meter\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC034",
+    "title": "Storage meter persists when navigating to Starred",
+    "description": "Verifies the storage usage meter remains available in the sidebar after navigating to Starred.",
+    "category": "Storage Meter & Quota",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"storage usage meter\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Starred\" in the sidebar"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard/starred\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"storage usage meter\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC035",
+    "title": "Storage meter persists when navigating to Shared",
+    "description": "Verifies the storage usage meter remains available in the sidebar after navigating to Shared files.",
+    "category": "Storage Meter & Quota",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"storage usage meter\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Shared\" in the sidebar"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard/shared\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"storage usage meter\" is visible"
+      }
+    ]
+  },
+  {
+    "id": "TC036",
+    "title": "Storage meter remains visible on Settings page",
+    "description": "Verifies the storage usage meter remains present when navigating to Settings from the dashboard.",
+    "category": "Storage Meter & Quota",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to \"/dashboard\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"storage usage meter\" is visible"
+      },
+      {
+        "type": "action",
+        "description": "Click on \"Settings\" in the sidebar"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify URL contains \"/dashboard/settings\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify element \"storage usage meter\" is visible"
+      }
+    ]
+  }
+]

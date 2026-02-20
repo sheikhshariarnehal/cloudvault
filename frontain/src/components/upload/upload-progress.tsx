@@ -16,7 +16,7 @@ export function UploadProgress() {
   if (uploadQueue.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 bg-white rounded-xl shadow-xl border overflow-hidden">
+    <div className="fixed bottom-4 right-4 left-4 sm:left-auto z-50 w-auto sm:w-80 bg-white rounded-xl shadow-xl border overflow-hidden pb-[env(safe-area-inset-bottom)]">
       <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b">
         <div className="flex items-center gap-2">
           <Upload className="h-4 w-4" />
