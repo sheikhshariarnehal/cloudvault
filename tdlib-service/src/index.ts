@@ -48,12 +48,24 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// ─── Public: chunk upload (auth via uploadId session token) ──────────
-app.use("/api/chunked-upload/chunk", chunkedUploadRouter);
+// ─── Chunked upload: /init and /chunk are public (browser direct) ────
+// /complete requires API key (called from Vercel backend)
+// Security: uploadId is 32-char random hex, unguessable
+const chunkedUploadAuth = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  // Only /complete needs API key auth
+  if (req.path === "/complete") {
+    return authMiddleware(req, res, next);
+  }
+  next();
+};
+app.use("/api/chunked-upload", chunkedUploadAuth, chunkedUploadRouter);
 
 // ─── Protected API Routes ────────────────────────────────────────────
 app.use("/api/upload", authMiddleware, uploadRouter);
-app.use("/api/chunked-upload", authMiddleware, chunkedUploadRouter);
 app.use("/api/download", authMiddleware, downloadRouter);
 app.use("/api/thumbnail", authMiddleware, thumbnailRouter);
 app.use("/api/message", authMiddleware, deleteRouter);
