@@ -26,9 +26,11 @@ interface FilesState {
   // Upload Queue actions
   addToUploadQueue: (item: UploadQueueItem) => void;
   updateUploadProgress: (id: string, progress: number) => void;
+  updateUploadBytes: (id: string, bytesLoaded: number, bytesTotal: number) => void;
   updateUploadStatus: (id: string, status: UploadQueueItem["status"], error?: string) => void;
   removeFromUploadQueue: (id: string) => void;
   clearUploadQueue: () => void;
+  cancelAllUploads: () => void;
 
   // UI actions
   setViewMode: (mode: ViewMode) => void;
@@ -110,6 +112,12 @@ export const useFilesStore = create<FilesState>((set) => ({
         item.id === id ? { ...item, progress } : item
       ),
     })),
+  updateUploadBytes: (id, bytesLoaded, bytesTotal) =>
+    set((state) => ({
+      uploadQueue: state.uploadQueue.map((item) =>
+        item.id === id ? { ...item, bytesLoaded, bytesTotal } : item
+      ),
+    })),
   updateUploadStatus: (id, status, error) =>
     set((state) => ({
       uploadQueue: state.uploadQueue.map((item) =>
@@ -121,6 +129,10 @@ export const useFilesStore = create<FilesState>((set) => ({
       uploadQueue: state.uploadQueue.filter((item) => item.id !== id),
     })),
   clearUploadQueue: () => set({ uploadQueue: [] }),
+  cancelAllUploads: () =>
+    set((state) => ({
+      uploadQueue: state.uploadQueue.filter((item) => item.status === "success"),
+    })),
 
   // UI actions
   setViewMode: (mode) => set({ viewMode: mode }),
