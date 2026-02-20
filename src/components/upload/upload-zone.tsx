@@ -98,11 +98,11 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       chunkForm.append("chunkIndex", String(i));
 
       // Direct upload to TDLib service (bypasses Vercel 4.5MB limit)
-      if (!directUrl) {
+      if (!chunkEndpoint) {
         throw new Error("No direct chunk endpoint available. Set NEXT_PUBLIC_TDLIB_CHUNK_URL.");
       }
 
-      const res = await fetch(directUrl, { method: "POST", body: chunkForm });
+      const res = await fetch(chunkEndpoint, { method: "POST", body: chunkForm });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Chunk ${i} failed with status ${res.status}`);
