@@ -13,6 +13,7 @@ import { UploadProgress } from "@/components/upload/upload-progress";
 import { PreviewModal } from "@/components/preview/preview-modal";
 import { NewFolderModal } from "@/components/modals/new-folder-modal";
 import { RenameModal } from "@/components/modals/rename-modal";
+import type { DbFile, DbFolder } from "@/types/file.types";
 import { ShareModal } from "@/components/modals/share-modal";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
@@ -73,8 +74,8 @@ export default function DashboardLayout({
             .order("name", { ascending: true }),
         ]);
 
-        if (filesRes.data) setFiles(filesRes.data);
-        if (foldersRes.data) setFolders(foldersRes.data);
+        if (filesRes.data) setFiles(filesRes.data as DbFile[]);
+        if (foldersRes.data) setFolders(foldersRes.data as DbFolder[]);
       } catch (error) {
         console.error("Failed to load data:", error);
       } finally {
