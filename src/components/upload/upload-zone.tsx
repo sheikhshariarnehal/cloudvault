@@ -19,6 +19,101 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   const { addToUploadQueue, updateUploadStatus, updateUploadProgress, addFile } =
     useFilesStore();
 
+  // 3.5 MB chunk size — safely under Vercel's 4.5 MB serverless body limit
+  const CHUNK_SIZE = 3.5 * 1024 * 1024;
+
+  /**
+   * Chunked upload for large files (> CHUNK_SIZE).
+   * 1. POST /api/upload/init     → get uploadId
+   * 2. POST /api/upload/chunk    → send each chunk
+   * 3. POST /api/upload/complete → assemble + Telegram upload + DB insert
+   */
+  const uploadFileChunked = useCallback(async (
+    queueId: string,
+    file: File,
+    targetFolderId: string | null,
+  ) => {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+    // 1. Init session
+    const initRes = await fetch("/api/upload/init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || "application/octet-stream",
+        totalChunks,
+      }),
+    });
+
+    if (!initRes.ok) {
+      const err = await initRes.json().catch(() => ({}));
+      throw new Error(err.error || `Init failed with status ${initRes.status}`);
+    }
+
+    const { uploadId } = await initRes.json();
+
+    // 2. Upload chunks sequentially with progress
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const chunk = file.slice(start, end);
+
+      const chunkForm = new FormData();
+      chunkForm.append("chunk", chunk, `chunk_${i}`);
+      chunkForm.append("uploadId", uploadId);
+      chunkForm.append("chunkIndex", String(i));
+
+      const chunkRes = await fetch("/api/upload/chunk", {
+        method: "POST",
+        body: chunkForm,
+      });
+
+      if (!chunkRes.ok) {
+        const err = await chunkRes.json().catch(() => ({}));
+        throw new Error(err.error || `Chunk ${i} failed with status ${chunkRes.status}`);
+      }
+
+      // Progress: chunk upload phase is 0-90%, final assemble is 90-100%
+      const pct = Math.round(((i + 1) / totalChunks) * 90);
+      updateUploadProgress(queueId, pct);
+    }
+
+    // 3. Complete: assemble + upload to Telegram + DB insert
+    updateUploadProgress(queueId, 92);
+
+    const completeRes = await fetch("/api/upload/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uploadId,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || "application/octet-stream",
+        userId: user?.id || null,
+        guestSessionId: guestSessionId || null,
+        folderId: targetFolderId,
+      }),
+    });
+
+    if (!completeRes.ok) {
+      const errData = await completeRes.json().catch(() => ({}));
+      if (completeRes.status === 429) {
+        const retryAfter = errData.retry_after ?? 30;
+        const err = new Error(errData.error || `Rate limited. Retry after ${retryAfter}s`);
+        (err as any).retryAfter = retryAfter;
+        (err as any).isRateLimit = true;
+        throw err;
+      }
+      throw new Error(errData.error || `Complete failed with status ${completeRes.status}`);
+    }
+
+    const data = await completeRes.json();
+    updateUploadProgress(queueId, 100);
+    return data;
+  }, [user, guestSessionId, updateUploadProgress, CHUNK_SIZE]);
+
   const uploadFile = useCallback(async (
     queueId: string,
     file: File,
@@ -34,17 +129,12 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
     updateUploadStatus(queueId, "uploading");
 
-    const formData = new FormData();
-    formData.append("file", file);
-    if (targetFolderId) formData.append("folder_id", targetFolderId);
-    if (user?.id) formData.append("user_id", user.id);
-    if (guestSessionId) formData.append("guest_session_id", guestSessionId);
-
     console.log("Starting upload:", {
       fileName: file.name,
       fileSize: file.size,
       hasUser: !!user?.id,
       hasGuestSession: !!guestSessionId,
+      chunked: file.size > CHUNK_SIZE,
     });
 
     // Carries Telegram rate-limit info through the error chain
@@ -56,11 +146,19 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       }
     }
 
-    const MAX_ATTEMPTS = 6; // allow enough retries to outlast a rate-limit window
+    const MAX_ATTEMPTS = 6;
 
     const attemptUpload = async (attempt: number): Promise<void> => {
       try {
-        // Rebuild FormData for each attempt to avoid consumed body issues
+        // ── Use chunked upload for files larger than CHUNK_SIZE ──────────
+        if (file.size > CHUNK_SIZE) {
+          const data = await uploadFileChunked(queueId, file, targetFolderId);
+          addFile(data.file);
+          updateUploadStatus(queueId, "success");
+          return;
+        }
+
+        // ── Small file: single-request upload (original path) ───────────
         const uploadData = new FormData();
         uploadData.append("file", file);
         if (targetFolderId) uploadData.append("folder_id", targetFolderId);
@@ -137,7 +235,12 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
         const message =
           error instanceof Error ? error.message : "Upload failed";
 
-        if (attempt >= MAX_ATTEMPTS) {
+        // For chunked uploads, don't retry the whole thing on non-rate-limit errors
+        // (chunks are already individual requests, retrying everything would be wasteful)
+        const isChunked = file.size > CHUNK_SIZE;
+        const isRateLimit = error instanceof RateLimitError || (error as any)?.isRateLimit;
+
+        if (attempt >= MAX_ATTEMPTS || (isChunked && !isRateLimit)) {
           console.error("Upload error:", message, error);
           updateUploadStatus(queueId, "error", message);
           return;
@@ -145,11 +248,12 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
         let delay: number;
         if (error instanceof RateLimitError) {
-          // Honour the server's Retry-After, plus a small jitter
           delay = (error.retryAfter + Math.random() * 2) * 1000;
           console.warn(`[Upload] Rate limited by Telegram – waiting ${error.retryAfter}s before retry (attempt ${attempt}/${MAX_ATTEMPTS})`);
+        } else if ((error as any)?.isRateLimit) {
+          delay = ((error as any).retryAfter + Math.random() * 2) * 1000;
+          console.warn(`[Upload] Rate limited – waiting before retry (attempt ${attempt}/${MAX_ATTEMPTS})`);
         } else {
-          // Exponential backoff for non-rate-limit errors
           delay = Math.pow(2, attempt) * 1000;
         }
         await new Promise((res) => setTimeout(res, delay));
@@ -158,7 +262,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     };
 
     await attemptUpload(1);
-  }, [user, guestSessionId, updateUploadStatus, updateUploadProgress, addFile]);
+  }, [user, guestSessionId, updateUploadStatus, updateUploadProgress, addFile, uploadFileChunked, CHUNK_SIZE]);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
