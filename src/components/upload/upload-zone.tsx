@@ -19,8 +19,9 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   const { addToUploadQueue, updateUploadStatus, updateUploadProgress, addFile } =
     useFilesStore();
 
-  // 10 MB chunks — sent directly to TDLib service, no Vercel size limit
-  const CHUNK_SIZE = 10 * 1024 * 1024;
+  // 3.5 MB chunks — fits under Vercel's 4.5 MB limit for fallback path
+  // 3 parallel × 3.5 MB = 10.5 MB effective bandwidth (same as single 10 MB)
+  const CHUNK_SIZE = 3.5 * 1024 * 1024;
   const PARALLEL_CHUNKS = 3; // upload 3 chunks simultaneously
 
   /**
