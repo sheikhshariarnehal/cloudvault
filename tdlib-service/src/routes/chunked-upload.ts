@@ -68,6 +68,7 @@ interface UploadSession {
   nextFlushIndex: number;        // next chunk to append to assembled file
   assembledPath: string;         // output file being built progressively
   assembledBytes: number;        // bytes flushed so far
+  telegramProgress: number;      // 0–1 fraction of Telegram upload
   createdAt: number;
   dir: string;
 }
@@ -155,6 +156,7 @@ router.post("/init", (req: Request, res: Response) => {
     nextFlushIndex: 0,
     assembledPath,
     assembledBytes: 0,
+    telegramProgress: 0,
     createdAt: Date.now(),
     dir,
   };
@@ -235,6 +237,29 @@ router.post("/chunk", chunkUpload.single("chunk"), (req: Request, res: Response)
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /api/chunked-upload/status?uploadId=xxx
+// Polled by the browser during the Telegram upload phase for live progress
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/status", (req: Request, res: Response) => {
+  const uploadId = req.query.uploadId as string;
+  if (!uploadId) {
+    res.status(400).json({ error: "Missing uploadId" });
+    return;
+  }
+  const session = sessions.get(uploadId);
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+  res.json({
+    receivedChunks: session.receivedChunks.size,
+    totalChunks: session.totalChunks,
+    flushedBytes: session.assembledBytes,
+    telegramProgress: session.telegramProgress,
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/chunked-upload/complete
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/complete", async (req: Request, res: Response) => {
@@ -311,7 +336,8 @@ router.post("/complete", async (req: Request, res: Response) => {
 
     let sendParams: Parameters<typeof client.invoke>[0];
 
-    if (mimeType.startsWith("image/") && !mimeType.includes("svg")) {
+    const MAX_PHOTO_SIZE = 10 * 1024 * 1024; // Telegram photo limit
+    if (mimeType.startsWith("image/") && !mimeType.includes("svg") && stats.size <= MAX_PHOTO_SIZE) {
       sendParams = {
         _: "sendMessage",
         chat_id: parseInt(channelId, 10),
@@ -360,7 +386,8 @@ router.post("/complete", async (req: Request, res: Response) => {
     const isMediaRejection = (msg: string) =>
       msg.includes("IMAGE_PROCESS_FAILED") ||
       msg.includes("PHOTO_INVALID_DIMENSIONS") ||
-      msg.includes("MEDIA_INVALID");
+      msg.includes("MEDIA_INVALID") ||
+      msg.includes("too big for a photo");
 
     const documentFallbackParams = {
       _: "sendMessage" as const,
@@ -386,13 +413,13 @@ router.post("/complete", async (req: Request, res: Response) => {
     let sentMessage: Record<string, unknown>;
     try {
       const pending = await invokeWithSlot(sendParams);
-      sentMessage = await waitForMessageSent(client, pending, session.fileSize);
+      sentMessage = await waitForMessageSent(client, pending, session.fileSize, session);
     } catch (sendErr) {
       const sendErrMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
       if (isMediaRejection(sendErrMsg)) {
         console.warn(`[ChunkedUpload] Media rejected (${sendErrMsg}), retrying as document...`);
         const pending = await invokeWithSlot(documentFallbackParams);
-        sentMessage = await waitForMessageSent(client, pending, session.fileSize);
+        sentMessage = await waitForMessageSent(client, pending, session.fileSize, session);
       } else {
         throw sendErr;
       }
@@ -483,6 +510,7 @@ async function waitForMessageSent(
   client: Awaited<ReturnType<typeof getTDLibClient>>,
   pendingMessage: Record<string, unknown>,
   fileSize: number = 0,
+  session?: UploadSession,
 ): Promise<Record<string, unknown>> {
   if (!pendingMessage.sending_state) return pendingMessage;
 
@@ -531,7 +559,9 @@ async function waitForMessageSent(
           const uploaded = remote.uploaded_size as number || 0;
           lastActivity = Date.now();
           if (uploaded > 0 && fileSize > 0) {
-            const pct = Math.round((uploaded / fileSize) * 100);
+            const ratio = uploaded / fileSize;
+            if (session) session.telegramProgress = ratio;
+            const pct = Math.round(ratio * 100);
             if (pct % 10 === 0) {
               console.log(`[ChunkedUpload] Telegram upload progress: ${pct}% (${Math.round(uploaded / 1024 / 1024)} MB / ${Math.round(fileSize / 1024 / 1024)} MB)`);
             }

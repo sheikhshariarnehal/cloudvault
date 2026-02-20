@@ -45,10 +45,10 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   const { addToUploadQueue, updateUploadStatus, updateUploadProgress, addFile } =
     useFilesStore();
 
-  // 10 MB chunks — go direct to TDLib (bypasses Vercel 4.5 MB limit entirely)
-  // 5 parallel × 10 MB = 50 MB effective bandwidth per batch
-  // 1.7 GB file = 170 chunks instead of 497 → ~3-5 min instead of 15-20 min
-  const CHUNK_SIZE = 10 * 1024 * 1024;
+  // Route files > 4 MB through chunked upload → bypasses Vercel 4.5 MB body limit.
+  // Actual chunk slices are 10 MB each, sent direct to TDLib service.
+  const CHUNK_THRESHOLD = 4 * 1024 * 1024; // decision boundary
+  const CHUNK_SIZE = 10 * 1024 * 1024;     // actual slice size per chunk
   const PARALLEL_CHUNKS = 5;
 
   /**
@@ -85,12 +85,24 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     const { uploadId, chunkEndpoint } = await initRes.json();
 
     // 2. Upload chunks in parallel directly to TDLib service
+    // Track per-chunk byte progress for smooth UI updates
+    const chunkBytesLoaded = new Array(totalChunks).fill(0);
+    const chunkBytesTotal = new Array(totalChunks).fill(0);
     let completedChunks = 0;
+
+    const updateChunkProgress = () => {
+      const loaded = chunkBytesLoaded.reduce((a, b) => a + b, 0);
+      const total = file.size;
+      // Chunk upload phase = 0–80% of the bar
+      const pct = Math.round((loaded / total) * 80);
+      updateUploadProgress(queueId, pct);
+    };
 
     const uploadSingleChunk = async (i: number) => {
       const start = i * CHUNK_SIZE;
       const end = Math.min(start + CHUNK_SIZE, file.size);
       const chunk = file.slice(start, end);
+      chunkBytesTotal[i] = end - start;
 
       const chunkForm = new FormData();
       chunkForm.append("chunk", chunk, `chunk_${i}`);
@@ -102,15 +114,37 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
         throw new Error("No direct chunk endpoint available. Set NEXT_PUBLIC_TDLIB_CHUNK_URL.");
       }
 
-      const res = await fetch(chunkEndpoint, { method: "POST", body: chunkForm });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Chunk ${i} failed with status ${res.status}`);
-      }
+      // Use XMLHttpRequest for byte-level progress within each chunk
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", chunkEndpoint);
 
-      completedChunks++;
-      const pct = Math.round((completedChunks / totalChunks) * 90);
-      updateUploadProgress(queueId, pct);
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) {
+            chunkBytesLoaded[i] = e.loaded;
+            updateChunkProgress();
+          }
+        });
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            chunkBytesLoaded[i] = chunkBytesTotal[i];
+            completedChunks++;
+            updateChunkProgress();
+            resolve();
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText);
+              reject(new Error(err.error || `Chunk ${i} failed with status ${xhr.status}`));
+            } catch {
+              reject(new Error(`Chunk ${i} failed with status ${xhr.status}`));
+            }
+          }
+        };
+
+        xhr.onerror = () => reject(new Error(`Chunk ${i} network error`));
+        xhr.send(chunkForm);
+      });
     };
 
     // Process in parallel batches
@@ -122,8 +156,28 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       await Promise.all(batch);
     }
 
-    // 3. Complete: assemble + upload to Telegram + DB insert (through Vercel)
-    updateUploadProgress(queueId, 92);
+    // 3. Complete: upload to Telegram + DB insert (through Vercel)
+    // Poll TDLib for Telegram upload progress (80% → 98%)
+    updateUploadProgress(queueId, 82);
+
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    const pollProgress = async () => {
+      try {
+        const statusUrl = chunkEndpoint.replace("/chunk", `/status?uploadId=${uploadId}`);
+        const statusRes = await fetch(statusUrl);
+        if (statusRes.ok) {
+          const status = await statusRes.json();
+          if (status.telegramProgress != null) {
+            // Telegram upload phase: 82% → 98%
+            const pct = 82 + Math.round(status.telegramProgress * 16);
+            updateUploadProgress(queueId, Math.min(pct, 98));
+          }
+        }
+      } catch {
+        // ignore poll errors
+      }
+    };
+    pollTimer = setInterval(pollProgress, 2000);
 
     const completeRes = await fetch("/api/upload/complete", {
       method: "POST",
@@ -141,6 +195,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     });
 
     if (!completeRes.ok) {
+      if (pollTimer) clearInterval(pollTimer);
       const errData = await completeRes.json().catch(() => ({}));
       if (completeRes.status === 429) {
         const retryAfter = errData.retry_after ?? 30;
@@ -152,6 +207,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       throw new Error(errData.error || `Complete failed with status ${completeRes.status}`);
     }
 
+    if (pollTimer) clearInterval(pollTimer);
     const data = await completeRes.json();
     updateUploadProgress(queueId, 100);
     return data;
@@ -219,7 +275,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       fileSize: file.size,
       hasUser: !!user?.id,
       hasGuestSession: !!guestSessionId,
-      chunked: file.size > CHUNK_SIZE,
+      chunked: file.size > CHUNK_THRESHOLD,
     });
 
     // Carries Telegram rate-limit info through the error chain
@@ -235,8 +291,8 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
     const attemptUpload = async (attempt: number): Promise<void> => {
       try {
-        // ── Use chunked upload for files larger than CHUNK_SIZE ──────────
-        if (file.size > CHUNK_SIZE) {
+        // ── Use chunked upload for files larger than 4 MB (bypasses Vercel) ──
+        if (file.size > CHUNK_THRESHOLD) {
           const data = await uploadFileChunked(queueId, file, targetFolderId, fileHash);
           addFile(data.file);
           updateUploadStatus(queueId, "success");
@@ -323,7 +379,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
         // For chunked uploads, don't retry the whole thing on non-rate-limit errors
         // (chunks are already individual requests, retrying everything would be wasteful)
-        const isChunked = file.size > CHUNK_SIZE;
+        const isChunked = file.size > CHUNK_THRESHOLD;
         const isRateLimit = error instanceof RateLimitError || (error as any)?.isRateLimit;
 
         if (attempt >= MAX_ATTEMPTS || (isChunked && !isRateLimit)) {
@@ -348,10 +404,15 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     };
 
     await attemptUpload(1);
-  }, [user, guestSessionId, updateUploadStatus, updateUploadProgress, addFile, uploadFileChunked, CHUNK_SIZE]);
+  }, [user, guestSessionId, updateUploadStatus, updateUploadProgress, addFile, uploadFileChunked, CHUNK_THRESHOLD]);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
+      // Stagger uploads: Telegram rate-limits at ~30 messages/minute.
+      // Queue them with a small delay between starts to avoid 429s.
+      const STAGGER_MS = 1500; // 1.5s gap between each file start
+
+      const fileEntries: { queueId: string; file: File }[] = [];
       for (const file of acceptedFiles) {
         const validation = validateFile(file);
         if (!validation.valid) {
@@ -367,8 +428,15 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
           progress: 0,
           status: "pending",
         });
+        fileEntries.push({ queueId, file });
+      }
 
-        // Start upload
+      // Fire each upload with a stagger delay to avoid Telegram 429
+      for (let i = 0; i < fileEntries.length; i++) {
+        const { queueId, file } = fileEntries[i];
+        if (i > 0) {
+          await new Promise((r) => setTimeout(r, STAGGER_MS));
+        }
         uploadFile(queueId, file, folderId);
       }
     },

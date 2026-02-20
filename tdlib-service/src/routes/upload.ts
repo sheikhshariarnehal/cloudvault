@@ -113,7 +113,8 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
 
     let sendParams: Parameters<typeof client.invoke>[0];
 
-    if (mimeType.startsWith("image/") && !mimeType.includes("svg")) {
+    const MAX_PHOTO_SIZE = 10 * 1024 * 1024; // Telegram photo limit
+    if (mimeType.startsWith("image/") && !mimeType.includes("svg") && fileStats.size <= MAX_PHOTO_SIZE) {
       sendParams = {
         _: "sendMessage",
         chat_id: parseInt(channelId, 10),
@@ -191,7 +192,8 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
     const isMediaRejection = (msg: string) =>
       msg.includes("IMAGE_PROCESS_FAILED") ||
       msg.includes("PHOTO_INVALID_DIMENSIONS") ||
-      msg.includes("MEDIA_INVALID");
+      msg.includes("MEDIA_INVALID") ||
+      msg.includes("too big for a photo");
 
     const documentFallbackParams = {
       _: "sendMessage" as const,
