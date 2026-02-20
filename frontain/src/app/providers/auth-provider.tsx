@@ -27,6 +27,40 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+/**
+ * Ensures the authenticated user has a corresponding public.users profile.
+ * The DB trigger handles this on signup, but this is a safety net for:
+ * - Users created before the trigger existed
+ * - Edge cases where the trigger might fail
+ */
+async function ensureUserProfile(supabase: ReturnType<typeof createClient>, user: User) {
+  try {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile) {
+      const displayName =
+        user.user_metadata?.display_name ||
+        user.user_metadata?.full_name ||
+        user.email?.split("@")[0] ||
+        "User";
+
+      await supabase.from("users").insert({
+        id: user.id,
+        email: user.email,
+        display_name: displayName,
+        avatar_url: user.user_metadata?.avatar_url || null,
+      });
+    }
+  } catch {
+    // Profile already exists or creation failed silently — either way, don't block auth
+    console.warn("ensureUserProfile: could not verify/create profile");
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [guestSessionId, setGuestSessionId] = useState<string | null>(null);
@@ -39,10 +73,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        setUser(session?.user ?? null);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
 
-        // Create guest session for unauthenticated users
-        if (!session?.user) {
+        if (currentUser) {
+          // Ensure the user has a public.users profile
+          await ensureUserProfile(supabase, currentUser);
+        } else {
+          // Create guest session for unauthenticated users
           setGuestSessionId(getGuestSessionId());
         }
       } catch (error) {
@@ -58,12 +96,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (!session?.user) {
-        setGuestSessionId(getGuestSessionId());
-      } else {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      if (currentUser) {
         setGuestSessionId(null);
+        // Ensure profile on any auth state change (login, token refresh, etc.)
+        await ensureUserProfile(supabase, currentUser);
+      } else {
+        setGuestSessionId(getGuestSessionId());
       }
     });
 

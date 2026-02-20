@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useUIStore } from "@/store/ui-store";
 import { FileContextMenu } from "@/components/context-menu/file-context-menu";
 import { getFileCategory } from "@/types/file.types";
-import { getFileUrl } from "@/lib/utils";
 import {
   FileText,
   Image as ImageIcon,
@@ -49,21 +48,65 @@ function getSmartConfig(mimeType: string, category: string) {
   return fileTypeConfig[category] || fileTypeConfig.other;
 }
 
+/**
+ * Returns the thumbnail src for a file card.
+ * - If a base64 thumbnail_url is already in memory (e.g. just uploaded), use it.
+ * - Otherwise, for images/videos, use the lightweight /api/thumbnail/[id] route
+ *   which serves the stored thumbnail with aggressive caching.
+ */
+function getThumbnailSrc(file: DbFile, category: string): string | null {
+  // Inline base64 from upload — already available, no extra fetch needed
+  if (file.thumbnail_url) return file.thumbnail_url;
+  // For images/videos, use the cached thumbnail API (small, fast)
+  if (category === "image" || category === "video") {
+    return `/api/thumbnail/${file.id}`;
+  }
+  return null;
+}
+
+/** Whether a file category should attempt to show a thumbnail preview */
+function shouldShowThumbnail(category: string): boolean {
+  return category === "image" || category === "video";
+}
+
 export function FileCard({ file }: FileCardProps) {
   const { setPreviewFileId } = useUIStore();
   const category = getFileCategory(file.mime_type);
-  const [imgError, setImgError] = useState(false);
 
   const config = getSmartConfig(file.mime_type, category);
   const Icon = config.icon;
 
-  const thumbnailSrc =
-    file.thumbnail_url || (category === "image" ? getFileUrl(file.id, file.name) : null);
-  const showThumbnail =
-    (category === "image" || (category === "video" && file.thumbnail_url) || ((category === "pdf" || category === "document") && file.thumbnail_url)) && !imgError && !!thumbnailSrc;
+  const [imgError, setImgError] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const hasThumbnail = shouldShowThumbnail(category) && !imgError;
+  const thumbnailSrc = hasThumbnail ? getThumbnailSrc(file, category) : null;
+
+  // IntersectionObserver — only load thumbnails when the card enters the viewport
+  useEffect(() => {
+    if (!hasThumbnail || !thumbnailSrc) return;
+
+    const el = cardRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" } // start loading 200px before visible
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasThumbnail, thumbnailSrc]);
 
   return (
     <div
+      ref={cardRef}
       className="group flex flex-col rounded-lg border border-[#dadce0] bg-white hover:border-[#174ea6] hover:shadow-[0_1px_3px_0_rgba(60,64,67,0.3),0_4px_8px_3px_rgba(60,64,67,0.15)] transition-[box-shadow,border-color] duration-200 overflow-hidden cursor-pointer h-[200px]"
     >
       {/* ===== TOP BAR: icon + name + ⋮ ===== */}
@@ -85,13 +128,14 @@ export function FileCard({ file }: FileCardProps) {
         className="relative w-full flex-1 border-t border-[#e0e0e0] overflow-hidden"
         onClick={() => setPreviewFileId(file.id)}
       >
-        {showThumbnail ? (
+        {hasThumbnail && thumbnailSrc && isVisible ? (
           <img
-            src={thumbnailSrc!}
+            src={thumbnailSrc}
             alt={file.name}
             className="w-full h-full object-cover"
             onError={() => setImgError(true)}
             loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className={`flex items-center justify-center w-full h-full ${config.bgClass}`}>

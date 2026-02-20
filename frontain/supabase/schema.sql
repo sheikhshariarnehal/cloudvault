@@ -99,39 +99,67 @@ CREATE POLICY "Users can update own profile"
   ON public.users FOR UPDATE
   USING (auth.uid() = id);
 
--- Files RLS
+CREATE POLICY "Users can insert own profile"
+  ON public.users FOR INSERT
+  WITH CHECK (auth.uid() = id);
+
+-- Files RLS (authenticated users see own files; guest files accessible via anon role)
 CREATE POLICY "Users can view own files"
   ON public.files FOR SELECT
-  USING (auth.uid() = user_id OR guest_session_id IS NOT NULL);
+  USING (
+    (auth.uid() = user_id) 
+    OR (user_id IS NULL AND guest_session_id IS NOT NULL)
+  );
 
 CREATE POLICY "Users can insert own files"
   ON public.files FOR INSERT
-  WITH CHECK (auth.uid() = user_id OR guest_session_id IS NOT NULL);
+  WITH CHECK (
+    (auth.uid() = user_id) 
+    OR (user_id IS NULL AND guest_session_id IS NOT NULL)
+  );
 
 CREATE POLICY "Users can update own files"
   ON public.files FOR UPDATE
-  USING (auth.uid() = user_id OR guest_session_id IS NOT NULL);
+  USING (
+    (auth.uid() = user_id) 
+    OR (user_id IS NULL AND guest_session_id IS NOT NULL)
+  );
 
 CREATE POLICY "Users can delete own files"
   ON public.files FOR DELETE
-  USING (auth.uid() = user_id OR guest_session_id IS NOT NULL);
+  USING (
+    (auth.uid() = user_id) 
+    OR (user_id IS NULL AND guest_session_id IS NOT NULL)
+  );
 
 -- Folders RLS
 CREATE POLICY "Users can view own folders"
   ON public.folders FOR SELECT
-  USING (auth.uid() = user_id OR guest_session_id IS NOT NULL);
+  USING (
+    (auth.uid() = user_id) 
+    OR (user_id IS NULL AND guest_session_id IS NOT NULL)
+  );
 
 CREATE POLICY "Users can insert own folders"
   ON public.folders FOR INSERT
-  WITH CHECK (auth.uid() = user_id OR guest_session_id IS NOT NULL);
+  WITH CHECK (
+    (auth.uid() = user_id) 
+    OR (user_id IS NULL AND guest_session_id IS NOT NULL)
+  );
 
 CREATE POLICY "Users can update own folders"
   ON public.folders FOR UPDATE
-  USING (auth.uid() = user_id OR guest_session_id IS NOT NULL);
+  USING (
+    (auth.uid() = user_id) 
+    OR (user_id IS NULL AND guest_session_id IS NOT NULL)
+  );
 
 CREATE POLICY "Users can delete own folders"
   ON public.folders FOR DELETE
-  USING (auth.uid() = user_id OR guest_session_id IS NOT NULL);
+  USING (
+    (auth.uid() = user_id) 
+    OR (user_id IS NULL AND guest_session_id IS NOT NULL)
+  );
 
 -- Shared Links RLS
 CREATE POLICY "Users can view own shared links"
@@ -142,9 +170,37 @@ CREATE POLICY "Users can create shared links"
   ON public.shared_links FOR INSERT
   WITH CHECK (auth.uid() = created_by);
 
+CREATE POLICY "Users can update own shared links"
+  ON public.shared_links FOR UPDATE
+  USING (auth.uid() = created_by);
+
+CREATE POLICY "Users can delete own shared links"
+  ON public.shared_links FOR DELETE
+  USING (auth.uid() = created_by);
+
 CREATE POLICY "Anyone can view active shared links by token"
   ON public.shared_links FOR SELECT
   USING (is_active = TRUE);
+
+-- Auto-create public.users profile when a new auth user signs up
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email, display_name, avatar_url)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    NEW.raw_user_meta_data->>'avatar_url'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- Helper function to increment storage
 CREATE OR REPLACE FUNCTION increment_storage(user_id_param UUID, bytes_param BIGINT)

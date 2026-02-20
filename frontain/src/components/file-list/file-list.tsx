@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
 import { FileContextMenu } from "@/components/context-menu/file-context-menu";
@@ -44,24 +43,6 @@ const iconMap = {
 function FileThumbnail({ file }: { file: DbFile }) {
   const category = getFileCategory(file.mime_type);
   const { icon: Icon, color, bg } = iconMap[category];
-  const [imgError, setImgError] = useState(false);
-
-  const thumbnailSrc = file.thumbnail_url || (category === "image" ? getFileUrl(file.id, file.name) : null);
-  const showThumbnail = (category === "image" || (category === "video" && file.thumbnail_url)) && !imgError;
-
-  if (showThumbnail && thumbnailSrc) {
-    return (
-      <div className="h-9 w-9 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-        <img
-          src={thumbnailSrc}
-          alt={file.name}
-          className="w-full h-full object-cover"
-          onError={() => setImgError(true)}
-          loading="lazy"
-        />
-      </div>
-    );
-  }
 
   return (
     <div className={`h-9 w-9 rounded-lg ${bg} flex items-center justify-center flex-shrink-0`}>

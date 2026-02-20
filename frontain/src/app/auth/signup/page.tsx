@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Cloud, Mail, Chrome, Eye, EyeOff } from "lucide-react";
+import { GoogleAuthButton } from "@/components/auth/google-auth-button";
+import { Cloud, Mail, Eye, EyeOff } from "lucide-react";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("");
@@ -34,7 +35,7 @@ export default function SignUpPage() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -43,22 +44,20 @@ export default function SignUpPage() {
         },
       });
       if (error) throw error;
+
+      // If user is auto-confirmed (session exists), redirect to dashboard directly
+      if (data.session) {
+        router.push("/dashboard");
+        return;
+      }
+
+      // Otherwise, show email verification message
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleGoogleSignUp = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (error) setError(error.message);
   };
 
   if (success) {
@@ -181,14 +180,7 @@ export default function SignUpPage() {
             </div>
           </div>
 
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleGoogleSignUp}
-          >
-            <Chrome className="h-4 w-4 mr-2" />
-            Google
-          </Button>
+          <GoogleAuthButton mode="signup" />
         </div>
 
         <p className="text-center text-sm text-muted-foreground">
