@@ -61,22 +61,48 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-8">
-      <div className="w-full max-w-[420px] space-y-6">
+    <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center py-8 px-4 sm:px-6">
+      <div className="w-full max-w-sm mx-auto space-y-5">
+
+        {/* Logo */}
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Cloud className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight">CloudVault</h1>
+          <div className="inline-flex items-center justify-center w-11 h-11 bg-blue-600 rounded-xl mb-3">
+            <Cloud className="h-5 w-5 text-white" />
           </div>
-          <p className="text-sm text-muted-foreground">
-            Sign in to access your files
-          </p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Welcome back</h1>
+          <p className="text-sm text-gray-500 mt-1">Sign in to your CloudVault account</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-8 space-y-5">
-          <form onSubmit={handleEmailLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-7 space-y-4">
+
+          {/* Google first */}
+          <GoogleAuthButton mode="login" />
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative flex justify-center text-[11px] uppercase">
+              <span className="bg-white px-3 text-gray-400 font-medium tracking-wide">or continue with email</span>
+            </div>
+          </div>
+
+          {/* Error / info */}
+          {error && (
+            <div className={`p-3 rounded-lg text-sm border ${
+              error.toLowerCase().includes("check")
+                ? "bg-green-50 border-green-200 text-green-700"
+                : "bg-red-50 border-red-200 text-red-600"
+            }`}>
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleEmailLogin} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -84,16 +110,18 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
+                className="h-11 text-base sm:text-sm"
               />
             </div>
 
             {!isMagicLink && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
                   <Link
                     href="/auth/forgot-password"
-                    className="text-xs text-primary hover:underline"
+                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
                   >
                     Forgot password?
                   </Link>
@@ -106,13 +134,15 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="pr-10"
+                    autoComplete="current-password"
+                    className="h-11 pr-10 text-base sm:text-sm"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
                     tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -120,55 +150,38 @@ export default function LoginPage() {
               </div>
             )}
 
-            {error && (
-              <p className={`text-sm ${error.includes("Check") ? "text-green-600" : "text-destructive"}`}>
-                {error}
-              </p>
-            )}
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full h-11 bg-gray-900 hover:bg-gray-800 font-semibold text-sm"
+              disabled={isLoading}
+            >
               <Mail className="h-4 w-4 mr-2" />
-              {isLoading
-                ? "Signing in..."
-                : isMagicLink
-                ? "Send Magic Link"
-                : "Sign In"}
+              {isLoading ? "Signing in..." : isMagicLink ? "Send Magic Link" : "Sign In"}
             </Button>
           </form>
 
           <button
+            type="button"
             onClick={() => setIsMagicLink(!isMagicLink)}
-            className="text-sm text-muted-foreground hover:text-foreground w-full text-center"
+            className="text-xs text-gray-400 hover:text-gray-600 w-full text-center py-1"
           >
             {isMagicLink ? "Use password instead" : "Use magic link instead"}
           </button>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
-
-          <GoogleAuthButton mode="login" />
-
           <Button
+            type="button"
             variant="ghost"
-            className="w-full text-muted-foreground"
+            className="w-full h-10 text-sm text-gray-500 hover:text-gray-700"
             onClick={handleGuestMode}
           >
             Continue as Guest
           </Button>
         </div>
 
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-sm text-gray-500">
           Don&apos;t have an account?{" "}
-          <Link href="/auth/signup" className="text-primary hover:underline font-medium">
-            Sign up
+          <Link href="/auth/signup" className="text-blue-600 hover:text-blue-700 font-semibold">
+            Sign up free
           </Link>
         </p>
       </div>

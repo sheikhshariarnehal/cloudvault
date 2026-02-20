@@ -62,15 +62,18 @@ export default function SignUpPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-md text-center space-y-4">
-          <Cloud className="h-12 w-12 text-primary mx-auto" />
-          <h2 className="text-2xl font-bold">Check your email</h2>
-          <p className="text-muted-foreground">
-            We&apos;ve sent a verification link to <strong>{email}</strong>.
+      <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 px-4">
+        <div className="w-full max-w-sm text-center space-y-5 py-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-green-100 rounded-full">
+            <Cloud className="h-7 w-7 text-green-600" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Check your email</h2>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            We&apos;ve sent a verification link to{" "}
+            <strong className="text-gray-800 break-all">{email}</strong>.
             Please verify your email to continue.
           </p>
-          <Button variant="outline" onClick={() => router.push("/auth/login")}>
+          <Button className="w-full h-11" variant="outline" onClick={() => router.push("/auth/login")}>
             Back to Sign In
           </Button>
         </div>
@@ -79,22 +82,44 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md space-y-8">
+    <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center py-8 px-4 sm:px-6">
+      <div className="w-full max-w-sm mx-auto space-y-5">
+
+        {/* Logo */}
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Cloud className="h-10 w-10 text-primary" />
-            <h1 className="text-3xl font-bold">CloudVault</h1>
+          <div className="inline-flex items-center justify-center w-11 h-11 bg-blue-600 rounded-xl mb-3">
+            <Cloud className="h-5 w-5 text-white" />
           </div>
-          <p className="text-muted-foreground">
-            Create your account to get started
-          </p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create your account</h1>
+          <p className="text-sm text-gray-500 mt-1">Free forever. No credit card required.</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border p-8 space-y-6">
-          <form onSubmit={handleSignUp} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Display Name</Label>
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-7 space-y-4">
+
+          {/* Google first — primary action */}
+          <GoogleAuthButton mode="signup" />
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative flex justify-center text-[11px] uppercase">
+              <span className="bg-white px-3 text-gray-400 font-medium tracking-wide">or sign up with email</span>
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSignUp} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="name" className="text-sm font-medium text-gray-700">Display Name</Label>
               <Input
                 id="name"
                 type="text"
@@ -102,11 +127,12 @@ export default function SignUpPage() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 required
+                className="h-11 text-base sm:text-sm"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -114,78 +140,69 @@ export default function SignUpPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
+                className="h-11 text-base sm:text-sm"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Min 8 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="pr-10"
+                  autoComplete="new-password"
+                  className="h-11 pr-10 text-base sm:text-sm"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
                   tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-start gap-2.5 pt-1">
               <Checkbox
                 id="terms"
                 checked={acceptTerms}
                 onCheckedChange={(checked) => setAcceptTerms(checked as boolean)}
+                className="flex-shrink-0 mt-0.5"
               />
-              <Label htmlFor="terms" className="text-sm text-muted-foreground">
-                I accept the{" "}
-                <span className="text-primary hover:underline cursor-pointer">
-                  Terms of Service
-                </span>{" "}
-                and{" "}
-                <span className="text-primary hover:underline cursor-pointer">
-                  Privacy Policy
-                </span>
-              </Label>
+              <label
+                htmlFor="terms"
+                className="text-xs text-gray-500 leading-relaxed cursor-pointer select-none"
+              >
+                I agree to the{" "}
+                <a href="#" className="text-blue-600 hover:text-blue-700 underline underline-offset-2 font-medium">Terms&nbsp;of&nbsp;Service</a>
+                {" "}and{" "}
+                <a href="#" className="text-blue-600 hover:text-blue-700 underline underline-offset-2 font-medium">Privacy&nbsp;Policy</a>
+              </label>
             </div>
 
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full h-11 bg-gray-900 hover:bg-gray-800 font-semibold text-sm mt-1"
+              disabled={isLoading}
+            >
               <Mail className="h-4 w-4 mr-2" />
               {isLoading ? "Creating account..." : "Create Account"}
             </Button>
           </form>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
-
-          <GoogleAuthButton mode="signup" />
         </div>
 
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-sm text-gray-500">
           Already have an account?{" "}
-          <Link href="/auth/login" className="text-primary hover:underline font-medium">
+          <Link href="/auth/login" className="text-blue-600 hover:text-blue-700 font-semibold">
             Sign in
           </Link>
         </p>

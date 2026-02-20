@@ -22,7 +22,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, guestSessionId } = useAuth();
+  const { user, guestSessionId, isLoading: authLoading } = useAuth();
   const { setFiles, setFolders, setIsLoading, currentFolderId } = useFilesStore();
   const { sidebarOpen, setSidebarOpen, isOnline, setIsOnline } = useUIStore();
 
@@ -31,6 +31,10 @@ export default function DashboardLayout({
 
   // Load initial data
   useEffect(() => {
+    // Wait for auth to finish resolving before querying.
+    // This prevents: (a) querying with wrong identity, (b) double-firing.
+    if (authLoading) return;
+
     const loadData = async () => {
       setIsLoading(true);
       const supabase = createClient();
@@ -84,7 +88,7 @@ export default function DashboardLayout({
     };
 
     loadData();
-  }, [user?.id, guestSessionId, setFiles, setFolders, setIsLoading]);
+  }, [user?.id, guestSessionId, authLoading, setFiles, setFolders, setIsLoading]);
 
   // Online/offline detection
   useEffect(() => {

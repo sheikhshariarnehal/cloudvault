@@ -35,16 +35,19 @@ export default function ForgotPasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
-        <div className="w-full max-w-[420px] text-center space-y-4">
-          <Cloud className="h-12 w-12 text-primary mx-auto" />
-          <h2 className="text-2xl font-bold">Check your email</h2>
-          <p className="text-muted-foreground">
-            We&apos;ve sent a password reset link to <strong>{email}</strong>.
-            Please check your inbox.
+      <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center py-8 px-4 sm:px-6">
+        <div className="w-full max-w-sm mx-auto text-center space-y-5">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-green-100 rounded-full">
+            <Mail className="h-6 w-6 text-green-600" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Check your email</h2>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            We&apos;ve sent a reset link to{" "}
+            <strong className="text-gray-800 break-all">{email}</strong>.
+            Check your inbox and follow the link.
           </p>
           <Link href="/auth/login">
-            <Button variant="outline">
+            <Button variant="outline" className="w-full h-11">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Sign In
             </Button>
@@ -55,22 +58,29 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-8">
-      <div className="w-full max-w-[420px] space-y-6">
+    <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center py-8 px-4 sm:px-6">
+      <div className="w-full max-w-sm mx-auto space-y-5">
+
+        {/* Logo */}
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Cloud className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight">CloudVault</h1>
+          <div className="inline-flex items-center justify-center w-11 h-11 bg-blue-600 rounded-xl mb-3">
+            <Cloud className="h-5 w-5 text-white" />
           </div>
-          <p className="text-sm text-muted-foreground">
-            Enter your email to reset your password
-          </p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Reset password</h1>
+          <p className="text-sm text-gray-500 mt-1">We&apos;ll send a reset link to your email</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-8 space-y-5">
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-7 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleResetPassword} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email address</Label>
               <Input
                 id="email"
                 type="email"
@@ -78,28 +88,29 @@ export default function ForgotPasswordPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
+                className="h-11 text-base sm:text-sm"
               />
             </div>
 
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full h-11 bg-gray-900 hover:bg-gray-800 font-semibold text-sm"
+              disabled={isLoading}
+            >
               <Mail className="h-4 w-4 mr-2" />
               {isLoading ? "Sending..." : "Send Reset Link"}
             </Button>
           </form>
         </div>
 
-        <p className="text-center text-sm text-muted-foreground">
-          <Link href="/auth/login" className="text-primary hover:underline font-medium">
-            <span className="inline-flex items-center gap-1">
-              <ArrowLeft className="h-3 w-3" />
-              Back to Sign In
-            </span>
-          </Link>
-        </p>
+        <Link
+          href="/auth/login"
+          className="flex items-center justify-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to Sign In
+        </Link>
       </div>
     </div>
   );

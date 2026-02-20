@@ -71,13 +71,13 @@ export default function ResetPasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
-        <div className="w-full max-w-[420px] text-center space-y-4">
-          <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
-          <h2 className="text-2xl font-bold">Password Updated</h2>
-          <p className="text-muted-foreground">
-            Your password has been successfully updated. Redirecting to dashboard...
-          </p>
+      <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center py-8 px-4 sm:px-6">
+        <div className="w-full max-w-sm mx-auto text-center space-y-5">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-green-100 rounded-full">
+            <CheckCircle className="h-7 w-7 text-green-600" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Password updated!</h2>
+          <p className="text-sm text-gray-500">Redirecting to your dashboard...</p>
         </div>
       </div>
     );
@@ -85,75 +85,105 @@ export default function ResetPasswordPage() {
 
   if (!isValidSession) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
-        <div className="w-full max-w-[420px] text-center space-y-4">
-          <Cloud className="h-12 w-12 text-primary mx-auto" />
-          <h2 className="text-2xl font-bold">Loading...</h2>
-          <p className="text-muted-foreground">
-            Verifying your reset link...
-          </p>
+      <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center py-8 px-4 sm:px-6">
+        <div className="w-full max-w-sm mx-auto text-center space-y-4">
+          <div className="inline-flex items-center justify-center w-11 h-11 bg-blue-600 rounded-xl">
+            <Cloud className="h-5 w-5 text-white" />
+          </div>
+          <p className="text-sm text-gray-500">Verifying your reset link...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-8">
-      <div className="w-full max-w-[420px] space-y-6">
+    <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center py-8 px-4 sm:px-6">
+      <div className="w-full max-w-sm mx-auto space-y-5">
+
+        {/* Logo */}
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Cloud className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight">CloudVault</h1>
+          <div className="inline-flex items-center justify-center w-11 h-11 bg-blue-600 rounded-xl mb-3">
+            <Cloud className="h-5 w-5 text-white" />
           </div>
-          <p className="text-sm text-muted-foreground">
-            Set your new password
-          </p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">New password</h1>
+          <p className="text-sm text-gray-500 mt-1">Choose a strong password</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-8 space-y-5">
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="password">New Password</Label>
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-7 space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleResetPassword} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-sm font-medium text-gray-700">New Password</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Min 8 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="pr-10"
+                  autoComplete="new-password"
+                  className="h-11 pr-10 text-base sm:text-sm"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
                   tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-password" className="text-sm font-medium text-gray-700">Confirm Password</Label>
               <Input
                 id="confirm-password"
                 type={showPassword ? "text" : "password"}
-                placeholder="••••••••"
+                placeholder="Repeat password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={8}
+                autoComplete="new-password"
+                className="h-11 text-base sm:text-sm"
               />
             </div>
 
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
+            {/* Password strength bar */}
+            <div className="flex gap-1 pt-0.5">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className={`h-1 flex-1 rounded-full transition-colors ${
+                    password.length === 0
+                      ? "bg-gray-200"
+                      : password.length < 6
+                      ? i === 1 ? "bg-red-400" : "bg-gray-200"
+                      : password.length < 8
+                      ? i <= 2 ? "bg-yellow-400" : "bg-gray-200"
+                      : password.length < 12
+                      ? i <= 3 ? "bg-blue-400" : "bg-gray-200"
+                      : "bg-green-400"
+                  }`}
+                />
+              ))}
+            </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full h-11 bg-gray-900 hover:bg-gray-800 font-semibold text-sm mt-1"
+              disabled={isLoading}
+            >
               <Lock className="h-4 w-4 mr-2" />
               {isLoading ? "Updating..." : "Update Password"}
             </Button>
