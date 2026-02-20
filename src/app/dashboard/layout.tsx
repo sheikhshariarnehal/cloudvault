@@ -74,8 +74,8 @@ export default function DashboardLayout({
             .order("name", { ascending: true }),
         ]);
 
-        if (filesRes.data) setFiles(filesRes.data as DbFile[]);
-        if (foldersRes.data) setFolders(foldersRes.data as DbFolder[]);
+        if (filesRes.data) setFiles(filesRes.data as unknown as DbFile[]);
+        if (foldersRes.data) setFolders(foldersRes.data as unknown as DbFolder[]);
       } catch (error) {
         console.error("Failed to load data:", error);
       } finally {
