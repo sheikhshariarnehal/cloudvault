@@ -19,14 +19,15 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   const { addToUploadQueue, updateUploadStatus, updateUploadProgress, addFile } =
     useFilesStore();
 
-  // 3.5 MB chunk size — safely under Vercel's 4.5 MB serverless body limit
-  const CHUNK_SIZE = 3.5 * 1024 * 1024;
+  // 10 MB chunks — sent directly to TDLib service, no Vercel size limit
+  const CHUNK_SIZE = 10 * 1024 * 1024;
+  const PARALLEL_CHUNKS = 3; // upload 3 chunks simultaneously
 
   /**
    * Chunked upload for large files (> CHUNK_SIZE).
-   * 1. POST /api/upload/init     → get uploadId
-   * 2. POST /api/upload/chunk    → send each chunk
-   * 3. POST /api/upload/complete → assemble + Telegram upload + DB insert
+   * 1. POST /api/upload/init        → get uploadId + direct chunkEndpoint
+   * 2. POST chunkEndpoint (direct)   → send chunks in parallel batches of 3
+   * 3. POST /api/upload/complete     → assemble + Telegram upload + DB insert
    */
   const uploadFileChunked = useCallback(async (
     queueId: string,
@@ -35,7 +36,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   ) => {
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-    // 1. Init session
+    // 1. Init session (small JSON, goes through Vercel — fast)
     const initRes = await fetch("/api/upload/init", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -52,10 +53,12 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       throw new Error(err.error || `Init failed with status ${initRes.status}`);
     }
 
-    const { uploadId } = await initRes.json();
+    const { uploadId, chunkEndpoint } = await initRes.json();
 
-    // 2. Upload chunks sequentially with progress
-    for (let i = 0; i < totalChunks; i++) {
+    // 2. Upload chunks in parallel directly to TDLib service
+    let completedChunks = 0;
+
+    const uploadSingleChunk = async (i: number) => {
       const start = i * CHUNK_SIZE;
       const end = Math.min(start + CHUNK_SIZE, file.size);
       const chunk = file.slice(start, end);
@@ -65,22 +68,48 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       chunkForm.append("uploadId", uploadId);
       chunkForm.append("chunkIndex", String(i));
 
-      const chunkRes = await fetch("/api/upload/chunk", {
-        method: "POST",
-        body: chunkForm,
-      });
+      // Try direct backend first, fall back to Vercel proxy
+      const directUrl = chunkEndpoint;
+      let success = false;
 
-      if (!chunkRes.ok) {
-        const err = await chunkRes.json().catch(() => ({}));
-        throw new Error(err.error || `Chunk ${i} failed with status ${chunkRes.status}`);
+      if (directUrl) {
+        try {
+          const res = await fetch(directUrl, { method: "POST", body: chunkForm });
+          if (res.ok) success = true;
+        } catch {
+          // Direct failed (CORS/network) — will fallback below
+        }
       }
 
-      // Progress: chunk upload phase is 0-90%, final assemble is 90-100%
-      const pct = Math.round(((i + 1) / totalChunks) * 90);
+      if (!success) {
+        // Fallback: send through Vercel proxy
+        const fallbackForm = new FormData();
+        fallbackForm.append("chunk", file.slice(start, end), `chunk_${i}`);
+        fallbackForm.append("uploadId", uploadId);
+        fallbackForm.append("chunkIndex", String(i));
+
+        const res = await fetch("/api/upload/chunk", { method: "POST", body: fallbackForm });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Chunk ${i} failed`);
+        }
+      }
+
+      completedChunks++;
+      const pct = Math.round((completedChunks / totalChunks) * 90);
       updateUploadProgress(queueId, pct);
+    };
+
+    // Process in parallel batches
+    for (let i = 0; i < totalChunks; i += PARALLEL_CHUNKS) {
+      const batch = [];
+      for (let j = i; j < Math.min(i + PARALLEL_CHUNKS, totalChunks); j++) {
+        batch.push(uploadSingleChunk(j));
+      }
+      await Promise.all(batch);
     }
 
-    // 3. Complete: assemble + upload to Telegram + DB insert
+    // 3. Complete: assemble + upload to Telegram + DB insert (through Vercel)
     updateUploadProgress(queueId, 92);
 
     const completeRes = await fetch("/api/upload/complete", {

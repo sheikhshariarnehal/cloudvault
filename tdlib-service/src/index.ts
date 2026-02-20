@@ -22,6 +22,22 @@ const PORT = parseInt(process.env.PORT || "3001", 10);
 // ─── Global Middleware ───────────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));
 
+// CORS for direct chunk uploads from browser
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Upload-Id, X-Chunk-Index");
+    res.setHeader("Access-Control-Max-Age", "86400");
+  }
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
+
 // Health check (no auth required)
 app.get("/health", (_req, res) => {
   res.json({
@@ -31,6 +47,9 @@ app.get("/health", (_req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// ─── Public: chunk upload (auth via uploadId session token) ──────────
+app.use("/api/chunked-upload/chunk", chunkedUploadRouter);
 
 // ─── Protected API Routes ────────────────────────────────────────────
 app.use("/api/upload", authMiddleware, uploadRouter);

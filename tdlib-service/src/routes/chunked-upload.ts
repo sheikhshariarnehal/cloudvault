@@ -105,7 +105,7 @@ const chunkUpload = multer({
       cb(null, `chunk_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`);
     },
   }),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per chunk max
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB per chunk max (direct upload from browser)
 });
 
 const router = Router();
