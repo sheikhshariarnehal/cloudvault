@@ -65,6 +65,9 @@ interface UploadSession {
   fileSize: number;
   totalChunks: number;
   receivedChunks: Set<number>;
+  nextFlushIndex: number;        // next chunk to append to assembled file
+  assembledPath: string;         // output file being built progressively
+  assembledBytes: number;        // bytes flushed so far
   createdAt: number;
   dir: string;
 }
@@ -78,6 +81,7 @@ setInterval(() => {
     if (now - session.createdAt > 60 * 60 * 1000) {
       // 1 hour expiry
       cleanupSessionDir(session.dir);
+      cleanupTempFile(session.assembledPath);
       sessions.delete(id);
       console.log(`[ChunkedUpload] Expired session ${id}`);
     }
@@ -131,6 +135,16 @@ router.post("/init", (req: Request, res: Response) => {
   const dir = path.join(CHUNKS_DIR, uploadId);
   fs.mkdirSync(dir, { recursive: true });
 
+  // Pre-create the assembled output file path so we can flush progressively
+  const rawFilesPath = process.env.TDLIB_FILES_PATH || "./tdlib-files";
+  const filesBase = path.isAbsolute(rawFilesPath)
+    ? rawFilesPath
+    : path.join(SERVICE_ROOT, rawFilesPath);
+  const uploadsDir = path.join(filesBase, "uploads");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  const assembledName = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${fileName}`;
+  const assembledPath = path.join(uploadsDir, assembledName);
+
   const session: UploadSession = {
     uploadId,
     fileName,
@@ -138,6 +152,9 @@ router.post("/init", (req: Request, res: Response) => {
     fileSize,
     totalChunks,
     receivedChunks: new Set(),
+    nextFlushIndex: 0,
+    assembledPath,
+    assembledBytes: 0,
     createdAt: Date.now(),
     dir,
   };
@@ -185,8 +202,29 @@ router.post("/chunk", chunkUpload.single("chunk"), (req: Request, res: Response)
 
   session.receivedChunks.add(chunkIndex);
 
+  // ── Progressive flush: append sequential chunks to output file ─────────
+  // This keeps disk usage minimal — only out-of-order chunks stay on disk.
+  // With 5 parallel uploads, max buffered = 4 chunks × 10MB = 40MB.
+  try {
+    while (session.receivedChunks.has(session.nextFlushIndex)) {
+      const flushPath = path.join(session.dir, String(session.nextFlushIndex));
+      if (fs.existsSync(flushPath)) {
+        const chunkData = fs.readFileSync(flushPath);
+        fs.appendFileSync(session.assembledPath, chunkData);
+        session.assembledBytes += chunkData.length;
+        fs.unlinkSync(flushPath); // free disk space immediately
+      }
+      session.nextFlushIndex++;
+    }
+  } catch (flushErr) {
+    console.warn(`[ChunkedUpload] Flush error for ${uploadId}:`, flushErr);
+  }
+
+  const flushedMB = Math.round(session.assembledBytes / 1024 / 1024);
+  const buffered = session.receivedChunks.size - session.nextFlushIndex;
   console.log(
-    `[ChunkedUpload] ${uploadId} chunk ${chunkIndex + 1}/${session.totalChunks} received`
+    `[ChunkedUpload] ${uploadId} chunk ${chunkIndex + 1}/${session.totalChunks} received` +
+    ` (flushed: ${session.nextFlushIndex}/${session.totalChunks} = ${flushedMB}MB, buffered: ${buffered})`
   );
 
   res.status(200).json({
@@ -221,47 +259,34 @@ router.post("/complete", async (req: Request, res: Response) => {
     return;
   }
 
-  // Assemble chunks into a single file
-  const rawFilesPath = process.env.TDLIB_FILES_PATH || "./tdlib-files";
-  const filesBase = path.isAbsolute(rawFilesPath)
-    ? rawFilesPath
-    : path.join(SERVICE_ROOT, rawFilesPath);
-  const uploadsDir = path.join(filesBase, "uploads");
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  // Flush any remaining buffered chunks (shouldn't be many)
+  try {
+    while (session.nextFlushIndex < session.totalChunks) {
+      const flushPath = path.join(session.dir, String(session.nextFlushIndex));
+      if (fs.existsSync(flushPath)) {
+        const chunkData = fs.readFileSync(flushPath);
+        fs.appendFileSync(session.assembledPath, chunkData);
+        session.assembledBytes += chunkData.length;
+        fs.unlinkSync(flushPath);
+      }
+      session.nextFlushIndex++;
+    }
+  } catch (flushErr) {
+    console.error(`[ChunkedUpload] Final flush error:`, flushErr);
+  }
 
-  const assembledName = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${session.fileName}`;
-  const assembledPath = path.join(uploadsDir, assembledName);
+  // Clean up chunk directory (should be empty now)
+  cleanupSessionDir(session.dir);
+
+  const assembledPath = session.assembledPath;
 
   try {
-    console.log(`[ChunkedUpload] Assembling ${session.totalChunks} chunks → ${assembledPath}`);
-
-    const writeStream = fs.createWriteStream(assembledPath);
-
-    for (let i = 0; i < session.totalChunks; i++) {
-      const chunkPath = path.join(session.dir, String(i));
-      if (!fs.existsSync(chunkPath)) {
-        writeStream.destroy();
-        cleanupTempFile(assembledPath);
-        res.status(400).json({ error: `Missing chunk ${i}` });
-        return;
-      }
-      const chunkData = fs.readFileSync(chunkPath);
-      writeStream.write(chunkData);
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      writeStream.on("finish", resolve);
-      writeStream.on("error", reject);
-      writeStream.end();
-    });
-
     // Verify assembled size
     const stats = fs.statSync(assembledPath);
     console.log(`[ChunkedUpload] Assembled file: ${stats.size} bytes (expected ${session.fileSize})`);
 
     if (stats.size === 0) {
       cleanupTempFile(assembledPath);
-      cleanupSessionDir(session.dir);
       sessions.delete(uploadId);
       res.status(400).json({ error: "Assembled file is empty" });
       return;
@@ -273,7 +298,6 @@ router.post("/complete", async (req: Request, res: Response) => {
 
     if (!channelId) {
       cleanupTempFile(assembledPath);
-      cleanupSessionDir(session.dir);
       sessions.delete(uploadId);
       res.status(500).json({ error: "TELEGRAM_CHANNEL_ID not configured" });
       return;
@@ -324,7 +348,6 @@ router.post("/complete", async (req: Request, res: Response) => {
         await client.invoke({ _: "getChat", chat_id: chatIdNum });
       } catch (loadErr) {
         cleanupTempFile(assembledPath);
-        cleanupSessionDir(session.dir);
         sessions.delete(uploadId);
         res.status(400).json({
           error: `Channel not accessible. Details: ${loadErr}`,
@@ -379,7 +402,6 @@ router.post("/complete", async (req: Request, res: Response) => {
     const fileInfo = extractFileInfo(sentMessage);
     if (!fileInfo) {
       cleanupTempFile(assembledPath);
-      cleanupSessionDir(session.dir);
       sessions.delete(uploadId);
       res.status(500).json({ error: "Failed to extract file info from Telegram response" });
       return;
@@ -387,7 +409,6 @@ router.post("/complete", async (req: Request, res: Response) => {
 
     if (!fileInfo.remoteFileId || /^\d+$/.test(fileInfo.remoteFileId)) {
       cleanupTempFile(assembledPath);
-      cleanupSessionDir(session.dir);
       sessions.delete(uploadId);
       res.status(500).json({ error: "Telegram returned an invalid file ID. Please retry." });
       return;
@@ -413,7 +434,6 @@ router.post("/complete", async (req: Request, res: Response) => {
 
     // Cleanup
     cleanupTempFile(assembledPath);
-    cleanupSessionDir(session.dir);
     sessions.delete(uploadId);
 
     res.status(201).json({
@@ -425,7 +445,6 @@ router.post("/complete", async (req: Request, res: Response) => {
     });
   } catch (err) {
     cleanupTempFile(assembledPath);
-    cleanupSessionDir(session.dir);
     sessions.delete(uploadId);
     console.error("[ChunkedUpload] Error:", err);
 
