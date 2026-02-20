@@ -363,13 +363,13 @@ router.post("/complete", async (req: Request, res: Response) => {
     let sentMessage: Record<string, unknown>;
     try {
       const pending = await invokeWithSlot(sendParams);
-      sentMessage = await waitForMessageSent(client, pending);
+      sentMessage = await waitForMessageSent(client, pending, session.fileSize);
     } catch (sendErr) {
       const sendErrMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
       if (isMediaRejection(sendErrMsg)) {
         console.warn(`[ChunkedUpload] Media rejected (${sendErrMsg}), retrying as document...`);
         const pending = await invokeWithSlot(documentFallbackParams);
-        sentMessage = await waitForMessageSent(client, pending);
+        sentMessage = await waitForMessageSent(client, pending, session.fileSize);
       } else {
         throw sendErr;
       }
@@ -455,31 +455,84 @@ router.post("/complete", async (req: Request, res: Response) => {
 
 // ── Helpers (duplicated from upload.ts to keep module self-contained) ────────
 
+/**
+ * Wait for TDLib to confirm the message was sent (uploaded to Telegram).
+ * Timeout scales with file size and resets whenever TDLib reports upload progress,
+ * so even very large files (1-2 GB) won't time out as long as the upload is moving.
+ */
 async function waitForMessageSent(
   client: Awaited<ReturnType<typeof getTDLibClient>>,
   pendingMessage: Record<string, unknown>,
-  timeoutMs: number = 120000
+  fileSize: number = 0,
 ): Promise<Record<string, unknown>> {
   if (!pendingMessage.sending_state) return pendingMessage;
 
+  // Base: 2 min. Add 1 min per 100 MB, min 2 min, max 30 min.
+  const baseTotalMs = Math.max(
+    2 * 60 * 1000,
+    Math.min(30 * 60 * 1000, 2 * 60 * 1000 + Math.ceil(fileSize / (100 * 1024 * 1024)) * 60 * 1000)
+  );
+  // Per-tick idle timeout: if no progress event for 3 min, give up
+  const idleTimeoutMs = 3 * 60 * 1000;
+
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Message send timeout")), timeoutMs);
     const messageId = pendingMessage.id as number;
+    let lastActivity = Date.now();
+
+    // Absolute deadline
+    const absoluteTimer = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Message send timeout after ${Math.round(baseTotalMs / 1000)}s (file: ${Math.round(fileSize / 1024 / 1024)} MB)`));
+    }, baseTotalMs);
+
+    // Idle timer — resets every time we see upload progress
+    let idleTimer = setTimeout(checkIdle, idleTimeoutMs);
+
+    function checkIdle() {
+      if (Date.now() - lastActivity >= idleTimeoutMs) {
+        cleanup();
+        reject(new Error(`Message send stalled — no upload progress for ${Math.round(idleTimeoutMs / 1000)}s`));
+      } else {
+        idleTimer = setTimeout(checkIdle, idleTimeoutMs);
+      }
+    }
+
+    function cleanup() {
+      clearTimeout(absoluteTimer);
+      clearTimeout(idleTimer);
+      client.off("update", handler);
+    }
 
     const handler = (update: Record<string, unknown>) => {
+      // Upload progress — reset idle timer
+      if (update._ === "updateFile") {
+        const file = update.file as Record<string, unknown> | undefined;
+        const remote = file?.remote as Record<string, unknown> | undefined;
+        if (remote?.is_uploading_active) {
+          const uploaded = remote.uploaded_size as number || 0;
+          lastActivity = Date.now();
+          if (uploaded > 0 && fileSize > 0) {
+            const pct = Math.round((uploaded / fileSize) * 100);
+            if (pct % 10 === 0) {
+              console.log(`[ChunkedUpload] Telegram upload progress: ${pct}% (${Math.round(uploaded / 1024 / 1024)} MB / ${Math.round(fileSize / 1024 / 1024)} MB)`);
+            }
+          }
+        }
+      }
+
       if (update._ === "updateMessageSendSucceeded" && (update.old_message_id as number) === messageId) {
-        clearTimeout(timeout);
-        client.off("update", handler);
+        cleanup();
         resolve(update.message as Record<string, unknown>);
       } else if (update._ === "updateMessageSendFailed" && (update.old_message_id as number) === messageId) {
-        clearTimeout(timeout);
-        client.off("update", handler);
+        cleanup();
         const tdErr = update.error as { code?: number; message?: string } | undefined;
         reject(new Error(`Message send failed [${tdErr?.code ?? 0}]: ${tdErr?.message || "Unknown error"}`));
       }
     };
 
     client.on("update", handler);
+
+    console.log(`[ChunkedUpload] Waiting for Telegram upload (timeout: ${Math.round(baseTotalMs / 1000)}s, idle: ${Math.round(idleTimeoutMs / 1000)}s, fileSize: ${Math.round(fileSize / 1024 / 1024)} MB)`);
   });
 }
 

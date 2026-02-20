@@ -15,7 +15,7 @@ export const maxDuration = 300; // 5 minutes — Telegram upload can be slow for
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { uploadId, fileName, fileSize, mimeType, userId, guestSessionId, folderId } = body;
+    const { uploadId, fileName, fileSize, mimeType, userId, guestSessionId, folderId, fileHash } = body;
 
     if (!uploadId) {
       return NextResponse.json({ error: "Missing uploadId" }, { status: 400 });
@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
         telegram_message_id: telegramResult.message_id,
         tdlib_file_id: telegramResult.tdlib_file_id || null,
         thumbnail_url: telegramResult.thumbnail_data || null,
+        file_hash: fileHash || null,
       })
       .select()
       .single();

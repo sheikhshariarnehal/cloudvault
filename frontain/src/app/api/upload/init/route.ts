@@ -34,9 +34,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Return direct backend URL so client can bypass Vercel for chunks
+    // Strip trailing slash to avoid double-slash in URL
+    const baseUrl = PUBLIC_BACKEND_URL.replace(/\/+$/, "");
     return NextResponse.json({
       ...data,
-      chunkEndpoint: `${PUBLIC_BACKEND_URL}/api/chunked-upload/chunk`,
+      chunkEndpoint: `${baseUrl}/api/chunked-upload/chunk`,
     });
   } catch (error) {
     console.error("[upload/init] Error:", error);
