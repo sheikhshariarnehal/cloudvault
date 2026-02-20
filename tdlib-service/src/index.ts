@@ -11,6 +11,7 @@ import { authMiddleware } from "./middleware/auth.js";
 import { getTDLibClient, closeTDLibClient, isClientReady } from "./tdlib-client.js";
 import { cleanupOldTempFiles } from "./utils/temp-file.js";
 import uploadRouter from "./routes/upload.js";
+import chunkedUploadRouter from "./routes/chunked-upload.js";
 import downloadRouter from "./routes/download.js";
 import thumbnailRouter from "./routes/thumbnail.js";
 import deleteRouter from "./routes/delete.js";
@@ -33,6 +34,7 @@ app.get("/health", (_req, res) => {
 
 // ─── Protected API Routes ────────────────────────────────────────────
 app.use("/api/upload", authMiddleware, uploadRouter);
+app.use("/api/chunked-upload", authMiddleware, chunkedUploadRouter);
 app.use("/api/download", authMiddleware, downloadRouter);
 app.use("/api/thumbnail", authMiddleware, thumbnailRouter);
 app.use("/api/message", authMiddleware, deleteRouter);
@@ -87,6 +89,9 @@ async function start() {
     console.log("");
     console.log("Endpoints:");
     console.log(`  POST   /api/upload`);
+    console.log(`  POST   /api/chunked-upload/init`);
+    console.log(`  POST   /api/chunked-upload/chunk`);
+    console.log(`  POST   /api/chunked-upload/complete`);
     console.log(`  GET    /api/download/:remoteFileId`);
     console.log(`  GET    /api/download/status/:remoteFileId`);
     console.log(`  GET    /api/thumbnail/:remoteFileId`);
