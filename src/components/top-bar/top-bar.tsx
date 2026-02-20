@@ -6,77 +6,77 @@ import { NotificationPopover } from "@/components/top-bar/notification-popover";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/store/ui-store";
 import { useAuth } from "@/app/providers/auth-provider";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Menu, Upload, UserPlus } from "lucide-react";
+import { Menu, Upload, LogIn, UserRoundPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export function TopBar() {
   const { toggleSidebar, openFilePicker } = useUIStore();
-  const { isGuest, user } = useAuth();
+  const { isGuest, user, isLoading } = useAuth();
   const router = useRouter();
 
+  const isAuthenticated = !isGuest && !!user;
+
   return (
-    <header className="flex items-center gap-4 px-5 lg:px-8 h-[64px] bg-white border-b border-gray-200 shrink-0">
+    <header className="flex items-center gap-2 sm:gap-4 px-4 sm:px-6 lg:px-8 h-16 bg-white border-b border-gray-100 shrink-0 shadow-sm">
       {/* Mobile hamburger */}
       <Button
         variant="ghost"
         size="icon"
-        className="lg:hidden h-10 w-10 hover:bg-gray-100"
+        className="lg:hidden h-9 w-9 flex-shrink-0 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
         onClick={toggleSidebar}
+        aria-label="Toggle sidebar"
       >
         <Menu className="h-5 w-5" />
       </Button>
 
       {/* Search */}
-      <div className="flex-1 max-w-2xl">
+      <div className="flex-1 min-w-0 max-w-xl">
         <SearchBar />
       </div>
 
       {/* Right actions */}
-      <div className="flex items-center gap-2 ml-auto">
-        {/* Mobile upload button — visible only on small screens */}
+      <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-shrink-0">
+        {/* Mobile upload shortcut */}
         <Button
           variant="ghost"
           size="icon"
-          className="lg:hidden h-10 w-10 hover:bg-gray-100"
+          className="lg:hidden h-9 w-9 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
           onClick={() => openFilePicker?.()}
+          aria-label="Upload file"
         >
           <Upload className="h-5 w-5" />
         </Button>
 
-        <NotificationPopover />
+        {/* Notifications — only for authenticated users */}
+        {isAuthenticated && <NotificationPopover />}
 
-        {isGuest || !user ? (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="hidden sm:flex items-center gap-2 h-10 text-sm font-medium text-gray-400 border-gray-200 cursor-not-allowed"
-                  onClick={() => router.push("/auth/signup")}
-                >
-                  <UserPlus className="h-4 w-4" />
-                  <span className="hidden md:inline">Invite member</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Sign up to invite members</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        {/* Auth state: guest → login + signup buttons; loading → skeleton; logged in → user menu */}
+        {isLoading ? (
+          <div className="h-8 w-8 rounded-full bg-gray-100 animate-pulse" />
+        ) : isAuthenticated ? (
+          <UserMenu />
         ) : (
-          <Button
-            variant="default"
-            size="sm"
-            className="hidden sm:flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white h-10 text-sm font-semibold shadow-sm hover:shadow"
-          >
-            <UserPlus className="h-4 w-4" />
-            <span className="hidden md:inline">Invite member</span>
-          </Button>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 px-3 sm:px-4 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+              onClick={() => router.push("/auth/login")}
+            >
+              <LogIn className="h-4 w-4 sm:mr-1.5 shrink-0" />
+              <span className="hidden sm:inline">Log in</span>
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              className="h-9 px-3 sm:px-4 text-sm font-semibold bg-gray-900 hover:bg-gray-800 text-white rounded-lg shadow-sm"
+              onClick={() => router.push("/auth/signup")}
+            >
+              <UserRoundPlus className="h-4 w-4 sm:mr-1.5 shrink-0" />
+              <span className="hidden sm:inline">Sign up</span>
+            </Button>
+          </div>
         )}
-
-        <UserMenu />
       </div>
     </header>
   );

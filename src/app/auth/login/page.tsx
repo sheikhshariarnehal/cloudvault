@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -8,7 +8,8 @@ import { getGuestSessionId } from "@/lib/guest-session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Cloud, Mail, Chrome, Eye, EyeOff } from "lucide-react";
+import { GoogleAuthButton } from "@/components/auth/google-auth-button";
+import { Cloud, Mail, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -19,6 +20,14 @@ export default function LoginPage() {
   const [isMagicLink, setIsMagicLink] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  // Show error if redirected back from OAuth callback failure
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error")) {
+      setError("Sign-in failed. Please try again.");
+    }
+  }, []);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,16 +53,6 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (error) setError(error.message);
   };
 
   const handleGuestMode = () => {
@@ -155,14 +154,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleGoogleLogin}
-          >
-            <Chrome className="h-4 w-4 mr-2" />
-            Google
-          </Button>
+          <GoogleAuthButton mode="login" />
 
           <Button
             variant="ghost"
