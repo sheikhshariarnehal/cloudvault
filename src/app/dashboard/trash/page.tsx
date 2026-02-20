@@ -24,9 +24,15 @@ export default function TrashPage() {
         return;
       }
 
+      const FILE_COLUMNS =
+        "id,user_id,guest_session_id,folder_id,name,original_name," +
+        "mime_type,size_bytes,telegram_file_id,telegram_message_id," +
+        "file_hash,tdlib_file_id,is_starred,is_trashed,trashed_at," +
+        "created_at,updated_at";
+
       const { data } = await supabase
         .from("files")
-        .select("*")
+        .select(FILE_COLUMNS)
         .eq(filterColumn, filterValue)
         .eq("is_trashed", true)
         .order("trashed_at", { ascending: false });

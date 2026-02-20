@@ -44,16 +44,30 @@ export default function DashboardLayout({
       }
 
       try {
+        // Select only the columns needed by the UI — intentionally
+        // omitting thumbnail_url (large base64 blob stored in DB) from
+        // list queries.  Thumbnails are rendered inline wherever they're
+        // already in memory (after upload) or lazy-loaded on demand.
+        const FILE_COLUMNS =
+          "id,user_id,guest_session_id,folder_id,name,original_name," +
+          "mime_type,size_bytes,telegram_file_id,telegram_message_id," +
+          "file_hash,tdlib_file_id,is_starred,is_trashed,trashed_at," +
+          "created_at,updated_at";
+        const FOLDER_COLUMNS =
+          "id,user_id,guest_session_id,parent_id,name,color," +
+          "is_trashed,trashed_at,created_at,updated_at";
+
         const [filesRes, foldersRes] = await Promise.all([
           supabase
             .from("files")
-            .select("*")
+            .select(FILE_COLUMNS)
             .eq(filterColumn, filterValue)
             .eq("is_trashed", false)
-            .order("created_at", { ascending: false }),
+            .order("created_at", { ascending: false })
+            .limit(200), // prevent unbounded payload growth
           supabase
             .from("folders")
-            .select("*")
+            .select(FOLDER_COLUMNS)
             .eq(filterColumn, filterValue)
             .eq("is_trashed", false)
             .order("name", { ascending: true }),

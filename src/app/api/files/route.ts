@@ -13,7 +13,15 @@ export async function GET(request: NextRequest) {
     const starred = searchParams.get("starred");
     const trashed = searchParams.get("trashed");
 
-    let query = supabase.from("files").select("*");
+    let query = supabase
+      .from("files")
+      // Intentionally omit thumbnail_url (large base64 blob) from list queries
+      .select(
+        "id,user_id,guest_session_id,folder_id,name,original_name," +
+          "mime_type,size_bytes,telegram_file_id,telegram_message_id," +
+          "file_hash,tdlib_file_id,is_starred,is_trashed,trashed_at," +
+          "created_at,updated_at"
+      );
 
     if (userId) query = query.eq("user_id", userId);
     else if (guestSessionId)
