@@ -47,7 +47,7 @@ export const useFilesStore = create<FilesState>((set) => ({
   viewMode: "list",
   selectedFiles: [],
   currentFolderId: null,
-  isLoading: true,
+  isLoading: false,
   searchQuery: "",
 
   // File actions

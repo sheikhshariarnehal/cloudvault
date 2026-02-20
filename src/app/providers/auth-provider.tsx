@@ -77,8 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(currentUser);
 
         if (currentUser) {
-          // Ensure the user has a public.users profile
-          await ensureUserProfile(supabase, currentUser);
+          // Ensure the user has a public.users profile (fire-and-forget — don't block auth loading)
+          ensureUserProfile(supabase, currentUser);
         } else {
           // Create guest session for unauthenticated users
           setGuestSessionId(getGuestSessionId());
@@ -102,8 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (currentUser) {
         setGuestSessionId(null);
-        // Ensure profile on any auth state change (login, token refresh, etc.)
-        await ensureUserProfile(supabase, currentUser);
+        // Ensure profile on any auth state change (fire-and-forget — don't block renders)
+        ensureUserProfile(supabase, currentUser);
       } else {
         setGuestSessionId(getGuestSessionId());
       }
