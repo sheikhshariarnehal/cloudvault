@@ -13,39 +13,51 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Copy, CheckCircle2, Link as LinkIcon } from "lucide-react";
+import { Loader2, Copy, CheckCircle2, Link as LinkIcon, Folder } from "lucide-react";
 
 export function ShareModal() {
-  const { shareModalOpen, setShareModalOpen, shareFileId, setShareFileId } =
-    useUIStore();
-  const { files } = useFilesStore();
+  const {
+    shareModalOpen,
+    setShareModalOpen,
+    shareFileId,
+    setShareFileId,
+    shareFolderId,
+    setShareFolderId,
+  } = useUIStore();
+  const { files, folders } = useFilesStore();
   const { user, guestSessionId } = useAuth();
   const [shareLink, setShareLink] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
-  const file = files.find((f) => f.id === shareFileId);
+  const file = shareFileId ? files.find((f) => f.id === shareFileId) : null;
+  const folder = shareFolderId ? folders.find((f) => f.id === shareFolderId) : null;
+  const isFolder = !!shareFolderId;
+  const targetName = isFolder ? folder?.name : file?.name;
 
   useEffect(() => {
-    if (shareModalOpen && shareFileId) {
+    if (shareModalOpen && (shareFileId || shareFolderId)) {
       generateShareLink();
     }
-  }, [shareModalOpen, shareFileId]);
+  }, [shareModalOpen, shareFileId, shareFolderId]);
 
   const generateShareLink = async () => {
-    if (!shareFileId) return;
+    if (!shareFileId && !shareFolderId) return;
     setIsLoading(true);
     setShareLink("");
 
     try {
+      const body: Record<string, unknown> = {
+        userId: user?.id,
+        guestSessionId,
+      };
+      if (shareFileId) body.fileId = shareFileId;
+      if (shareFolderId) body.folderId = shareFolderId;
+
       const response = await fetch("/api/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileId: shareFileId,
-          userId: user?.id,
-          guestSessionId,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) throw new Error("Failed to create share link");
@@ -73,6 +85,7 @@ export function ShareModal() {
   const handleClose = () => {
     setShareModalOpen(false);
     setShareFileId(null);
+    setShareFolderId(null);
     setShareLink("");
     setIsCopied(false);
   };
@@ -82,11 +95,17 @@ export function ShareModal() {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <LinkIcon className="h-5 w-5" />
-            Share File
+            {isFolder ? (
+              <Folder className="h-5 w-5" style={{ color: folder?.color || "#EAB308" }} />
+            ) : (
+              <LinkIcon className="h-5 w-5" />
+            )}
+            Share {isFolder ? "Folder" : "File"}
           </DialogTitle>
           <DialogDescription>
-            {file ? `Share "${file.name}" with anyone` : "Loading..."}
+            {targetName
+              ? `Share "${targetName}" with anyone`
+              : "Loading..."}
           </DialogDescription>
         </DialogHeader>
 
@@ -123,7 +142,9 @@ export function ShareModal() {
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                Anyone with this link can view and download the file.
+                {isFolder
+                  ? "Anyone with this link can browse and download files in the folder."
+                  : "Anyone with this link can view and download the file."}
               </p>
             </div>
           ) : (
