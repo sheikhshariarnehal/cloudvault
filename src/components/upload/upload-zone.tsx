@@ -18,6 +18,7 @@ interface FileWithPath {
 
 /**
  * Read a single FileSystemDirectoryEntry, returning an array of its entries.
+ * Handles the batched readEntries() API — browsers return ~100 entries at a time.
  */
 function readDirectoryEntries(
   dirReader: FileSystemDirectoryReader
@@ -25,14 +26,27 @@ function readDirectoryEntries(
   return new Promise((resolve, reject) => {
     const allEntries: FileSystemEntry[] = [];
     const readBatch = () => {
-      dirReader.readEntries((entries) => {
-        if (entries.length === 0) {
-          resolve(allEntries);
-        } else {
-          allEntries.push(...entries);
-          readBatch(); // readEntries returns batches of ~100
-        }
-      }, reject);
+      try {
+        dirReader.readEntries((entries) => {
+          if (entries.length === 0) {
+            resolve(allEntries);
+          } else {
+            allEntries.push(...entries);
+            readBatch(); // readEntries returns batches of ~100
+          }
+        }, (err) => {
+          // If partial entries were read, return what we have
+          if (allEntries.length > 0) {
+            console.warn("[Upload] readEntries partial error, returning collected entries:", err);
+            resolve(allEntries);
+          } else {
+            reject(err);
+          }
+        });
+      } catch (err) {
+        if (allEntries.length > 0) resolve(allEntries);
+        else reject(err);
+      }
     };
     readBatch();
   });
@@ -50,30 +64,51 @@ function fileEntryToFile(entry: FileSystemFileEntry): Promise<File> {
 /**
  * Recursively traverse a FileSystemEntry tree and collect all files
  * along with their path segments (folder hierarchy).
+ * Gracefully handles errors per-file so one bad entry doesn't kill the whole tree.
  */
 async function traverseEntry(
   entry: FileSystemEntry,
   pathSegments: string[] = []
 ): Promise<FileWithPath[]> {
   if (entry.isFile) {
-    const file = await fileEntryToFile(entry as FileSystemFileEntry);
-    return [{ file, pathSegments }];
+    try {
+      const file = await fileEntryToFile(entry as FileSystemFileEntry);
+      return [{ file, pathSegments }];
+    } catch (err) {
+      console.warn("[Upload] Could not read file:", entry.fullPath, err);
+      return [];
+    }
   }
 
   if (entry.isDirectory) {
     const dirEntry = entry as FileSystemDirectoryEntry;
-    const reader = dirEntry.createReader();
-    const children = await readDirectoryEntries(reader);
-    const results: FileWithPath[] = [];
+    let children: FileSystemEntry[];
+    try {
+      const reader = dirEntry.createReader();
+      children = await readDirectoryEntries(reader);
+    } catch (err) {
+      console.warn("[Upload] Could not read directory:", entry.fullPath, err);
+      return [];
+    }
 
-    for (const child of children) {
-      // Skip hidden files/folders (starting with .)
-      if (child.name.startsWith(".")) continue;
-      const childResults = await traverseEntry(child, [
-        ...pathSegments,
-        dirEntry.name,
-      ]);
-      results.push(...childResults);
+    const results: FileWithPath[] = [];
+    const nextSegments = [...pathSegments, dirEntry.name];
+
+    // Process children concurrently in batches for speed
+    const BATCH = 10;
+    for (let i = 0; i < children.length; i += BATCH) {
+      const batch = children.slice(i, i + BATCH);
+      const batchResults = await Promise.all(
+        batch
+          .filter((child) => !child.name.startsWith("."))
+          .map((child) =>
+            traverseEntry(child, nextSegments).catch((err) => {
+              console.warn("[Upload] Skipping entry:", child.name, err);
+              return [] as FileWithPath[];
+            })
+          )
+      );
+      for (const r of batchResults) results.push(...r);
     }
     return results;
   }
@@ -82,33 +117,21 @@ async function traverseEntry(
 }
 
 /**
- * Extract all files (with path info) from a native DragEvent.
- * Uses webkitGetAsEntry() to detect folders and traverse them recursively.
- * Falls back to plain DataTransfer.files if the API is unsupported.
+ * Process pre-collected FileSystemEntry objects into FileWithPath[].
+ * Entries MUST be grabbed synchronously during the drop event — browsers
+ * clear DataTransfer after the synchronous handler returns.
  */
-async function getFilesFromDragEvent(
-  event: React.DragEvent
+async function processEntries(
+  entries: FileSystemEntry[]
 ): Promise<FileWithPath[]> {
-  const items = event.dataTransfer?.items;
-  if (!items) return [];
-
-  const entries: FileSystemEntry[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const entry = items[i].webkitGetAsEntry?.();
-    if (entry) entries.push(entry);
-  }
-
-  // If webkitGetAsEntry is not supported, fall back to plain files
-  if (entries.length === 0) {
-    const files = event.dataTransfer?.files;
-    if (!files) return [];
-    return Array.from(files).map((file) => ({ file, pathSegments: [] }));
-  }
-
   const allFiles: FileWithPath[] = [];
   for (const entry of entries) {
-    const results = await traverseEntry(entry);
-    allFiles.push(...results);
+    try {
+      const results = await traverseEntry(entry);
+      allFiles.push(...results);
+    } catch (err) {
+      console.warn("[Upload] Failed to traverse entry:", entry.name, err);
+    }
   }
   return allFiles;
 }
@@ -563,6 +586,8 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
         (a, b) => a.split("/").length - b.split("/").length
       );
 
+      console.log(`[Upload] Creating ${sortedPaths.length} folder(s):`, sortedPaths);
+
       for (const pathStr of sortedPaths) {
         if (createdPaths.has(pathStr)) continue;
 
@@ -607,7 +632,12 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   // ── Main drop handler: supports both files and folders ──────────────
   const onDropWithFolders = useCallback(
     async (filesWithPaths: FileWithPath[]) => {
-      if (filesWithPaths.length === 0) return;
+      if (filesWithPaths.length === 0) {
+        console.warn("[Upload] No files found in drop");
+        return;
+      }
+
+      console.log(`[Upload] Processing ${filesWithPaths.length} file(s) from folder drop`);
 
       const STAGGER_MS = 1500;
 
@@ -730,29 +760,50 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       setIsDragOver(false);
       setIsDraggingFolder(false);
 
-      // Check if any item is a directory
+      // ── CRITICAL: Grab ALL entries synchronously ──────────────────
+      // Browsers clear DataTransfer.items after the synchronous portion
+      // of the event handler returns. We must collect everything NOW,
+      // before any await.
       const items = e.dataTransfer?.items;
+      const entries: FileSystemEntry[] = [];
+      const plainFiles: File[] = [];
       let hasDirectory = false;
-      if (items) {
+
+      if (items && items.length > 0) {
         for (let i = 0; i < items.length; i++) {
           const entry = items[i].webkitGetAsEntry?.();
-          if (entry?.isDirectory) {
-            hasDirectory = true;
-            break;
+          if (entry) {
+            entries.push(entry);
+            if (entry.isDirectory) hasDirectory = true;
           }
         }
       }
 
-      if (hasDirectory) {
-        // Folder-aware recursive extraction
-        const filesWithPaths = await getFilesFromDragEvent(e);
-        await onDropWithFolders(filesWithPaths);
-      } else {
-        // Plain files
-        const files = e.dataTransfer?.files;
-        if (files && files.length > 0) {
-          await onDropFiles(Array.from(files));
+      // Fallback: grab plain files synchronously too (in case entries failed)
+      if (entries.length === 0 && e.dataTransfer?.files) {
+        for (let i = 0; i < e.dataTransfer.files.length; i++) {
+          plainFiles.push(e.dataTransfer.files[i]);
         }
+      }
+
+      console.log(`[Upload] Drop: ${entries.length} entries (${hasDirectory ? "has dirs" : "files only"}), ${plainFiles.length} plain fallback files`);
+
+      // ── Now process async (safe — we already have the handles) ────
+      if (entries.length > 0) {
+        if (hasDirectory) {
+          const filesWithPaths = await processEntries(entries);
+          if (filesWithPaths.length > 0) {
+            await onDropWithFolders(filesWithPaths);
+          } else {
+            console.warn("[Upload] Folder traversal returned 0 files");
+          }
+        } else {
+          // All entries are files, convert them
+          const filesWithPaths = await processEntries(entries);
+          await onDropFiles(filesWithPaths.map((f) => f.file));
+        }
+      } else if (plainFiles.length > 0) {
+        await onDropFiles(plainFiles);
       }
     },
     [onDropWithFolders, onDropFiles]
