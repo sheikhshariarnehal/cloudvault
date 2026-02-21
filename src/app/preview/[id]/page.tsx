@@ -1,8 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
-import { getFileCategory, formatFileSize } from "@/types/file.types";
+import { getFileCategory, formatFileSize, isOfficeFile, isCsvFile, isPptxFile, isJsonFile, isTextFile } from "@/types/file.types";
 import { Download, FileIcon, ArrowLeft } from "lucide-react";
 import { PreviewClient } from "./preview-client";
+import { OfficePreviewClient } from "./office-preview-client";
+import { CsvPreviewClient } from "./csv-preview-client";
+import { TextPreviewClient } from "./text-preview-client";
+import { JsonPreviewClient } from "./json-preview-client";
+import { PptxPreviewClient } from "./pptx-preview-client";
 import { getFileUrl } from "@/lib/utils";
 
 export default async function PreviewPage({
@@ -83,7 +88,43 @@ export default async function PreviewPage({
             <audio controls src={downloadUrl} className="w-full max-w-md" />
           </div>
         )}
-        {(category === "document" ||
+        {/* Office documents (Word, Excel) — NOT PowerPoint */}
+        {category === "document" && isOfficeFile(file.mime_type, file.name) && !isPptxFile(file.mime_type, file.name) && (
+          <div className="w-full h-[calc(100vh-64px)]">
+            <OfficePreviewClient src={downloadUrl} fileName={file.name} />
+          </div>
+        )}
+        {/* PowerPoint presentations */}
+        {category === "document" && isPptxFile(file.mime_type, file.name) && (
+          <div className="w-full h-[calc(100vh-64px)]">
+            <PptxPreviewClient src={downloadUrl} fileName={file.name} downloadUrl={directDownloadUrl} />
+          </div>
+        )}
+        {/* CSV files */}
+        {category === "document" && isCsvFile(file.mime_type, file.name) && (
+          <div className="w-full h-[calc(100vh-64px)]">
+            <CsvPreviewClient src={downloadUrl} fileName={file.name} downloadUrl={directDownloadUrl} />
+          </div>
+        )}
+        {/* JSON files */}
+        {category === "document" && isJsonFile(file.mime_type, file.name) && (
+          <div className="w-full h-[calc(100vh-64px)]">
+            <JsonPreviewClient src={downloadUrl} fileName={file.name} downloadUrl={directDownloadUrl} />
+          </div>
+        )}
+        {/* Text / code files */}
+        {category === "document" && isTextFile(file.mime_type, file.name) && (
+          <div className="w-full h-[calc(100vh-64px)]">
+            <TextPreviewClient src={downloadUrl} fileName={file.name} downloadUrl={directDownloadUrl} />
+          </div>
+        )}
+        {/* Other non-previewable files */}
+        {((category === "document" &&
+          !isOfficeFile(file.mime_type, file.name) &&
+          !isCsvFile(file.mime_type, file.name) &&
+          !isJsonFile(file.mime_type, file.name) &&
+          !isTextFile(file.mime_type, file.name) &&
+          !isPptxFile(file.mime_type, file.name)) ||
           category === "archive" ||
           category === "other") && (
           <div className="text-center">
