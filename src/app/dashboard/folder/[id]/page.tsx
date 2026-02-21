@@ -143,8 +143,8 @@ export default function FolderPage({
         </TooltipProvider>
       </div>
 
-      {/* Subfolders */}
-      {subFolders.length > 0 && (
+      {/* Subfolders (grid view only – list view inlines them in FileList) */}
+      {viewMode === "grid" && subFolders.length > 0 && (
         <section>
           <h2 className="text-sm font-medium text-[#202124] mb-3">Folders</h2>
           <FolderGrid folders={subFolders} />
@@ -162,7 +162,7 @@ export default function FolderPage({
               ))}
             </div>
           ) : (
-            <FileList files={folderFiles} />
+            <FileList files={folderFiles} folders={subFolders} />
           )}
         </section>
       ) : (
