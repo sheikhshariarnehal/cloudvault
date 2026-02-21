@@ -15,20 +15,26 @@ import {
   Palette,
   FolderInput,
   Trash2,
+  Link,
 } from "lucide-react";
 import type { DbFolder } from "@/types/file.types";
-import Link from "next/link";
+import NextLink from "next/link";
 
 interface FolderContextMenuProps {
   folder: DbFolder;
 }
 
 export function FolderContextMenu({ folder }: FolderContextMenuProps) {
-  const { setRenameTarget, setRenameModalOpen } = useUIStore();
+  const { setRenameTarget, setRenameModalOpen, setShareFolderId, setShareModalOpen } = useUIStore();
 
   const handleRename = () => {
     setRenameTarget({ id: folder.id, name: folder.name, type: "folder" });
     setRenameModalOpen(true);
+  };
+
+  const handleShare = () => {
+    setShareFolderId(folder.id);
+    setShareModalOpen(true);
   };
 
   const handleDelete = async () => {
@@ -56,11 +62,14 @@ export function FolderContextMenu({ folder }: FolderContextMenuProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
         <DropdownMenuItem asChild>
-          <Link href={`/dashboard/folder/${folder.id}`}>
+          <NextLink href={`/dashboard/folder/${folder.id}`}>
             <FolderOpen className="h-4 w-4 mr-2" /> Open
-          </Link>
+          </NextLink>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleShare}>
+          <Link className="h-4 w-4 mr-2" /> Share
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={handleRename}>
           <Pencil className="h-4 w-4 mr-2" /> Rename
         </DropdownMenuItem>

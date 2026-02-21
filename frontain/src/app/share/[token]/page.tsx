@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { ImagePreview } from "@/components/preview/image-preview";
+import { VideoPreview } from "@/components/preview/video-preview";
+import { PdfPreview } from "@/components/preview/pdf-preview";
 import { getFileCategory, formatFileSize } from "@/types/file.types";
 import {
   Download,
@@ -12,8 +15,13 @@ import {
   Music,
   Archive,
   Loader2,
-  AlertCircle,
   CloudOff,
+  Folder,
+  ChevronRight,
+  ChevronLeft,
+  ArrowLeft,
+  X,
+  Eye,
 } from "lucide-react";
 
 interface SharedFile {
@@ -25,7 +33,20 @@ interface SharedFile {
   created_at: string;
 }
 
-interface ShareData {
+interface SharedFolder {
+  id: string;
+  name: string;
+  color: string;
+  created_at: string;
+}
+
+interface BreadcrumbItem {
+  id: string;
+  name: string;
+}
+
+interface FileShareData {
+  type: "file";
   file: SharedFile;
   shareLink: {
     token: string;
@@ -33,25 +54,215 @@ interface ShareData {
   };
 }
 
-function getCategoryIcon(category: string) {
+interface FolderShareData {
+  type: "folder";
+  folder: SharedFolder;
+  rootFolder: { id: string; name: string };
+  files: SharedFile[];
+  folders: SharedFolder[];
+  totalSize: number;
+  breadcrumbs: BreadcrumbItem[];
+  shareLink: {
+    token: string;
+    created_at: string;
+  };
+}
+
+type ShareData = FileShareData | FolderShareData;
+
+function getCategoryIcon(category: string, size: "sm" | "lg" = "lg") {
+  const cls = size === "lg" ? "h-16 w-16" : "h-5 w-5";
   switch (category) {
     case "image":
-      return <ImageIcon className="h-16 w-16 text-blue-500" />;
+      return <ImageIcon className={`${cls} text-blue-500`} />;
     case "video":
-      return <Video className="h-16 w-16 text-purple-500" />;
+      return <Video className={`${cls} text-purple-500`} />;
     case "audio":
-      return <Music className="h-16 w-16 text-green-500" />;
+      return <Music className={`${cls} text-green-500`} />;
     case "pdf":
-      return <FileText className="h-16 w-16 text-red-500" />;
+      return <FileText className={`${cls} text-red-500`} />;
     case "archive":
-      return <Archive className="h-16 w-16 text-yellow-600" />;
+      return <Archive className={`${cls} text-yellow-600`} />;
     case "document":
-      return <FileText className="h-16 w-16 text-blue-600" />;
+      return <FileText className={`${cls} text-blue-600`} />;
     default:
-      return <FileIcon className="h-16 w-16 text-gray-500" />;
+      return <FileIcon className={`${cls} text-gray-500`} />;
   }
 }
 
+function getFileIconColor(mimeType: string): string {
+  const cat = getFileCategory(mimeType);
+  switch (cat) {
+    case "image": return "text-blue-400";
+    case "video": return "text-purple-400";
+    case "audio": return "text-green-400";
+    case "pdf": return "text-red-400";
+    case "archive": return "text-yellow-500";
+    case "document": return "text-blue-500";
+    default: return "text-gray-400";
+  }
+}
+
+/** Check if a file type can be previewed inline */
+function isPreviewable(mimeType: string): boolean {
+  const cat = getFileCategory(mimeType);
+  return ["image", "video", "audio", "pdf"].includes(cat);
+}
+
+// ─────────────────────────────────────────────
+// Inline Preview Modal (reuses app preview components)
+// ─────────────────────────────────────────────
+function SharePreviewModal({
+  file,
+  token,
+  files,
+  onClose,
+  onNavigate,
+}: {
+  file: SharedFile;
+  token: string;
+  files: SharedFile[];
+  onClose: () => void;
+  onNavigate: (fileId: string) => void;
+}) {
+  const category = getFileCategory(file.mime_type);
+  const previewUrl = `/api/share/${token}?previewFileId=${file.id}`;
+  const downloadUrl = `/api/share/${token}?downloadFileId=${file.id}`;
+
+  // Navigable previewable files for arrow navigation
+  const previewableFiles = files.filter((f) => isPreviewable(f.mime_type));
+  const currentIndex = previewableFiles.findIndex((f) => f.id === file.id);
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < previewableFiles.length - 1;
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft" && hasPrev)
+        onNavigate(previewableFiles[currentIndex - 1].id);
+      else if (e.key === "ArrowRight" && hasNext)
+        onNavigate(previewableFiles[currentIndex + 1].id);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, onNavigate, hasPrev, hasNext, currentIndex, previewableFiles]);
+
+  // Lock body scroll
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col bg-[#202124]">
+      {/* Top bar */}
+      <div className="flex items-center justify-between h-16 px-4 bg-[#202124] flex-shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={onClose}
+            className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors flex-shrink-0"
+            title="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-medium text-white truncate">
+              {file.name}
+            </h2>
+            <p className="text-xs text-white/50">
+              {formatFileSize(file.size_bytes)}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <a
+            href={downloadUrl}
+            className="p-2.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+            title="Download"
+          >
+            <Download className="h-5 w-5" />
+          </a>
+        </div>
+      </div>
+
+      {/* Preview content */}
+      <div
+        className="flex-1 relative flex items-center justify-center overflow-hidden"
+        onClick={handleOverlayClick}
+      >
+        {/* Left arrow */}
+        {hasPrev && (
+          <button
+            onClick={() => onNavigate(previewableFiles[currentIndex - 1].id)}
+            className="absolute left-4 z-10 p-3 text-white/60 hover:text-white bg-black/30 hover:bg-black/50 rounded-full transition-all"
+            title="Previous"
+          >
+            <ChevronLeft className="h-7 w-7" />
+          </button>
+        )}
+
+        {/* Content */}
+        <div className="w-full h-full flex items-center justify-center">
+          {category === "image" && (
+            <ImagePreview src={previewUrl} alt={file.name} />
+          )}
+          {category === "pdf" && (
+            <div className="w-full h-full">
+              <PdfPreview src={previewUrl} />
+            </div>
+          )}
+          {category === "video" && (
+            <div className="max-w-5xl w-full px-8">
+              <VideoPreview src={previewUrl} />
+            </div>
+          )}
+          {category === "audio" && (
+            <div className="p-8 text-center">
+              <FileIcon className="h-20 w-20 text-white/30 mx-auto mb-6" />
+              <p className="text-lg font-medium mb-6 text-white">
+                {file.name}
+              </p>
+              <audio
+                controls
+                src={previewUrl}
+                className="w-full max-w-md mx-auto"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Right arrow */}
+        {hasNext && (
+          <button
+            onClick={() => onNavigate(previewableFiles[currentIndex + 1].id)}
+            className="absolute right-4 z-10 p-3 text-white/60 hover:text-white bg-black/30 hover:bg-black/50 rounded-full transition-all"
+            title="Next"
+          >
+            <ChevronRight className="h-7 w-7" />
+          </button>
+        )}
+      </div>
+
+      {/* Counter */}
+      {previewableFiles.length > 1 && (
+        <div className="absolute bottom-6 right-6 text-xs text-white/50 bg-[#2d2e30] px-3 py-1.5 rounded-full">
+          {currentIndex + 1} / {previewableFiles.length}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Main Share Page
+// ─────────────────────────────────────────────
 export default function SharePage() {
   const params = useParams();
   const token = params.token as string;
@@ -59,11 +270,20 @@ export default function SharePage() {
   const [data, setData] = useState<ShareData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentSubfolderId, setCurrentSubfolderId] = useState<string | null>(
+    null
+  );
+  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchShareData = async () => {
+  const fetchShareData = useCallback(
+    async (subfolderId?: string | null) => {
+      setIsLoading(true);
       try {
-        const response = await fetch(`/api/share/${token}`);
+        let url = `/api/share/${token}`;
+        if (subfolderId) {
+          url += `?subfolderId=${subfolderId}`;
+        }
+        const response = await fetch(url);
         if (!response.ok) {
           const err = await response.json();
           throw new Error(err.error || "Share link not found");
@@ -72,27 +292,44 @@ export default function SharePage() {
         setData(shareData);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to load shared file"
+          err instanceof Error ? err.message : "Failed to load shared content"
         );
       } finally {
         setIsLoading(false);
       }
-    };
+    },
+    [token]
+  );
 
-    fetchShareData();
-  }, [token]);
+  useEffect(() => {
+    fetchShareData(currentSubfolderId);
+  }, [token, currentSubfolderId, fetchShareData]);
 
+  const navigateToFolder = (folderId: string) => {
+    setCurrentSubfolderId(folderId);
+  };
+
+  const navigateToBreadcrumb = (folderId: string) => {
+    if (data?.type === "folder" && folderId === data.rootFolder.id) {
+      setCurrentSubfolderId(null);
+    } else {
+      setCurrentSubfolderId(folderId);
+    }
+  };
+
+  // ─── Loading ───
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-10 w-10 animate-spin text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">Loading shared file...</p>
+          <p className="text-gray-500">Loading shared content...</p>
         </div>
       </div>
     );
   }
 
+  // ─── Error ───
   if (error || !data) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -117,115 +354,346 @@ export default function SharePage() {
     );
   }
 
-  const { file, shareLink } = data;
-  const category = getFileCategory(file.mime_type);
-  const previewUrl = `/api/share/${token}?preview=true&_t=${Date.now()}`;
-  const downloadUrl = `/api/share/${token}?download=true`;
+  // ===== FILE SHARE VIEW =====
+  if (data.type === "file") {
+    const { file } = data;
+    const category = getFileCategory(file.mime_type);
+    const previewUrl = `/api/share/${token}?preview=true&_t=${Date.now()}`;
+    const downloadUrl = `/api/share/${token}?download=true`;
+
+    return (
+      <div className="min-h-screen bg-[#202124] flex flex-col">
+        <header className="bg-[#202124] h-16 flex-shrink-0">
+          <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <a
+                href="/"
+                className="flex items-center gap-2 text-white/80 hover:text-white"
+              >
+                <svg
+                  className="h-6 w-6"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9" />
+                  <path d="M12 12v9" />
+                  <path d="m16 16-4-4-4 4" />
+                </svg>
+                <span className="font-bold text-sm">CloudVault</span>
+              </a>
+              <div className="w-px h-6 bg-white/20 mx-1" />
+              <div className="min-w-0">
+                <h1 className="text-[15px] font-medium text-white truncate">
+                  {file.name}
+                </h1>
+                <p className="text-xs text-white/50">
+                  {formatFileSize(file.size_bytes)}
+                </p>
+              </div>
+            </div>
+            <a
+              href={downloadUrl}
+              className="p-2.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+              title="Download"
+            >
+              <Download className="h-5 w-5" />
+            </a>
+          </div>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center overflow-hidden">
+          {category === "image" && (
+            <div className="w-full h-full">
+              <ImagePreview src={previewUrl} alt={file.name} />
+            </div>
+          )}
+          {category === "video" && (
+            <div className="max-w-5xl w-full px-8">
+              <VideoPreview src={previewUrl} />
+            </div>
+          )}
+          {category === "pdf" && (
+            <div className="w-full h-full">
+              <PdfPreview src={previewUrl} />
+            </div>
+          )}
+          {category === "audio" && (
+            <div className="p-8 text-center">
+              <FileIcon className="h-20 w-20 text-white/30 mx-auto mb-6" />
+              <p className="text-lg font-medium text-white mb-6">{file.name}</p>
+              <audio
+                controls
+                src={previewUrl}
+                className="w-full max-w-md mx-auto"
+              />
+            </div>
+          )}
+          {(category === "document" ||
+            category === "archive" ||
+            category === "other") && (
+            <div className="text-center max-w-md w-full">
+              <div className="text-white/30 flex justify-center mb-4">
+                {getCategoryIcon(category)}
+              </div>
+              <p className="text-lg font-medium text-white mt-4 mb-1">
+                {file.name}
+              </p>
+              <p className="text-sm text-white/50 mb-6">
+                {formatFileSize(file.size_bytes)} &middot; Preview not available
+              </p>
+              <a
+                href={downloadUrl}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-[#8ab4f8] text-[#202124] rounded-full font-medium hover:bg-[#aecbfa] transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                Download File
+              </a>
+            </div>
+          )}
+        </main>
+
+        <footer className="bg-[#202124] border-t border-white/10 py-4 flex-shrink-0">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
+            <p className="text-sm text-white/30">
+              Shared via{" "}
+              <a
+                href="/"
+                className="text-white/50 hover:text-white/70 font-medium"
+              >
+                CloudVault
+              </a>
+            </p>
+          </div>
+        </footer>
+      </div>
+    );
+  }
+
+  // ===== FOLDER SHARE VIEW =====
+  const { folder, rootFolder, files, folders, totalSize, breadcrumbs } = data;
+  const fileCount = files.length;
+  const folderCount = folders.length;
+
+  // File currently being previewed
+  const previewFile = previewFileId
+    ? files.find((f) => f.id === previewFileId)
+    : null;
 
   return (
     <div className="min-h-screen bg-[#202124] flex flex-col">
-      {/* Header - Google Drive style */}
-      <header className="bg-[#202124] h-16 flex-shrink-0">
-        <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <a href="/" className="flex items-center gap-2 text-white/80 hover:text-white">
-              <svg
-                className="h-6 w-6"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
+      {/* Inline preview modal */}
+      {previewFile && (
+        <SharePreviewModal
+          file={previewFile}
+          token={token}
+          files={files}
+          onClose={() => setPreviewFileId(null)}
+          onNavigate={(id) => setPreviewFileId(id)}
+        />
+      )}
+
+      {/* Header */}
+      <header className="bg-[#202124] border-b border-white/10 flex-shrink-0">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <a
+                href="/"
+                className="flex items-center gap-2 text-white/80 hover:text-white shrink-0"
               >
-                <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9" />
-                <path d="M12 12v9" />
-                <path d="m16 16-4-4-4 4" />
-              </svg>
-              <span className="font-bold text-sm">CloudVault</span>
-            </a>
-            <div className="w-px h-6 bg-white/20 mx-1" />
-            <div className="min-w-0">
-              <h1 className="text-[15px] font-medium text-white truncate">
-                {file.name}
-              </h1>
-              <p className="text-xs text-white/50">
-                {formatFileSize(file.size_bytes)}
-              </p>
+                <svg
+                  className="h-6 w-6"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9" />
+                  <path d="M12 12v9" />
+                  <path d="m16 16-4-4-4 4" />
+                </svg>
+                <span className="font-bold text-sm">CloudVault</span>
+              </a>
+              <div className="w-px h-6 bg-white/20 mx-1" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1 text-sm">
+                  <Folder
+                    className="h-4 w-4 shrink-0"
+                    style={{ color: folder.color || "#EAB308" }}
+                  />
+                  <h1 className="text-[15px] font-medium text-white truncate">
+                    {folder.name}
+                  </h1>
+                </div>
+                <p className="text-xs text-white/50">
+                  {folderCount > 0 &&
+                    `${folderCount} folder${folderCount !== 1 ? "s" : ""}, `}
+                  {fileCount} file{fileCount !== 1 ? "s" : ""} &middot;{" "}
+                  {formatFileSize(totalSize)}
+                </p>
+              </div>
             </div>
           </div>
-          <a
-            href={downloadUrl}
-            className="p-2.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
-            title="Download"
-          >
-            <Download className="h-5 w-5" />
-          </a>
+
+          {/* Breadcrumbs */}
+          {breadcrumbs.length > 1 && (
+            <nav className="mt-3 flex items-center gap-1 text-sm overflow-x-auto">
+              {breadcrumbs.map((crumb, idx) => (
+                <span
+                  key={crumb.id}
+                  className="flex items-center gap-1 shrink-0"
+                >
+                  {idx > 0 && (
+                    <ChevronRight className="h-3 w-3 text-white/30" />
+                  )}
+                  {idx < breadcrumbs.length - 1 ? (
+                    <button
+                      onClick={() => navigateToBreadcrumb(crumb.id)}
+                      className="text-[#8ab4f8] hover:text-[#aecbfa] hover:underline transition-colors"
+                    >
+                      {crumb.name}
+                    </button>
+                  ) : (
+                    <span className="text-white/70">{crumb.name}</span>
+                  )}
+                </span>
+              ))}
+            </nav>
+          )}
         </div>
       </header>
 
-      {/* Preview Content */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-hidden">
-        {category === "image" && (
-          <img
-            src={previewUrl}
-            alt={file.name}
-            className="max-w-full max-h-[calc(100vh-128px)] object-contain"
-          />
-        )}
-
-        {category === "video" && (
-          <div className="max-w-5xl w-full">
-            <video
-              controls
-              className="w-full max-h-[calc(100vh-128px)] rounded-lg mx-auto"
+      {/* Folder Contents */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+          {/* Back button */}
+          {currentSubfolderId && breadcrumbs.length > 1 && (
+            <button
+              onClick={() => {
+                const parentIdx = breadcrumbs.length - 2;
+                if (parentIdx >= 0)
+                  navigateToBreadcrumb(breadcrumbs[parentIdx].id);
+              }}
+              className="flex items-center gap-2 text-sm text-white/60 hover:text-white mb-4 transition-colors"
             >
-              <source src={previewUrl} type={file.mime_type} />
-              Your browser does not support the video tag.
-            </video>
-          </div>
-        )}
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+          )}
 
-        {category === "pdf" && (
-          <div className="max-w-5xl w-full h-[calc(100vh-128px)]">
-            <iframe
-              src={previewUrl}
-              className="w-full h-full rounded-lg border-0"
-              title={file.name}
-              allow="fullscreen"
-            />
-          </div>
-        )}
-
-        {category === "audio" && (
-          <div className="text-center max-w-md w-full">
-            <div className="text-white/30 flex justify-center mb-6">
-              {getCategoryIcon(category)}
+          {/* Sub-folders */}
+          {folders.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-xs font-medium text-white/40 uppercase tracking-wider mb-3">
+                Folders
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                {folders.map((subfolder) => (
+                  <button
+                    key={subfolder.id}
+                    onClick={() => navigateToFolder(subfolder.id)}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-left group"
+                  >
+                    <Folder
+                      className="h-5 w-5 shrink-0"
+                      style={{ color: subfolder.color || "#EAB308" }}
+                    />
+                    <span className="text-sm text-white/80 group-hover:text-white truncate">
+                      {subfolder.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="text-lg font-medium text-white mt-4 mb-6">{file.name}</p>
-            <audio controls src={previewUrl} className="w-full" />
-          </div>
-        )}
+          )}
 
-        {(category === "document" ||
-          category === "archive" ||
-          category === "other") && (
-          <div className="text-center max-w-md w-full">
-            <div className="text-white/30 flex justify-center mb-4">
-              {getCategoryIcon(category)}
+          {/* Files */}
+          {files.length > 0 && (
+            <div>
+              <h2 className="text-xs font-medium text-white/40 uppercase tracking-wider mb-3">
+                Files
+              </h2>
+              <div className="bg-white/5 rounded-lg overflow-hidden divide-y divide-white/5">
+                {files.map((file) => {
+                  const category = getFileCategory(file.mime_type);
+                  const downloadUrl = `/api/share/${token}?downloadFileId=${file.id}`;
+                  const previewUrl = `/api/share/${token}?previewFileId=${file.id}`;
+                  const canPreview = isPreviewable(file.mime_type);
+                  const isImage = category === "image";
+
+                  return (
+                    <div
+                      key={file.id}
+                      className={`flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors group ${canPreview ? "cursor-pointer" : ""}`}
+                      onClick={() => canPreview && setPreviewFileId(file.id)}
+                    >
+                      {/* Thumbnail for images */}
+                      {isImage ? (
+                        <div className="h-10 w-10 rounded overflow-hidden bg-white/10 shrink-0">
+                          <img
+                            src={previewUrl}
+                            alt={file.name}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className={`shrink-0 ${getFileIconColor(file.mime_type)}`}
+                        >
+                          {getCategoryIcon(category, "sm")}
+                        </div>
+                      )}
+
+                      {/* File info */}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-white/90 truncate">
+                          {file.name}
+                        </p>
+                        <p className="text-xs text-white/40">
+                          {formatFileSize(file.size_bytes)}
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div
+                        className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {canPreview && (
+                          <button
+                            onClick={() => setPreviewFileId(file.id)}
+                            className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                            title="Preview"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        )}
+                        <a
+                          href={downloadUrl}
+                          className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                          title="Download"
+                        >
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <p className="text-lg font-medium text-white mt-4 mb-1">{file.name}</p>
-            <p className="text-sm text-white/50 mb-6">
-              {formatFileSize(file.size_bytes)} &middot;{" "}
-              Preview not available for this file type
-            </p>
-            <a
-              href={downloadUrl}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-[#8ab4f8] text-[#202124] rounded-full font-medium hover:bg-[#aecbfa] transition-colors"
-            >
-              <Download className="h-4 w-4" />
-              Download File
-            </a>
-          </div>
-        )}
+          )}
+
+          {/* Empty state */}
+          {files.length === 0 && folders.length === 0 && (
+            <div className="text-center py-16">
+              <Folder className="h-16 w-16 text-white/20 mx-auto mb-4" />
+              <p className="text-white/50 text-lg">This folder is empty</p>
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Footer */}
@@ -233,7 +701,10 @@ export default function SharePage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
           <p className="text-sm text-white/30">
             Shared via{" "}
-            <a href="/" className="text-white/50 hover:text-white/70 font-medium">
+            <a
+              href="/"
+              className="text-white/50 hover:text-white/70 font-medium"
+            >
               CloudVault
             </a>
           </p>

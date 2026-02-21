@@ -25,6 +25,7 @@ import {
   Plus,
   Upload,
   FolderPlus,
+  FolderUp,
   LayoutGrid,
   List,
   Loader2,
@@ -34,7 +35,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { files, folders, viewMode, setViewMode, isLoading, searchQuery } =
     useFilesStore();
-  const { setNewFolderModalOpen, openFilePicker } = useUIStore();
+  const { setNewFolderModalOpen, openFilePicker, openFolderPicker } = useUIStore();
 
   const displayName =
     user?.user_metadata?.display_name ||
@@ -102,6 +103,10 @@ export default function DashboardPage() {
                 <Upload className="h-4 w-4 mr-2" />
                 Upload File
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openFolderPicker?.()}>
+                <FolderUp className="h-4 w-4 mr-2" />
+                Upload Folder
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -149,8 +154,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Folders Section */}
-      {filteredFolders.length > 0 && (
+      {/* Folders Section (grid view only – in list view, folders are inlined in FileList) */}
+      {viewMode === "grid" && filteredFolders.length > 0 && (
         <section>
           <h2 className="text-sm font-medium text-[#202124] mb-3">Folders</h2>
           <FolderGrid folders={filteredFolders} />
@@ -158,7 +163,7 @@ export default function DashboardPage() {
       )}
 
       {/* Suggested from your activity */}
-      {!searchQuery && files.length > 0 && (
+      {!searchQuery && files.length > 0 && viewMode !== "list" && (
         <section>
           <h2 className="text-sm font-medium text-[#202124] mb-3">
             Suggested
@@ -170,13 +175,16 @@ export default function DashboardPage() {
       {/* File List with Tabs */}
       <section>
         <Tabs defaultValue="recent" className="w-full">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-[#202124]">Files</h2>
-            <TabsList className="h-8 bg-[#f1f3f4] rounded-full px-1">
-              <TabsTrigger value="recent" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Recent</TabsTrigger>
-              <TabsTrigger value="starred" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Starred</TabsTrigger>
-            </TabsList>
-          </div>
+          {/* Tabs rendered inside FileList's filter bar row via topRightSlot;
+              for grid view (no FileList) we still need them visible */}
+          {viewMode === "grid" && (
+            <div className="hidden sm:flex items-center justify-end mb-3">
+              <TabsList className="h-8 bg-[#f1f3f4] rounded-full px-1">
+                <TabsTrigger value="recent" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Recent</TabsTrigger>
+                <TabsTrigger value="starred" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Starred</TabsTrigger>
+              </TabsList>
+            </div>
+          )}
 
           <TabsContent value="recent">
             {viewMode === "grid" ? (
@@ -187,10 +195,19 @@ export default function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <FileList files={filteredFiles} />
+                <FileList files={filteredFiles} folders={filteredFolders} />
               )
             ) : (
-              <FileList files={filteredFiles} />
+              <FileList
+                files={filteredFiles}
+                folders={filteredFolders}
+                topRightSlot={
+                  <TabsList className="h-8 bg-[#f1f3f4] rounded-full px-1">
+                    <TabsTrigger value="recent" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Recent</TabsTrigger>
+                    <TabsTrigger value="starred" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Starred</TabsTrigger>
+                  </TabsList>
+                }
+              />
             )}
           </TabsContent>
 
@@ -206,7 +223,15 @@ export default function DashboardPage() {
                 <FileList files={starredFiles} />
               )
             ) : (
-              <FileList files={starredFiles} />
+              <FileList
+                files={starredFiles}
+                topRightSlot={
+                  <TabsList className="h-8 bg-[#f1f3f4] rounded-full px-1">
+                    <TabsTrigger value="recent" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Recent</TabsTrigger>
+                    <TabsTrigger value="starred" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Starred</TabsTrigger>
+                  </TabsList>
+                }
+              />
             )}
           </TabsContent>
         </Tabs>

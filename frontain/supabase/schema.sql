@@ -58,10 +58,11 @@ ALTER TABLE public.files
   ADD CONSTRAINT fk_folder
   FOREIGN KEY (folder_id) REFERENCES public.folders(id) ON DELETE SET NULL;
 
--- Shared links table
+-- Shared links table (supports both file and folder sharing)
 CREATE TABLE IF NOT EXISTS public.shared_links (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  file_id UUID NOT NULL REFERENCES public.files(id) ON DELETE CASCADE,
+  file_id UUID REFERENCES public.files(id) ON DELETE CASCADE,
+  folder_id UUID REFERENCES public.folders(id) ON DELETE CASCADE,
   created_by UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   token TEXT UNIQUE DEFAULT encode(gen_random_bytes(32), 'hex'),
   expires_at TIMESTAMPTZ,
@@ -70,7 +71,11 @@ CREATE TABLE IF NOT EXISTS public.shared_links (
   download_count INTEGER DEFAULT 0,
   max_downloads INTEGER,
   is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT chk_shared_links_target CHECK (
+    (file_id IS NOT NULL AND folder_id IS NULL)
+    OR (file_id IS NULL AND folder_id IS NOT NULL)
+  )
 );
 
 -- Indexes
@@ -83,6 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_folders_user_id ON public.folders(user_id);
 CREATE INDEX IF NOT EXISTS idx_folders_guest_session ON public.folders(guest_session_id);
 CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON public.folders(parent_id);
 CREATE INDEX IF NOT EXISTS idx_shared_links_token ON public.shared_links(token);
+CREATE INDEX IF NOT EXISTS idx_shared_links_folder_id ON public.shared_links(folder_id);
 
 -- RLS Policies
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;

@@ -12,6 +12,121 @@ export type ViewMode = "grid" | "list";
 
 export type FileCategory = "image" | "video" | "audio" | "document" | "pdf" | "archive" | "other";
 
+/**
+ * MIME types supported by the Microsoft Office Online Viewer.
+ */
+const OFFICE_MIME_TYPES = [
+  "application/msword",                                                          // .doc
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",     // .docx
+  "application/vnd.ms-excel",                                                    // .xls
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",           // .xlsx
+  "application/vnd.ms-powerpoint",                                               // .ppt
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",   // .pptx
+];
+
+/** Extensions accepted by the Office Online Viewer. */
+const OFFICE_EXTENSIONS = ["doc", "docx", "xls", "xlsx", "ppt", "pptx"];
+
+/**
+ * Returns true when the file can be previewed with Microsoft Office Online.
+ */
+export function isOfficeFile(mimeType: string, fileName?: string): boolean {
+  if (OFFICE_MIME_TYPES.includes(mimeType)) return true;
+  if (fileName) {
+    const ext = fileName.split(".").pop()?.toLowerCase();
+    return !!ext && OFFICE_EXTENSIONS.includes(ext);
+  }
+  return false;
+}
+
+/**
+ * Returns true when the file is a CSV that can be previewed client-side.
+ */
+export function isCsvFile(mimeType: string, fileName?: string): boolean {
+  if (mimeType === "text/csv") return true;
+  if (fileName) {
+    return fileName.toLowerCase().endsWith(".csv");
+  }
+  return false;
+}
+
+/** Extensions recognised as PowerPoint presentations. */
+const PPTX_EXTENSIONS = ["ppt", "pptx"];
+const PPTX_MIME_TYPES = [
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+];
+
+/**
+ * Returns true when the file is a PowerPoint presentation.
+ */
+export function isPptxFile(mimeType: string, fileName?: string): boolean {
+  if (PPTX_MIME_TYPES.includes(mimeType)) return true;
+  if (fileName) {
+    const ext = fileName.split(".").pop()?.toLowerCase();
+    return !!ext && PPTX_EXTENSIONS.includes(ext);
+  }
+  return false;
+}
+
+/**
+ * Returns true when the file is a JSON file.
+ */
+export function isJsonFile(mimeType: string, fileName?: string): boolean {
+  if (mimeType === "application/json") return true;
+  if (fileName) {
+    return fileName.toLowerCase().endsWith(".json");
+  }
+  return false;
+}
+
+/** Extensions and MIME types for plain-text / code files (previewable as text). */
+const TEXT_EXTENSIONS = [
+  "txt", "md", "markdown", "log", "cfg", "conf", "ini", "env",
+  "sh", "bash", "zsh", "bat", "cmd", "ps1",
+  "py", "rb", "pl", "lua", "r",
+  "js", "jsx", "ts", "tsx", "mjs", "cjs",
+  "html", "htm", "css", "scss", "sass", "less",
+  "java", "c", "h", "cpp", "cc", "cxx", "hpp",
+  "cs", "go", "rs", "swift", "kt", "kts",
+  "php", "sql", "graphql", "gql",
+  "xml", "svg", "yaml", "yml", "toml",
+  "dockerfile", "makefile", "gitignore", "editorconfig",
+  "vue", "svelte", "astro",
+];
+
+const TEXT_MIME_PREFIXES = ["text/"];
+const TEXT_MIME_EXACT = [
+  "application/javascript",
+  "application/typescript",
+  "application/xml",
+  "application/x-yaml",
+  "application/sql",
+  "application/x-sql",
+  "application/x-sh",
+  "application/x-httpd-php",
+];
+
+/**
+ * Returns true when the file can be previewed as plain text / code.
+ * Excludes CSV (has its own previewer) and JSON (has its own previewer).
+ */
+export function isTextFile(mimeType: string, fileName?: string): boolean {
+  // Exclude CSV & JSON – they have dedicated previewers
+  if (isCsvFile(mimeType, fileName) || isJsonFile(mimeType, fileName)) return false;
+
+  if (TEXT_MIME_EXACT.includes(mimeType)) return true;
+  if (TEXT_MIME_PREFIXES.some((p) => mimeType.startsWith(p))) return true;
+
+  if (fileName) {
+    const lower = fileName.toLowerCase();
+    const ext = lower.split(".").pop() ?? "";
+    // Also check the full filename for dot-files like "Makefile", "Dockerfile"
+    return TEXT_EXTENSIONS.includes(ext) || TEXT_EXTENSIONS.includes(lower);
+  }
+  return false;
+}
+
 export interface UploadQueueItem {
   id: string;
   file: File;

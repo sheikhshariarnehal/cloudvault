@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 
-// POST - Create a share link for a file
+// POST - Create a share link for a file or folder
 export async function POST(request: NextRequest) {
   try {
     // Use service role client to bypass RLS for guest users
@@ -16,11 +16,11 @@ export async function POST(request: NextRequest) {
         },
       }
     );
-    const { fileId, userId, guestSessionId } = await request.json();
+    const { fileId, folderId, userId, guestSessionId } = await request.json();
 
-    if (!fileId) {
+    if (!fileId && !folderId) {
       return NextResponse.json(
-        { error: "File ID required" },
+        { error: "File ID or Folder ID required" },
         { status: 400 }
       );
     }
@@ -69,66 +69,134 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the file exists and belongs to the user
-    let fileQuery = supabase
-      .from("files")
-      .select("id")
-      .eq("id", fileId);
+    // Verify ownership based on whether it's a file or folder share
+    if (fileId) {
+      let fileQuery = supabase
+        .from("files")
+        .select("id")
+        .eq("id", fileId);
 
-    if (userId) {
-      fileQuery = fileQuery.eq("user_id", userId);
-    } else if (guestSessionId) {
-      fileQuery = fileQuery.eq("guest_session_id", guestSessionId);
+      if (userId) {
+        fileQuery = fileQuery.eq("user_id", userId);
+      } else if (guestSessionId) {
+        fileQuery = fileQuery.eq("guest_session_id", guestSessionId);
+      }
+
+      const { data: file, error: fileError } = await fileQuery.single();
+
+      if (fileError || !file) {
+        console.error("File verification error:", fileError);
+        return NextResponse.json(
+          { error: "File not found or access denied" },
+          { status: 404 }
+        );
+      }
+
+      // Check if a share link already exists for this file
+      const { data: existingLink } = await supabase
+        .from("shared_links")
+        .select("*")
+        .eq("file_id", fileId)
+        .eq("created_by", createdBy)
+        .eq("is_active", true)
+        .single();
+
+      if (existingLink) {
+        return NextResponse.json({ token: existingLink.token });
+      }
+
+      // Generate a unique token
+      const token = randomBytes(16).toString("hex");
+
+      // Create a new share link for the file
+      const { data: shareLink, error: shareLinkError } = await supabase
+        .from("shared_links")
+        .insert({
+          file_id: fileId,
+          created_by: createdBy,
+          token,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (shareLinkError) {
+        console.error("Share link creation error:", shareLinkError);
+        return NextResponse.json(
+          { error: shareLinkError.message },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ token: shareLink.token });
     }
 
-    const { data: file, error: fileError } = await fileQuery.single();
+    // Folder sharing
+    if (folderId) {
+      let folderQuery = supabase
+        .from("folders")
+        .select("id")
+        .eq("id", folderId);
 
-    if (fileError || !file) {
-      console.error("File verification error:", fileError);
-      return NextResponse.json(
-        { error: "File not found or access denied" },
-        { status: 404 }
-      );
+      if (userId) {
+        folderQuery = folderQuery.eq("user_id", userId);
+      } else if (guestSessionId) {
+        folderQuery = folderQuery.eq("guest_session_id", guestSessionId);
+      }
+
+      const { data: folder, error: folderError } = await folderQuery.single();
+
+      if (folderError || !folder) {
+        console.error("Folder verification error:", folderError);
+        return NextResponse.json(
+          { error: "Folder not found or access denied" },
+          { status: 404 }
+        );
+      }
+
+      // Check if a share link already exists for this folder
+      const { data: existingLink } = await supabase
+        .from("shared_links")
+        .select("*")
+        .eq("folder_id", folderId)
+        .eq("created_by", createdBy)
+        .eq("is_active", true)
+        .single();
+
+      if (existingLink) {
+        return NextResponse.json({ token: existingLink.token });
+      }
+
+      // Generate a unique token
+      const token = randomBytes(16).toString("hex");
+
+      // Create a new share link for the folder
+      const { data: shareLink, error: shareLinkError } = await supabase
+        .from("shared_links")
+        .insert({
+          folder_id: folderId,
+          created_by: createdBy,
+          token,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (shareLinkError) {
+        console.error("Share link creation error:", shareLinkError);
+        return NextResponse.json(
+          { error: shareLinkError.message },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ token: shareLink.token });
     }
 
-    // Generate a unique token
-    const token = randomBytes(16).toString("hex");
-
-    // Check if a share link already exists for this file
-    const { data: existingLink } = await supabase
-      .from("shared_links")
-      .select("*")
-      .eq("file_id", fileId)
-      .eq("created_by", createdBy)
-      .eq("is_active", true)
-      .single();
-
-    if (existingLink) {
-      // Return the existing link
-      return NextResponse.json({ token: existingLink.token });
-    }
-
-    // Create a new share link
-    const { data: shareLink, error: shareLinkError } = await supabase
-      .from("shared_links")
-      .insert({
-        file_id: fileId,
-        created_by: createdBy,
-        token,
-        is_active: true,
-      })
-      .select()
-      .single();
-
-    if (shareLinkError) {
-      console.error("Share link creation error:", shareLinkError);
-      return NextResponse.json(
-        { error: shareLinkError.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ token: shareLink.token });
+    return NextResponse.json(
+      { error: "Invalid request" },
+      { status: 400 }
+    );
   } catch (error) {
     console.error("Share API error:", error);
     return NextResponse.json(

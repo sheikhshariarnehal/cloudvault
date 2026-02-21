@@ -19,7 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ChevronRight, FolderOpen, Upload, Plus, FolderPlus, LayoutGrid, List } from "lucide-react";
+import { ChevronRight, FolderOpen, Upload, Plus, FolderPlus, FolderUp, LayoutGrid, List } from "lucide-react";
 import Link from "next/link";
 import type { BreadcrumbItem } from "@/types/file.types";
 
@@ -30,7 +30,7 @@ export default function FolderPage({
 }) {
   const { id } = use(params);
   const { files, folders, viewMode, setViewMode, setCurrentFolderId } = useFilesStore();
-  const { openFilePicker, setNewFolderModalOpen } = useUIStore();
+  const { openFilePicker, openFolderPicker, setNewFolderModalOpen } = useUIStore();
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
 
   const folderFiles = files.filter((f) => f.folder_id === id);
@@ -98,6 +98,10 @@ export default function FolderPage({
               <Upload className="h-4 w-4 mr-2" />
               Upload File
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openFolderPicker?.()}>
+              <FolderUp className="h-4 w-4 mr-2" />
+              Upload Folder
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -143,8 +147,8 @@ export default function FolderPage({
         </TooltipProvider>
       </div>
 
-      {/* Subfolders */}
-      {subFolders.length > 0 && (
+      {/* Subfolders (grid view only – list view inlines them in FileList) */}
+      {viewMode === "grid" && subFolders.length > 0 && (
         <section>
           <h2 className="text-sm font-medium text-[#202124] mb-3">Folders</h2>
           <FolderGrid folders={subFolders} />
@@ -162,7 +166,7 @@ export default function FolderPage({
               ))}
             </div>
           ) : (
-            <FileList files={folderFiles} />
+            <FileList files={folderFiles} folders={subFolders} />
           )}
         </section>
       ) : (

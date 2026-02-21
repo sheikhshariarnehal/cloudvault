@@ -9,8 +9,10 @@ interface UIState {
   renameTarget: { id: string; name: string; type: "file" | "folder" } | null;
   shareModalOpen: boolean;
   shareFileId: string | null;
+  shareFolderId: string | null;
   isOnline: boolean;
   openFilePicker: (() => void) | null;
+  openFolderPicker: (() => void) | null;
   uploadFiles: ((files: File[]) => void) | null;
 
   setSidebarOpen: (open: boolean) => void;
@@ -22,8 +24,10 @@ interface UIState {
   setRenameTarget: (target: { id: string; name: string; type: "file" | "folder" } | null) => void;
   setShareModalOpen: (open: boolean) => void;
   setShareFileId: (id: string | null) => void;
+  setShareFolderId: (id: string | null) => void;
   setIsOnline: (online: boolean) => void;
   setOpenFilePicker: (fn: (() => void) | null) => void;
+  setOpenFolderPicker: (fn: (() => void) | null) => void;
   setUploadFiles: (fn: ((files: File[]) => void) | null) => void;
 }
 
@@ -36,8 +40,10 @@ export const useUIStore = create<UIState>((set) => ({
   renameTarget: null,
   shareModalOpen: false,
   shareFileId: null,
+  shareFolderId: null,
   isOnline: true,
   openFilePicker: null,
+  openFolderPicker: null,
   uploadFiles: null,
 
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -49,7 +55,9 @@ export const useUIStore = create<UIState>((set) => ({
   setRenameTarget: (target) => set({ renameTarget: target }),
   setShareModalOpen: (open) => set({ shareModalOpen: open }),
   setShareFileId: (id) => set({ shareFileId: id }),
+  setShareFolderId: (id) => set({ shareFolderId: id }),
   setIsOnline: (online) => set({ isOnline: online }),
   setOpenFilePicker: (fn) => set({ openFilePicker: fn }),
+  setOpenFolderPicker: (fn) => set({ openFolderPicker: fn }),
   setUploadFiles: (fn) => set({ uploadFiles: fn }),
 }));

@@ -1,14 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Folder, MoreVertical } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useUIStore } from "@/store/ui-store";
+import { Folder } from "lucide-react";
+import { FolderContextMenu } from "@/components/context-menu/folder-context-menu";
 import type { DbFolder } from "@/types/file.types";
 
 interface FolderGridProps {
@@ -16,25 +10,6 @@ interface FolderGridProps {
 }
 
 export function FolderGrid({ folders }: FolderGridProps) {
-  const { setRenameTarget, setRenameModalOpen } = useUIStore();
-
-  const handleRename = (folder: DbFolder) => {
-    setRenameTarget({ id: folder.id, name: folder.name, type: "folder" });
-    setRenameModalOpen(true);
-  };
-
-  const handleDelete = async (folderId: string) => {
-    try {
-      await fetch("/api/folders", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: folderId, is_trashed: true, trashed_at: new Date().toISOString() }),
-      });
-    } catch (error) {
-      console.error("Failed to delete folder:", error);
-    }
-  };
-
   if (folders.length === 0) return null;
 
   return (
@@ -59,27 +34,9 @@ export function FolderGrid({ folders }: FolderGridProps) {
             </span>
           </Link>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-gray-100 transition-[opacity,background-color] duration-150">
-                <MoreVertical className="h-4 w-4 text-[#5f6368]" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/dashboard/folder/${folder.id}`}>Open</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleRename(folder)}>
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => handleDelete(folder.id)}
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            <FolderContextMenu folder={folder} />
+          </div>
         </div>
       ))}
     </div>

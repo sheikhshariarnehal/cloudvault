@@ -1,6 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const DEFAULT_COOKIE_OPTIONS = {
+  maxAge: 60 * 60 * 24 * 365, // 1 year — persist until explicit logout
+  path: "/",
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+};
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -22,14 +29,17 @@ export async function middleware(request: NextRequest) {
             request,
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              ...DEFAULT_COOKIE_OPTIONS,
+              ...options,
+            })
           );
         },
       },
     }
   );
 
-  // Refresh session if expired
+  // Refresh session if expired — getUser() validates server-side and refreshes tokens
   await supabase.auth.getUser();
 
   return supabaseResponse;

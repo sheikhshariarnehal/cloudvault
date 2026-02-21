@@ -1,13 +1,162 @@
 "use client";
 
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
-import { useDropzone } from "react-dropzone";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
 import { validateFile } from "@/types/file.types";
 import { v4 as uuidv4 } from "uuid";
-import { Upload } from "lucide-react";
+import { Upload, FolderUp, CloudUpload } from "lucide-react";
+
+// ─── Folder / Directory Handling Utilities ──────────────────────────────────
+
+interface FileWithPath {
+  file: File;
+  /** Relative path segments from the dropped root, e.g. ["photos", "vacation"] */
+  pathSegments: string[];
+}
+
+/**
+ * Read a single FileSystemDirectoryEntry, returning an array of its entries.
+ * Handles the batched readEntries() API — browsers return ~100 entries at a time.
+ */
+function readDirectoryEntries(
+  dirReader: FileSystemDirectoryReader
+): Promise<FileSystemEntry[]> {
+  return new Promise((resolve, reject) => {
+    const allEntries: FileSystemEntry[] = [];
+    const readBatch = () => {
+      try {
+        dirReader.readEntries((entries) => {
+          if (entries.length === 0) {
+            resolve(allEntries);
+          } else {
+            allEntries.push(...entries);
+            readBatch(); // readEntries returns batches of ~100
+          }
+        }, (err) => {
+          // If partial entries were read, return what we have
+          if (allEntries.length > 0) {
+            console.warn("[Upload] readEntries partial error, returning collected entries:", err);
+            resolve(allEntries);
+          } else {
+            reject(err);
+          }
+        });
+      } catch (err) {
+        if (allEntries.length > 0) resolve(allEntries);
+        else reject(err);
+      }
+    };
+    readBatch();
+  });
+}
+
+/**
+ * Convert a FileSystemFileEntry into a standard File object.
+ */
+function fileEntryToFile(entry: FileSystemFileEntry): Promise<File> {
+  return new Promise((resolve, reject) => {
+    entry.file(resolve, reject);
+  });
+}
+
+/**
+ * Recursively traverse a FileSystemEntry tree and collect all files
+ * along with their path segments (folder hierarchy).
+ * Gracefully handles errors per-file so one bad entry doesn't kill the whole tree.
+ */
+async function traverseEntry(
+  entry: FileSystemEntry,
+  pathSegments: string[] = []
+): Promise<FileWithPath[]> {
+  if (entry.isFile) {
+    try {
+      const file = await fileEntryToFile(entry as FileSystemFileEntry);
+      return [{ file, pathSegments }];
+    } catch (err) {
+      console.warn("[Upload] Could not read file:", entry.fullPath, err);
+      return [];
+    }
+  }
+
+  if (entry.isDirectory) {
+    const dirEntry = entry as FileSystemDirectoryEntry;
+    let children: FileSystemEntry[];
+    try {
+      const reader = dirEntry.createReader();
+      children = await readDirectoryEntries(reader);
+    } catch (err) {
+      console.warn("[Upload] Could not read directory:", entry.fullPath, err);
+      return [];
+    }
+
+    const results: FileWithPath[] = [];
+    const nextSegments = [...pathSegments, dirEntry.name];
+
+    // Process children concurrently in batches for speed
+    const BATCH = 10;
+    for (let i = 0; i < children.length; i += BATCH) {
+      const batch = children.slice(i, i + BATCH);
+      const batchResults = await Promise.all(
+        batch
+          .filter((child) => !child.name.startsWith("."))
+          .map((child) =>
+            traverseEntry(child, nextSegments).catch((err) => {
+              console.warn("[Upload] Skipping entry:", child.name, err);
+              return [] as FileWithPath[];
+            })
+          )
+      );
+      for (const r of batchResults) results.push(...r);
+    }
+    return results;
+  }
+
+  return [];
+}
+
+/**
+ * Process pre-collected FileSystemEntry objects into FileWithPath[].
+ * Entries MUST be grabbed synchronously during the drop event — browsers
+ * clear DataTransfer after the synchronous handler returns.
+ */
+async function processEntries(
+  entries: FileSystemEntry[]
+): Promise<FileWithPath[]> {
+  const allFiles: FileWithPath[] = [];
+  for (const entry of entries) {
+    try {
+      const results = await traverseEntry(entry);
+      allFiles.push(...results);
+    } catch (err) {
+      console.warn("[Upload] Failed to traverse entry:", entry.name, err);
+    }
+  }
+  return allFiles;
+}
+
+/**
+ * Extract files with path info from a file input change event.
+ * Supports both regular file selection and webkitdirectory selection.
+ */
+function getFilesFromInputEvent(
+  files: FileList | null
+): FileWithPath[] {
+  if (!files) return [];
+  const result: FileWithPath[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    // webkitRelativePath is set when using webkitdirectory attribute
+    // e.g. "myFolder/subdir/image.png"
+    const relativePath = (file as any).webkitRelativePath || "";
+    const segments = relativePath
+      ? relativePath.split("/").slice(0, -1) // remove the filename itself
+      : [];
+    result.push({ file, pathSegments: segments });
+  }
+  return result;
+}
 
 /**
  * Compute SHA-256 hash of a File using the Web Crypto API.
@@ -42,8 +191,13 @@ interface UploadZoneProps {
 
 export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   const { user, guestSessionId } = useAuth();
-  const { addToUploadQueue, updateUploadStatus, updateUploadProgress, updateUploadBytes, addFile } =
+  const { addToUploadQueue, updateUploadStatus, updateUploadProgress, updateUploadBytes, addFile, addFolder } =
     useFilesStore();
+
+  // ── Drag state — managed manually (no react-dropzone) ─────────────
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isDraggingFolder, setIsDraggingFolder] = useState(false);
+  const dragCounterRef = useRef(0);
 
   // Route files > 4 MB through chunked upload → bypasses Vercel 4.5 MB body limit.
   // Actual chunk slices are 10 MB each, sent direct to TDLib service.
@@ -408,93 +562,327 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     await attemptUpload(1);
   }, [user, guestSessionId, updateUploadStatus, updateUploadProgress, updateUploadBytes, addFile, uploadFileChunked, CHUNK_THRESHOLD]);
 
-  const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      // Stagger uploads: Telegram rate-limits at ~30 messages/minute.
-      // Queue them with a small delay between starts to avoid 429s.
-      const STAGGER_MS = 1500; // 1.5s gap between each file start
+  // ── Folder creation helper ──────────────────────────────────────────
+  /**
+   * Given a list of FileWithPath entries, create the necessary folder hierarchy
+   * and return a map from path string → folder ID.
+   * e.g. "photos" → "uuid-1", "photos/vacation" → "uuid-2"
+   */
+  const createFolderHierarchy = useCallback(
+    async (filesWithPaths: FileWithPath[], rootFolderId: string | null): Promise<Map<string, string>> => {
+      const folderMap = new Map<string, string>(); // "path/string" → folderId
+      const createdPaths = new Set<string>();
 
-      const fileEntries: { queueId: string; file: File }[] = [];
-      for (const file of acceptedFiles) {
+      // Collect all unique folder paths
+      const allPaths = new Set<string>();
+      for (const { pathSegments } of filesWithPaths) {
+        for (let i = 1; i <= pathSegments.length; i++) {
+          allPaths.add(pathSegments.slice(0, i).join("/"));
+        }
+      }
+
+      // Sort by depth so parents are created before children
+      const sortedPaths = Array.from(allPaths).sort(
+        (a, b) => a.split("/").length - b.split("/").length
+      );
+
+      console.log(`[Upload] Creating ${sortedPaths.length} folder(s):`, sortedPaths);
+
+      for (const pathStr of sortedPaths) {
+        if (createdPaths.has(pathStr)) continue;
+
+        const segments = pathStr.split("/");
+        const folderName = segments[segments.length - 1];
+        const parentPath = segments.slice(0, -1).join("/");
+        const parentId = parentPath ? folderMap.get(parentPath) ?? rootFolderId : rootFolderId;
+
+        try {
+          const res = await fetch("/api/folders", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: folderName,
+              parent_id: parentId,
+              user_id: user?.id || null,
+              guest_session_id: guestSessionId || null,
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            folderMap.set(pathStr, data.folder.id);
+            addFolder(data.folder);
+            createdPaths.add(pathStr);
+          } else {
+            console.error(`Failed to create folder "${pathStr}":`, await res.text());
+            // Fall back to root/parent folder
+            folderMap.set(pathStr, parentId ?? rootFolderId ?? "");
+          }
+        } catch (err) {
+          console.error(`Error creating folder "${pathStr}":`, err);
+          folderMap.set(pathStr, parentId ?? rootFolderId ?? "");
+        }
+      }
+
+      return folderMap;
+    },
+    [user, guestSessionId, addFolder]
+  );
+
+  // ── Main drop handler: supports both files and folders ──────────────
+  const onDropWithFolders = useCallback(
+    async (filesWithPaths: FileWithPath[]) => {
+      if (filesWithPaths.length === 0) {
+        console.warn("[Upload] No files found in drop");
+        return;
+      }
+
+      console.log(`[Upload] Processing ${filesWithPaths.length} file(s) from folder drop`);
+
+      const STAGGER_MS = 1500;
+
+      // Separate files that need folder creation from plain files
+      const hasAnyFolders = filesWithPaths.some((f) => f.pathSegments.length > 0);
+
+      // Create folder hierarchy first if needed
+      let folderMap = new Map<string, string>();
+      if (hasAnyFolders) {
+        folderMap = await createFolderHierarchy(filesWithPaths, folderId);
+      }
+
+      // Queue all files for upload
+      const fileEntries: { queueId: string; file: File; targetFolderId: string | null }[] = [];
+      for (const { file, pathSegments } of filesWithPaths) {
         const validation = validateFile(file);
         if (!validation.valid) {
           console.error(validation.error);
           continue;
         }
 
+        // Skip zero-byte files (some browsers create these for folder entries)
+        if (file.size === 0 && file.type === "") continue;
+
+        // Determine the target folder for this file
+        let targetFolderId: string | null = folderId;
+        if (pathSegments.length > 0) {
+          const pathStr = pathSegments.join("/");
+          targetFolderId = folderMap.get(pathStr) ?? folderId;
+        }
+
         const queueId = uuidv4();
         addToUploadQueue({
           id: queueId,
           file,
-          folderId,
+          folderId: targetFolderId,
           progress: 0,
           bytesLoaded: 0,
           bytesTotal: file.size,
           status: "pending",
         });
-        fileEntries.push({ queueId, file });
+        fileEntries.push({ queueId, file, targetFolderId });
       }
 
       // Fire each upload with a stagger delay to avoid Telegram 429
       for (let i = 0; i < fileEntries.length; i++) {
-        const { queueId, file } = fileEntries[i];
+        const { queueId, file, targetFolderId } = fileEntries[i];
         if (i > 0) {
           await new Promise((r) => setTimeout(r, STAGGER_MS));
         }
-        uploadFile(queueId, file, folderId);
+        uploadFile(queueId, file, targetFolderId);
       }
     },
-    [folderId, addToUploadQueue, uploadFile]
+    [folderId, addToUploadQueue, uploadFile, createFolderHierarchy]
   );
 
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    onDrop,
-    noClick: true,
-    noKeyboard: true,
-  });
+  // Plain file drop (no folder info)
+  const onDropFiles = useCallback(
+    async (files: File[]) => {
+      const filesWithPaths: FileWithPath[] = files.map((file) => ({
+        file,
+        pathSegments: [],
+      }));
+      await onDropWithFolders(filesWithPaths);
+    },
+    [onDropWithFolders]
+  );
 
-  // Mobile-friendly file input ref — avoids iOS Safari issue where
-  // programmatic .click() on a display:none input is silently ignored.
+  // ── Unified native drag/drop handlers ─────────────────────────────
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+
+    if (dragCounterRef.current === 1) {
+      setIsDragOver(true);
+
+      // Detect if any item might be a folder
+      const items = e.dataTransfer?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].kind === "file" && items[i].type === "") {
+            setIsDraggingFolder(true);
+            return;
+          }
+        }
+      }
+      setIsDraggingFolder(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Required for drop to work
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
+      setIsDraggingFolder(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Immediately clear drag state
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
+      setIsDraggingFolder(false);
+
+      // ── CRITICAL: Grab ALL entries synchronously ──────────────────
+      // Browsers clear DataTransfer.items after the synchronous portion
+      // of the event handler returns. We must collect everything NOW,
+      // before any await.
+      const items = e.dataTransfer?.items;
+      const entries: FileSystemEntry[] = [];
+      const plainFiles: File[] = [];
+      let hasDirectory = false;
+
+      if (items && items.length > 0) {
+        for (let i = 0; i < items.length; i++) {
+          const entry = items[i].webkitGetAsEntry?.();
+          if (entry) {
+            entries.push(entry);
+            if (entry.isDirectory) hasDirectory = true;
+          }
+        }
+      }
+
+      // Fallback: grab plain files synchronously too (in case entries failed)
+      if (entries.length === 0 && e.dataTransfer?.files) {
+        for (let i = 0; i < e.dataTransfer.files.length; i++) {
+          plainFiles.push(e.dataTransfer.files[i]);
+        }
+      }
+
+      console.log(`[Upload] Drop: ${entries.length} entries (${hasDirectory ? "has dirs" : "files only"}), ${plainFiles.length} plain fallback files`);
+
+      // ── Now process async (safe — we already have the handles) ────
+      if (entries.length > 0) {
+        if (hasDirectory) {
+          const filesWithPaths = await processEntries(entries);
+          if (filesWithPaths.length > 0) {
+            await onDropWithFolders(filesWithPaths);
+          } else {
+            console.warn("[Upload] Folder traversal returned 0 files");
+          }
+        } else {
+          // All entries are files, convert them
+          const filesWithPaths = await processEntries(entries);
+          await onDropFiles(filesWithPaths.map((f) => f.file));
+        }
+      } else if (plainFiles.length > 0) {
+        await onDropFiles(plainFiles);
+      }
+    },
+    [onDropWithFolders, onDropFiles]
+  );
+
+  // ── File input handlers ──────────────────────────────────────────────
   const mobileFileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const handleMobileFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []);
-      if (files.length > 0) {
-        onDrop(files);
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        const hasRelativePaths = Array.from(files).some(
+          (f) => (f as any).webkitRelativePath
+        );
+        if (hasRelativePaths) {
+          const filesWithPaths = getFilesFromInputEvent(files);
+          onDropWithFolders(filesWithPaths);
+        } else {
+          onDropFiles(Array.from(files));
+        }
       }
-      // Reset so the same file can be re-selected
       if (e.target) e.target.value = "";
     },
-    [onDrop]
+    [onDropFiles, onDropWithFolders]
   );
 
-  const { setOpenFilePicker, setUploadFiles } = useUIStore();
+  const handleFolderSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        const filesWithPaths = getFilesFromInputEvent(files);
+        onDropWithFolders(filesWithPaths);
+      }
+      if (e.target) e.target.value = "";
+    },
+    [onDropWithFolders]
+  );
+
+  // ── Expose pickers to global UI store ────────────────────────────────
+  const { setOpenFilePicker, setUploadFiles, setOpenFolderPicker } = useUIStore();
 
   useEffect(() => {
-    // Store a function that clicks the mobile-friendly input directly.
-    // This preserves user-gesture context on iOS Safari / Android Chrome.
     setOpenFilePicker(() => {
-      if (mobileFileInputRef.current) {
-        mobileFileInputRef.current.click();
-      } else {
-        // Fallback to react-dropzone's open() (works on desktop)
-        open();
-      }
+      mobileFileInputRef.current?.click();
     });
     return () => setOpenFilePicker(null);
-  }, [open, setOpenFilePicker]);
+  }, [setOpenFilePicker]);
 
   useEffect(() => {
-    setUploadFiles(onDrop);
+    setOpenFolderPicker(() => {
+      folderInputRef.current?.click();
+    });
+    return () => setOpenFolderPicker(null);
+  }, [setOpenFolderPicker]);
+
+  useEffect(() => {
+    setUploadFiles((files: File[]) => {
+      const hasRelativePaths = files.some((f) => (f as any).webkitRelativePath);
+      if (hasRelativePaths) {
+        const filesWithPaths = getFilesFromInputEvent(files as unknown as FileList);
+        onDropWithFolders(filesWithPaths);
+      } else {
+        onDropFiles(files);
+      }
+    });
     return () => setUploadFiles(null);
-  }, [onDrop, setUploadFiles]);
+  }, [onDropFiles, onDropWithFolders, setUploadFiles]);
 
   return (
-    <div {...getRootProps()} className="relative">
-      <input {...getInputProps()} />
-      {/* Mobile-friendly hidden file input: uses opacity+positioning
-          instead of display:none so iOS Safari allows .click() */}
+    <div
+      className="relative"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Hidden file input */}
       <input
         ref={mobileFileInputRef}
         type="file"
@@ -514,18 +902,90 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
         tabIndex={-1}
         aria-hidden="true"
       />
-      {isDragActive && (
-        <div className="fixed inset-0 z-50 bg-primary/10 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-white rounded-2xl shadow-xl p-12 text-center border-2 border-dashed border-primary">
-            <Upload className="h-16 w-16 text-primary mx-auto mb-4" />
-            <h3 className="text-xl font-semibold">Drop files to upload</h3>
-            <p className="text-muted-foreground mt-2">
-              Release to start uploading
-            </p>
+      {/* Hidden folder input */}
+      <input
+        ref={folderInputRef}
+        type="file"
+        // @ts-expect-error webkitdirectory is not in React types
+        webkitdirectory=""
+        directory=""
+        multiple
+        onChange={handleFolderSelect}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "1px",
+          height: "1px",
+          opacity: 0.01,
+          overflow: "hidden",
+          zIndex: -1,
+          pointerEvents: "none",
+        }}
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+
+      {/* ── Drag overlay ─────────────────────────────────────────────── */}
+      {isDragOver && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center transition-all duration-200"
+          style={{ backgroundColor: "rgba(59, 130, 246, 0.06)", backdropFilter: "blur(4px)" }}
+        >
+          {/* Animated border ring */}
+          <div className="relative">
+            {/* Outer glow pulse */}
+            <div className="absolute -inset-4 rounded-3xl bg-blue-400/20 animate-pulse" />
+
+            <div
+              className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-blue-200 dark:border-blue-800 px-16 py-12 text-center max-w-md"
+              style={{
+                animation: "dropZoneEntry 0.2s ease-out",
+              }}
+            >
+              {/* Icon container */}
+              <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/40 dark:to-blue-800/30 ring-1 ring-blue-200/60 dark:ring-blue-700/40">
+                {isDraggingFolder ? (
+                  <FolderUp className="h-10 w-10 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
+                ) : (
+                  <CloudUpload className="h-10 w-10 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
+                )}
+              </div>
+
+              {/* Heading */}
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {isDraggingFolder ? "Drop folder to upload" : "Drop to upload"}
+              </h3>
+
+              {/* Subtext */}
+              <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
+                {isDraggingFolder
+                  ? "All files and subfolders will be preserved"
+                  : "Release to start uploading your files"}
+              </p>
+
+              {/* Dashed border accent inside */}
+              <div className="absolute inset-3 rounded-xl border-2 border-dashed border-blue-300/50 dark:border-blue-700/40 pointer-events-none" />
+            </div>
           </div>
         </div>
       )}
+
       {children}
+
+      {/* Keyframe animation */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes dropZoneEntry {
+          from {
+            opacity: 0;
+            transform: scale(0.95) translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+      `}} />
     </div>
   );
 }

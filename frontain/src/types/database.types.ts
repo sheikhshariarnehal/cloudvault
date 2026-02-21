@@ -183,7 +183,8 @@ export interface Database {
       shared_links: {
         Row: {
           id: string;
-          file_id: string;
+          file_id: string | null;
+          folder_id: string | null;
           created_by: string;
           token: string;
           expires_at: string | null;
@@ -196,7 +197,8 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          file_id: string;
+          file_id?: string | null;
+          folder_id?: string | null;
           created_by: string;
           token?: string;
           expires_at?: string | null;
@@ -209,7 +211,8 @@ export interface Database {
         };
         Update: {
           id?: string;
-          file_id?: string;
+          file_id?: string | null;
+          folder_id?: string | null;
           created_by?: string;
           token?: string;
           expires_at?: string | null;
@@ -226,6 +229,13 @@ export interface Database {
             columns: ["file_id"];
             isOneToOne: false;
             referencedRelation: "files";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "shared_links_folder_id_fkey";
+            columns: ["folder_id"];
+            isOneToOne: false;
+            referencedRelation: "folders";
             referencedColumns: ["id"];
           },
           {
