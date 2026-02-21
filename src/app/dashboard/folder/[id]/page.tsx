@@ -147,11 +147,39 @@ export default function FolderPage({
         </TooltipProvider>
       </div>
 
-      {/* Subfolders (grid view only – list view inlines them in FileList) */}
-      {viewMode === "grid" && subFolders.length > 0 && (
+      {/* Subfolders */}
+      {subFolders.length > 0 && (
         <section>
           <h2 className="text-sm font-medium text-[#202124] mb-3">Folders</h2>
-          <FolderGrid folders={subFolders} />
+          {viewMode === "grid" ? (
+            <FolderGrid folders={subFolders} />
+          ) : (
+            <div className="bg-white rounded-lg border">
+              {subFolders.map((folder) => (
+                <Link
+                  key={folder.id}
+                  href={`/dashboard/folder/${folder.id}`}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b last:border-b-0"
+                >
+                  <div
+                    className="flex items-center justify-center w-10 h-10 rounded-lg"
+                    style={{ backgroundColor: (folder.color || "#EAB308") + "20" }}
+                  >
+                    <FolderOpen
+                      className="h-5 w-5"
+                      style={{ color: folder.color || "#EAB308" }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {folder.name}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                </Link>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -166,7 +194,7 @@ export default function FolderPage({
               ))}
             </div>
           ) : (
-            <FileList files={folderFiles} folders={subFolders} />
+            <FileList files={folderFiles} folders={[]} />
           )}
         </section>
       ) : (
