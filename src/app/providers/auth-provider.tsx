@@ -68,12 +68,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = createClient();
 
   useEffect(() => {
-    const getSession = async () => {
+    const restoreSession = async () => {
       try {
+        // First try local session (fast, from cookies)
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        const currentUser = session?.user ?? null;
+
+        let currentUser = session?.user ?? null;
+
+        // If no local session, try getUser() which validates server-side
+        // and refreshes expired tokens using the refresh token cookie
+        if (!currentUser) {
+          const {
+            data: { user: refreshedUser },
+          } = await supabase.auth.getUser();
+          currentUser = refreshedUser;
+        }
+
         setUser(currentUser);
 
         if (currentUser) {
@@ -92,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    getSession();
+    restoreSession();
 
     const {
       data: { subscription },
