@@ -317,7 +317,7 @@ function FolderRow({ folder, isSelected, onToggle }: { folder: DbFolder; isSelec
       {/* Context menu - visible on hover */}
       <div className={`${COL.actions} flex-shrink-0 flex items-center justify-center`} data-no-preview>
         <button
-          className="p-1.5 rounded-full opacity-0 group-hover:opacity-100 hover:bg-black/5 transition-all duration-75"
+          className="p-1.5 rounded-full opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/5 transition-all duration-75"
           onClick={(e) => e.preventDefault()}
         >
           <MoreVertical className="h-4 w-4 text-[#5f6368]" />
@@ -827,7 +827,7 @@ export function FileList({ files, folders = [], topRightSlot }: FileListProps) {
         </div>
 
         {/* Sort button (Google Drive style) */}
-        <div className={`${COL.actions} flex-shrink-0 flex items-center justify-start pl-1`}>
+        <div className={`${COL.actions} flex-shrink-0 flex items-center justify-center xl:justify-start xl:pl-1`}>
           <button
             onClick={() => handleSort(sortKey)}
             title="Sort"
