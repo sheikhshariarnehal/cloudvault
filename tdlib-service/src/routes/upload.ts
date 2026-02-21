@@ -113,18 +113,8 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
 
     let sendParams: Parameters<typeof client.invoke>[0];
 
-    const MAX_PHOTO_SIZE = 10 * 1024 * 1024; // Telegram photo limit
-    if (mimeType.startsWith("image/") && !mimeType.includes("svg") && fileStats.size <= MAX_PHOTO_SIZE) {
-      sendParams = {
-        _: "sendMessage",
-        chat_id: parseInt(channelId, 10),
-        input_message_content: {
-          _: "inputMessagePhoto",
-          photo: inputFile,
-          caption,
-        },
-      };
-    } else if (mimeType.startsWith("video/")) {
+    // Always send images as documents to preserve original quality (no Telegram compression)
+    if (mimeType.startsWith("video/")) {
       sendParams = {
         _: "sendMessage",
         chat_id: parseInt(channelId, 10),

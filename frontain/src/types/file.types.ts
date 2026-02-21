@@ -17,6 +17,8 @@ export interface UploadQueueItem {
   file: File;
   folderId: string | null;
   progress: number;
+  bytesLoaded: number;
+  bytesTotal: number;
   status: "pending" | "uploading" | "success" | "error";
   error?: string;
 }

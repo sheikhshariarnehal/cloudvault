@@ -65,8 +65,6 @@ export function Sidebar() {
         <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">CloudVault</span>
       </div>
 
-      <Separator />
-
       {/* + New Button */}
       <div className="px-4 py-3 shrink-0">
         <input
@@ -124,8 +122,6 @@ export function Sidebar() {
         </DropdownMenu>
       </div>
 
-      <Separator />
-
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
         {navItems.map((item) => (
@@ -138,8 +134,6 @@ export function Sidebar() {
             badge={item.badge}
           />
         ))}
-
-        <Separator className="!my-4" />
 
         {/* Folder Tree */}
         <div className="px-1 mt-2">

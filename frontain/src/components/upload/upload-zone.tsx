@@ -42,7 +42,7 @@ interface UploadZoneProps {
 
 export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   const { user, guestSessionId } = useAuth();
-  const { addToUploadQueue, updateUploadStatus, updateUploadProgress, addFile } =
+  const { addToUploadQueue, updateUploadStatus, updateUploadProgress, updateUploadBytes, addFile } =
     useFilesStore();
 
   // Route files > 4 MB through chunked upload → bypasses Vercel 4.5 MB body limit.
@@ -96,6 +96,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       // Chunk upload phase = 0–80% of the bar
       const pct = Math.round((loaded / total) * 80);
       updateUploadProgress(queueId, pct);
+      updateUploadBytes(queueId, loaded, total);
     };
 
     const uploadSingleChunk = async (i: number) => {
@@ -211,7 +212,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     const data = await completeRes.json();
     updateUploadProgress(queueId, 100);
     return data;
-  }, [user, guestSessionId, updateUploadProgress, CHUNK_SIZE]);
+  }, [user, guestSessionId, updateUploadProgress, updateUploadBytes, CHUNK_SIZE]);
 
   const uploadFile = useCallback(async (
     queueId: string,
@@ -315,6 +316,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
             if (e.lengthComputable) {
               const pct = Math.round((e.loaded / e.total) * 100);
               updateUploadProgress(queueId, pct);
+              updateUploadBytes(queueId, e.loaded, e.total);
             }
           });
 
@@ -404,7 +406,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     };
 
     await attemptUpload(1);
-  }, [user, guestSessionId, updateUploadStatus, updateUploadProgress, addFile, uploadFileChunked, CHUNK_THRESHOLD]);
+  }, [user, guestSessionId, updateUploadStatus, updateUploadProgress, updateUploadBytes, addFile, uploadFileChunked, CHUNK_THRESHOLD]);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -426,6 +428,8 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
           file,
           folderId,
           progress: 0,
+          bytesLoaded: 0,
+          bytesTotal: file.size,
           status: "pending",
         });
         fileEntries.push({ queueId, file });
