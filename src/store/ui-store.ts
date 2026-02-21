@@ -12,6 +12,7 @@ interface UIState {
   shareFolderId: string | null;
   isOnline: boolean;
   openFilePicker: (() => void) | null;
+  openFolderPicker: (() => void) | null;
   uploadFiles: ((files: File[]) => void) | null;
 
   setSidebarOpen: (open: boolean) => void;
@@ -26,6 +27,7 @@ interface UIState {
   setShareFolderId: (id: string | null) => void;
   setIsOnline: (online: boolean) => void;
   setOpenFilePicker: (fn: (() => void) | null) => void;
+  setOpenFolderPicker: (fn: (() => void) | null) => void;
   setUploadFiles: (fn: ((files: File[]) => void) | null) => void;
 }
 
@@ -41,6 +43,7 @@ export const useUIStore = create<UIState>((set) => ({
   shareFolderId: null,
   isOnline: true,
   openFilePicker: null,
+  openFolderPicker: null,
   uploadFiles: null,
 
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -55,5 +58,6 @@ export const useUIStore = create<UIState>((set) => ({
   setShareFolderId: (id) => set({ shareFolderId: id }),
   setIsOnline: (online) => set({ isOnline: online }),
   setOpenFilePicker: (fn) => set({ openFilePicker: fn }),
+  setOpenFolderPicker: (fn) => set({ openFolderPicker: fn }),
   setUploadFiles: (fn) => set({ uploadFiles: fn }),
 }));

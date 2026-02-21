@@ -46,7 +46,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, isGuest } = useAuth();
   const { folders } = useFilesStore();
-  const { openFilePicker, setNewFolderModalOpen, uploadFiles } = useUIStore();
+  const { openFilePicker, openFolderPicker, setNewFolderModalOpen, uploadFiles } = useUIStore();
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   const handleFolderUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,7 +111,7 @@ export function Sidebar() {
 
             <DropdownMenuItem
               className="gap-3 py-2.5 px-3 cursor-pointer"
-              onClick={() => folderInputRef.current?.click()}
+              onClick={() => openFolderPicker?.() || folderInputRef.current?.click()}
             >
               <div className="flex items-center justify-center w-8 h-8 rounded bg-gray-100">
                 <FolderUp className="h-4 w-4 text-gray-600" />

@@ -25,6 +25,7 @@ import {
   Plus,
   Upload,
   FolderPlus,
+  FolderUp,
   LayoutGrid,
   List,
   Loader2,
@@ -34,7 +35,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { files, folders, viewMode, setViewMode, isLoading, searchQuery } =
     useFilesStore();
-  const { setNewFolderModalOpen, openFilePicker } = useUIStore();
+  const { setNewFolderModalOpen, openFilePicker, openFolderPicker } = useUIStore();
 
   const displayName =
     user?.user_metadata?.display_name ||
@@ -101,6 +102,10 @@ export default function DashboardPage() {
               <DropdownMenuItem onClick={() => openFilePicker?.()}>
                 <Upload className="h-4 w-4 mr-2" />
                 Upload File
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openFolderPicker?.()}>
+                <FolderUp className="h-4 w-4 mr-2" />
+                Upload Folder
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
