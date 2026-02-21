@@ -355,7 +355,7 @@ async function verifyDescendant(
     if (visited.has(currentId)) return false; // circular reference protection
     visited.add(currentId);
 
-    const { data: folder } = await supabase
+    const { data: folder }: { data: { parent_id: string | null } | null } = await supabase
       .from("folders")
       .select("parent_id")
       .eq("id", currentId)
@@ -404,7 +404,7 @@ async function buildBreadcrumbs(
   let currentId: string | null = targetFolderId;
 
   while (currentId) {
-    const { data: folder } = await supabase
+    const { data: folder }: { data: { id: string; name: string; parent_id: string | null } | null } = await supabase
       .from("folders")
       .select("id, name, parent_id")
       .eq("id", currentId)
