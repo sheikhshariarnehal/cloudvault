@@ -53,7 +53,7 @@ function IframeViewer({
   fileName,
   onDownload,
 }: PptxPreviewProps) {
-  const [mode, setMode] = useState<ViewerMode>("office");
+  const [mode, setMode] = useState<ViewerMode>("google");
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
