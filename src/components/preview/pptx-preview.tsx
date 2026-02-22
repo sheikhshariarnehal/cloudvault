@@ -151,8 +151,24 @@ function IframeViewer({
   }, [viewerUrl]);
 
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden bg-[#1a1a1a]">
-      <div className="flex-1 relative overflow-hidden">
+    <div className="w-full h-full relative overflow-hidden bg-[#1a1a1a]">
+
+      {/* ── Top-right viewer switcher overlay ── */}
+      <div className="absolute top-3 right-3 z-30 flex items-center gap-1 rounded-lg bg-black/50 backdrop-blur-sm p-0.5 shadow-lg">
+        {(["office", "google"] as ViewerMode[]).map((v) => (
+          <button
+            key={v}
+            onClick={() => setMode(v)}
+            className={`px-3 py-1 rounded-md text-[11px] font-medium transition-colors ${
+              mode === v
+                ? "bg-[#0078d4] text-white shadow"
+                : "text-white/50 hover:text-white/80 hover:bg-white/10"
+            }`}
+          >
+            {v === "office" ? "Office Online" : "Google Docs"}
+          </button>
+        ))}
+      </div>
 
         {/* Loading spinner */}
         {loading && !failed && (
@@ -212,38 +228,6 @@ function IframeViewer({
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"
           allowFullScreen
         />
-      </div>
-
-      {/* Bottom bar */}
-      <div className="flex items-center justify-between h-10 px-4 bg-[#1e1e2e] border-t border-white/[0.06] flex-shrink-0">
-        <span className="text-xs text-white/40 truncate max-w-[180px]">{fileName}</span>
-
-        {/* Viewer toggle pills */}
-        <div className="flex items-center gap-1 rounded-md bg-white/[0.05] p-0.5">
-          {(["office", "google"] as ViewerMode[]).map((v) => (
-            <button
-              key={v}
-              onClick={() => setMode(v)}
-              className={`px-3 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                mode === v
-                  ? "bg-[#0078d4] text-white shadow"
-                  : "text-white/40 hover:text-white/70"
-              }`}
-            >
-              {v === "office" ? "Office Online" : "Google Docs"}
-            </button>
-          ))}
-        </div>
-
-        {onDownload && (
-          <button
-            onClick={onDownload}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-white/40 hover:text-white/70 rounded transition-colors"
-          >
-            <Download className="h-3 w-3" /> Download
-          </button>
-        )}
-      </div>
     </div>
   );
 }
