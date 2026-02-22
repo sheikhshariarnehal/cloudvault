@@ -26,15 +26,6 @@ type ViewerMode = "office" | "google";
    Helpers
    ═══════════════════════════════════════════════════════════════ */
 
-/**
- * Determine the public base URL to use when constructing the file URL
- * that Office Online / Google Docs will fetch.
- *
- * Priority:
- *  1. NEXT_PUBLIC_APP_URL  (set in .env.local for ngrok on localhost,
- *                           or the canonical domain on production)
- *  2. window.location.origin  (works correctly on deployed production)
- */
 function getPublicOrigin(): string {
   if (typeof window === "undefined") return "";
   return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
@@ -49,20 +40,13 @@ function isRunningOnLocalhost(): boolean {
 
 /* ═══════════════════════════════════════════════════════════════
    Main exported component
-   Default: Microsoft Office Online (best quality, slide-by-slide).
-   Fallback: Google Docs Viewer.
-   Localhost without NEXT_PUBLIC_APP_URL: ngrok setup guide.
    ═══════════════════════════════════════════════════════════════ */
 
 export function PptxPreview({ src, fileName, onDownload }: PptxPreviewProps) {
   const [publicOrigin, setPublicOrigin] = useState<string | null>(null);
 
-  // Resolve on client only (window is undefined during SSR)
-  useEffect(() => {
-    setPublicOrigin(getPublicOrigin());
-  }, []);
+  useEffect(() => { setPublicOrigin(getPublicOrigin()); }, []);
 
-  // Still hydrating
   if (publicOrigin === null) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
@@ -71,17 +55,13 @@ export function PptxPreview({ src, fileName, onDownload }: PptxPreviewProps) {
     );
   }
 
-  // Localhost without a public URL configured → show ngrok setup guide
   if (isRunningOnLocalhost() && !process.env.NEXT_PUBLIC_APP_URL) {
-    return (
-      <LocalhostSetupGuide fileName={fileName} onDownload={onDownload} />
-    );
+    return <LocalhostSetupGuide fileName={fileName} onDownload={onDownload} />;
   }
 
-  const fileUrl = publicOrigin + src;
   return (
     <IframeViewer
-      fileUrl={fileUrl}
+      fileUrl={publicOrigin + src}
       fileName={fileName}
       onDownload={onDownload}
     />
@@ -89,7 +69,7 @@ export function PptxPreview({ src, fileName, onDownload }: PptxPreviewProps) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Iframe viewer — Microsoft Office Online (default) + Google Docs
+   Iframe viewer — full-view, auto-hiding switcher
    ═══════════════════════════════════════════════════════════════ */
 
 function IframeViewer({
@@ -104,29 +84,37 @@ function IframeViewer({
   const [mode, setMode] = useState<ViewerMode>("office");
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [showSwitcher, setShowSwitcher] = useState(true);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  // Microsoft Office Online: embed.aspx gives the true slide-by-slide viewer
-  const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
+  // Office Online: wdAr=2 enables 16:9 widescreen, action=embedview for full embed
+  const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}&wdAr=2`;
   const googleUrl = `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
   const viewerUrl = mode === "office" ? officeUrl : googleUrl;
 
   const currentViewer = mode === "office" ? "Microsoft Office Online" : "Google Docs Viewer";
   const otherViewer  = mode === "office" ? "Google Docs" : "Office Online";
 
-  /* Reset loading/error state whenever the viewer URL changes */
+  // Reset loading state on viewer/url change
   useEffect(() => {
     setLoading(true);
     setFailed(false);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    // Office Online can take a while for large files
-    timeoutRef.current = setTimeout(() => {
-      setLoading(false);
-      setFailed(true);
-    }, 30_000);
+    timeoutRef.current = setTimeout(() => { setLoading(false); setFailed(true); }, 30_000);
     return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
   }, [mode, fileUrl]);
+
+  // Auto-hide switcher after 3s once loaded
+  useEffect(() => {
+    if (!loading && !failed) {
+      hideTimerRef.current = setTimeout(() => setShowSwitcher(false), 3000);
+    } else {
+      setShowSwitcher(true);
+    }
+    return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
+  }, [loading, failed]);
 
   const handleLoad = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -138,96 +126,95 @@ function IframeViewer({
     setLoading(true);
     setFailed(false);
     if (iframeRef.current) {
-      // Bust cache so the iframe actually reloads
       const u = new URL(viewerUrl);
       u.searchParams.set("_t", Date.now().toString());
       iframeRef.current.src = u.toString();
     }
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      setLoading(false);
-      setFailed(true);
-    }, 30_000);
+    timeoutRef.current = setTimeout(() => { setLoading(false); setFailed(true); }, 30_000);
   }, [viewerUrl]);
 
-  return (
-    <div className="w-full h-full relative overflow-hidden bg-[#1a1a1a]">
+  const handleMouseMove = useCallback(() => {
+    setShowSwitcher(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    if (!loading && !failed) {
+      hideTimerRef.current = setTimeout(() => setShowSwitcher(false), 3000);
+    }
+  }, [loading, failed]);
 
-      {/* ── Top-right viewer switcher overlay ── */}
-      <div className="absolute top-3 right-3 z-30 flex items-center gap-1 rounded-lg bg-black/50 backdrop-blur-sm p-0.5 shadow-lg">
+  return (
+    <div
+      className="w-full h-full relative overflow-hidden bg-[#1a1a1a]"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => { if (!loading && !failed) setShowSwitcher(false); }}
+    >
+      {/* ── Floating viewer switcher — auto-hides ── */}
+      <div
+        className={`absolute top-2 right-2 z-30 flex items-center gap-0.5 rounded-lg bg-black/60 backdrop-blur-md p-0.5 shadow-xl transition-all duration-300 ${
+          showSwitcher ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none"
+        }`}
+      >
         {(["office", "google"] as ViewerMode[]).map((v) => (
           <button
             key={v}
             onClick={() => setMode(v)}
-            className={`px-3 py-1 rounded-md text-[11px] font-medium transition-colors ${
+            className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all ${
               mode === v
-                ? "bg-[#0078d4] text-white shadow"
-                : "text-white/50 hover:text-white/80 hover:bg-white/10"
+                ? "bg-[#0078d4] text-white shadow-md"
+                : "text-white/50 hover:text-white hover:bg-white/10"
             }`}
           >
-            {v === "office" ? "Office Online" : "Google Docs"}
+            {v === "office" ? "Office" : "Google"}
           </button>
         ))}
       </div>
 
-        {/* Loading spinner */}
-        {loading && !failed && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-[#1a1a1a]">
-            <Loader2 className="h-10 w-10 text-[#0078d4] animate-spin" />
-            <p className="text-sm text-white/50">
-              Loading <span className="text-white/70 font-medium">{currentViewer}</span>…
-            </p>
-          </div>
-        )}
+      {/* Loading */}
+      {loading && !failed && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-[#1a1a1a]">
+          <Loader2 className="h-10 w-10 text-[#0078d4] animate-spin" />
+          <p className="text-sm text-white/50">
+            Loading <span className="text-white/70 font-medium">{currentViewer}</span>…
+          </p>
+        </div>
+      )}
 
-        {/* Error state */}
-        {failed && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#1a1a1a]">
-            <div className="text-center max-w-md px-6">
-              <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-              <p className="text-white font-semibold text-base mb-1">
-                Preview failed
-              </p>
-              <p className="text-sm text-white/50 mb-6">
-                {currentViewer} could not load this file. The file may be too
-                large, or the URL may not be publicly reachable.
-              </p>
-              <div className="flex items-center justify-center gap-3 flex-wrap">
-                <button
-                  onClick={retry}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/15 transition-colors"
-                >
-                  <RefreshCw className="h-4 w-4" /> Retry
+      {/* Error */}
+      {failed && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#1a1a1a]">
+          <div className="text-center max-w-md px-6">
+            <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+            <p className="text-white font-semibold text-base mb-1">Preview failed</p>
+            <p className="text-sm text-white/50 mb-6">
+              {currentViewer} could not load this file. It may be too large or not publicly reachable.
+            </p>
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <button onClick={retry} className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/15 transition-colors">
+                <RefreshCw className="h-4 w-4" /> Retry
+              </button>
+              <button onClick={() => setMode(mode === "office" ? "google" : "office")} className="inline-flex items-center gap-2 px-4 py-2 bg-[#0078d4]/80 text-white rounded-lg text-sm hover:bg-[#0078d4] transition-colors">
+                <ExternalLink className="h-4 w-4" /> Try {otherViewer}
+              </button>
+              {onDownload && (
+                <button onClick={onDownload} className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/15 transition-colors">
+                  <Download className="h-4 w-4" /> Download
                 </button>
-                <button
-                  onClick={() => setMode(mode === "office" ? "google" : "office")}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#0078d4]/80 text-white rounded-lg text-sm hover:bg-[#0078d4] transition-colors"
-                >
-                  <ExternalLink className="h-4 w-4" /> Try {otherViewer}
-                </button>
-                {onDownload && (
-                  <button
-                    onClick={onDownload}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/15 transition-colors"
-                  >
-                    <Download className="h-4 w-4" /> Download
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        <iframe
-          ref={iframeRef}
-          src={viewerUrl}
-          onLoad={handleLoad}
-          title={`PowerPoint: ${fileName}`}
-          className="w-full h-full border-0"
-          // allow-popups needed by Office Online's internal navigation
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"
-          allowFullScreen
-        />
+      {/* Full-screen iframe — no wrappers, no padding, 100% of container */}
+      <iframe
+        ref={iframeRef}
+        src={viewerUrl}
+        onLoad={handleLoad}
+        title={`PowerPoint: ${fileName}`}
+        className="absolute inset-0 w-full h-full border-0"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"
+        allowFullScreen
+      />
     </div>
   );
 }
