@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
-import { getFileCategory, formatFileSize, isOfficeFile, isCsvFile, isPptxFile, isJsonFile, isTextFile } from "@/types/file.types";
+import { getFileCategory, formatFileSize, isOfficeFile, isCsvFile, isPptxFile, isJsonFile, isTextFile, isPreviewableFile, isLegacyPptFile } from "@/types/file.types";
 import { Download, FileIcon, ArrowLeft } from "lucide-react";
 import { PreviewClient } from "./preview-client";
 import { OfficePreviewClient } from "./office-preview-client";
@@ -89,44 +89,44 @@ export default async function PreviewPage({
           </div>
         )}
         {/* Office documents (Word, Excel) — NOT PowerPoint */}
-        {category === "document" && isOfficeFile(file.mime_type, file.name) && !isPptxFile(file.mime_type, file.name) && (
+        {isOfficeFile(file.mime_type, file.name) && !isPptxFile(file.mime_type, file.name) && (
           <div className="w-full h-[calc(100vh-64px)]">
             <OfficePreviewClient src={downloadUrl} fileName={file.name} />
           </div>
         )}
-        {/* PowerPoint presentations */}
-        {category === "document" && isPptxFile(file.mime_type, file.name) && (
+        {/* PowerPoint presentations (.pptx) */}
+        {isPptxFile(file.mime_type, file.name) && (
+          <div className="w-full h-[calc(100vh-64px)]">
+            <PptxPreviewClient src={downloadUrl} fileName={file.name} downloadUrl={directDownloadUrl} />
+          </div>
+        )}
+        {/* Legacy PowerPoint (.ppt) — show friendly download prompt */}
+        {isLegacyPptFile(file.mime_type, file.name) && (
           <div className="w-full h-[calc(100vh-64px)]">
             <PptxPreviewClient src={downloadUrl} fileName={file.name} downloadUrl={directDownloadUrl} />
           </div>
         )}
         {/* CSV files */}
-        {category === "document" && isCsvFile(file.mime_type, file.name) && (
+        {isCsvFile(file.mime_type, file.name) && (
           <div className="w-full h-[calc(100vh-64px)]">
             <CsvPreviewClient src={downloadUrl} fileName={file.name} downloadUrl={directDownloadUrl} />
           </div>
         )}
         {/* JSON files */}
-        {category === "document" && isJsonFile(file.mime_type, file.name) && (
+        {isJsonFile(file.mime_type, file.name) && (
           <div className="w-full h-[calc(100vh-64px)]">
             <JsonPreviewClient src={downloadUrl} fileName={file.name} downloadUrl={directDownloadUrl} />
           </div>
         )}
-        {/* Text / code files */}
-        {category === "document" && isTextFile(file.mime_type, file.name) && (
+        {/* Text / code files (.md, .sql, .html, .css, .js, .py, .txt, etc.) */}
+        {isTextFile(file.mime_type, file.name) && (
           <div className="w-full h-[calc(100vh-64px)]">
             <TextPreviewClient src={downloadUrl} fileName={file.name} downloadUrl={directDownloadUrl} />
           </div>
         )}
         {/* Other non-previewable files */}
-        {((category === "document" &&
-          !isOfficeFile(file.mime_type, file.name) &&
-          !isCsvFile(file.mime_type, file.name) &&
-          !isJsonFile(file.mime_type, file.name) &&
-          !isTextFile(file.mime_type, file.name) &&
-          !isPptxFile(file.mime_type, file.name)) ||
-          category === "archive" ||
-          category === "other") && (
+        {category !== "image" && category !== "video" && category !== "audio" &&
+          !isPreviewableFile(file.mime_type, file.name) && (
           <div className="text-center">
             <FileIcon className="h-20 w-20 text-white/30 mx-auto mb-6" />
             <p className="text-xl font-medium mb-2 text-white">{file.name}</p>
