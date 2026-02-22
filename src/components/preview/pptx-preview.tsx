@@ -7,6 +7,7 @@ import {
   Download,
   RefreshCw,
   ExternalLink,
+  Terminal,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -22,64 +23,110 @@ interface PptxPreviewProps {
 type ViewerMode = "office" | "google";
 
 /* ═══════════════════════════════════════════════════════════════
+   Helpers
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Determine the public base URL to use when constructing the file URL
+ * that Office Online / Google Docs will fetch.
+ *
+ * Priority:
+ *  1. NEXT_PUBLIC_APP_URL  (set in .env.local for ngrok on localhost,
+ *                           or the canonical domain on production)
+ *  2. window.location.origin  (works correctly on deployed production)
+ */
+function getPublicOrigin(): string {
+  if (typeof window === "undefined") return "";
+  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+    window.location.origin;
+}
+
+function isRunningOnLocalhost(): boolean {
+  if (typeof window === "undefined") return false;
+  const h = window.location.hostname;
+  return h === "localhost" || h === "127.0.0.1" || h === "[::1]";
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Main exported component
-   Uses Microsoft Office Online → Google Docs Viewer as fallback.
-   On localhost, shows download prompt (external viewers need a
-   publicly-reachable URL).
+   Default: Microsoft Office Online (best quality, slide-by-slide).
+   Fallback: Google Docs Viewer.
+   Localhost without NEXT_PUBLIC_APP_URL: ngrok setup guide.
    ═══════════════════════════════════════════════════════════════ */
 
 export function PptxPreview({ src, fileName, onDownload }: PptxPreviewProps) {
-  const isLocalhost =
-    typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1" ||
-      window.location.hostname === "[::1]");
+  const [publicOrigin, setPublicOrigin] = useState<string | null>(null);
 
-  if (isLocalhost) {
-    return <LocalhostFallback fileName={fileName} onDownload={onDownload} />;
+  // Resolve on client only (window is undefined during SSR)
+  useEffect(() => {
+    setPublicOrigin(getPublicOrigin());
+  }, []);
+
+  // Still hydrating
+  if (publicOrigin === null) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
+        <Loader2 className="h-8 w-8 text-white/30 animate-spin" />
+      </div>
+    );
   }
 
+  // Localhost without a public URL configured → show ngrok setup guide
+  if (isRunningOnLocalhost() && !process.env.NEXT_PUBLIC_APP_URL) {
+    return (
+      <LocalhostSetupGuide fileName={fileName} onDownload={onDownload} />
+    );
+  }
+
+  const fileUrl = publicOrigin + src;
   return (
-    <IframeViewer src={src} fileName={fileName} onDownload={onDownload} />
+    <IframeViewer
+      fileUrl={fileUrl}
+      fileName={fileName}
+      onDownload={onDownload}
+    />
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Iframe viewer — Office Online + Google Docs
+   Iframe viewer — Microsoft Office Online (default) + Google Docs
    ═══════════════════════════════════════════════════════════════ */
 
 function IframeViewer({
-  src,
+  fileUrl,
   fileName,
   onDownload,
-}: PptxPreviewProps) {
-  const [mode, setMode] = useState<ViewerMode>("google");
+}: {
+  fileUrl: string;
+  fileName: string;
+  onDownload?: () => void;
+}) {
+  const [mode, setMode] = useState<ViewerMode>("office");
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
-  const fileUrl = origin + src;
-
-  const officeUrl = `https://view.officeapps.live.com/op/embed.ashx?src=${encodeURIComponent(fileUrl)}`;
+  // Microsoft Office Online: embed.aspx gives the true slide-by-slide viewer
+  const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
   const googleUrl = `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
   const viewerUrl = mode === "office" ? officeUrl : googleUrl;
 
-  /* Reset state when mode or src changes */
+  const currentViewer = mode === "office" ? "Microsoft Office Online" : "Google Docs Viewer";
+  const otherViewer  = mode === "office" ? "Google Docs" : "Office Online";
+
+  /* Reset loading/error state whenever the viewer URL changes */
   useEffect(() => {
     setLoading(true);
     setFailed(false);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    // Office Online can take a while for large files
     timeoutRef.current = setTimeout(() => {
       setLoading(false);
       setFailed(true);
-    }, 20_000);
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [mode, src]);
+    }, 30_000);
+    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
+  }, [mode, fileUrl]);
 
   const handleLoad = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -91,6 +138,7 @@ function IframeViewer({
     setLoading(true);
     setFailed(false);
     if (iframeRef.current) {
+      // Bust cache so the iframe actually reloads
       const u = new URL(viewerUrl);
       u.searchParams.set("_t", Date.now().toString());
       iframeRef.current.src = u.toString();
@@ -99,44 +147,34 @@ function IframeViewer({
     timeoutRef.current = setTimeout(() => {
       setLoading(false);
       setFailed(true);
-    }, 20_000);
+    }, 30_000);
   }, [viewerUrl]);
-
-  const switchViewer = useCallback(() => {
-    setMode((m) => (m === "office" ? "google" : "office"));
-  }, []);
-
-  const otherViewer = mode === "office" ? "Google Docs" : "Office Online";
-  const currentViewer =
-    mode === "office" ? "Microsoft Office Online" : "Google Docs Viewer";
 
   return (
     <div className="w-full h-full flex flex-col overflow-hidden bg-[#1a1a1a]">
-      {/* Iframe area */}
-      <div className="flex-1 relative">
-        {/* Loading overlay */}
+      <div className="flex-1 relative overflow-hidden">
+
+        {/* Loading spinner */}
         {loading && !failed && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#1a1a1a]">
-            <div className="text-center">
-              <Loader2 className="h-10 w-10 text-white/40 animate-spin mx-auto mb-3" />
-              <p className="text-sm text-white/50">
-                Loading via {currentViewer}…
-              </p>
-            </div>
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-[#1a1a1a]">
+            <Loader2 className="h-10 w-10 text-[#0078d4] animate-spin" />
+            <p className="text-sm text-white/50">
+              Loading <span className="text-white/70 font-medium">{currentViewer}</span>…
+            </p>
           </div>
         )}
 
-        {/* Error overlay */}
+        {/* Error state */}
         {failed && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#1a1a1a]">
             <div className="text-center max-w-md px-6">
-              <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-3" />
-              <p className="text-white font-medium mb-2">
-                {currentViewer} didn&apos;t respond
+              <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+              <p className="text-white font-semibold text-base mb-1">
+                Preview failed
               </p>
-              <p className="text-sm text-white/50 mb-5">
-                The viewer may be unavailable or the file URL may not be
-                publicly reachable.
+              <p className="text-sm text-white/50 mb-6">
+                {currentViewer} could not load this file. The file may be too
+                large, or the URL may not be publicly reachable.
               </p>
               <div className="flex items-center justify-center gap-3 flex-wrap">
                 <button
@@ -146,15 +184,15 @@ function IframeViewer({
                   <RefreshCw className="h-4 w-4" /> Retry
                 </button>
                 <button
-                  onClick={switchViewer}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/15 transition-colors"
+                  onClick={() => setMode(mode === "office" ? "google" : "office")}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#0078d4]/80 text-white rounded-lg text-sm hover:bg-[#0078d4] transition-colors"
                 >
-                  Try {otherViewer}
+                  <ExternalLink className="h-4 w-4" /> Try {otherViewer}
                 </button>
                 {onDownload && (
                   <button
                     onClick={onDownload}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#8ab4f8] text-[#202124] rounded-lg text-sm font-medium hover:bg-[#aecbfa] transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/15 transition-colors"
                   >
                     <Download className="h-4 w-4" /> Download
                   </button>
@@ -170,128 +208,144 @@ function IframeViewer({
           onLoad={handleLoad}
           title={`PowerPoint: ${fileName}`}
           className="w-full h-full border-0"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+          // allow-popups needed by Office Online's internal navigation
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"
           allowFullScreen
         />
       </div>
 
       {/* Bottom bar */}
-      <div className="flex items-center justify-between h-10 px-4 bg-[#252526] border-t border-white/[0.08] flex-shrink-0">
-        <span className="text-xs text-white/50 truncate max-w-[200px]">
-          {fileName}
-        </span>
-        <span className="text-[11px] text-white/30">
-          Powered by {currentViewer}
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={switchViewer}
-            className="px-2.5 py-1 text-[11px] text-white/40 hover:text-white/60 rounded transition-colors"
-          >
-            Switch to {otherViewer}
-          </button>
-          {onDownload && (
+      <div className="flex items-center justify-between h-10 px-4 bg-[#1e1e2e] border-t border-white/[0.06] flex-shrink-0">
+        <span className="text-xs text-white/40 truncate max-w-[180px]">{fileName}</span>
+
+        {/* Viewer toggle pills */}
+        <div className="flex items-center gap-1 rounded-md bg-white/[0.05] p-0.5">
+          {(["office", "google"] as ViewerMode[]).map((v) => (
             <button
-              onClick={onDownload}
-              className="px-2.5 py-1 text-[11px] text-white/40 hover:text-white/60 rounded transition-colors"
+              key={v}
+              onClick={() => setMode(v)}
+              className={`px-3 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                mode === v
+                  ? "bg-[#0078d4] text-white shadow"
+                  : "text-white/40 hover:text-white/70"
+              }`}
             >
-              Download
+              {v === "office" ? "Office Online" : "Google Docs"}
             </button>
-          )}
+          ))}
         </div>
+
+        {onDownload && (
+          <button
+            onClick={onDownload}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-white/40 hover:text-white/70 rounded transition-colors"
+          >
+            <Download className="h-3 w-3" /> Download
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Localhost fallback — external viewers can't reach localhost,
-   so we show a friendly message + download button.
+   Localhost setup guide — shown when NEXT_PUBLIC_APP_URL is not set
    ═══════════════════════════════════════════════════════════════ */
 
-function LocalhostFallback({
+function LocalhostSetupGuide({
   fileName,
   onDownload,
 }: {
   fileName: string;
   onDownload?: () => void;
 }) {
-  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  const isLegacy = ext === "ppt";
+  const isLegacy = fileName.toLowerCase().endsWith(".ppt") &&
+    !fileName.toLowerCase().endsWith(".pptx");
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
-      <div className="text-center max-w-lg px-6">
-        {/* Icon */}
-        <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center">
-          <svg
-            viewBox="0 0 48 48"
-            className="w-10 h-10"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <rect
-              x="6"
-              y="10"
-              width="36"
-              height="28"
-              rx="3"
-              fill="#D35230"
-              fillOpacity="0.8"
-            />
-            <path
-              d="M16 20h16M16 26h12M16 32h8"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
+    <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a] p-6">
+      <div className="w-full max-w-lg">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-xl bg-[#0078d4]/20 flex items-center justify-center flex-shrink-0">
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+              <rect x="2" y="3" width="20" height="18" rx="2" fill="#0078d4" fillOpacity=".7"/>
+              <path d="M7 8h10M7 12h8M7 16h6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm">Microsoft Office Online Preview</p>
+            <p className="text-white/40 text-xs">Requires a public URL to fetch your file</p>
+          </div>
         </div>
 
-        <h2 className="text-white font-semibold text-lg mb-2">
-          PowerPoint Preview
-        </h2>
-        <p className="text-sm text-white/50 mb-1">
-          {isLegacy ? (
-            <>
-              Legacy <span className="font-mono text-white/60">.ppt</span>{" "}
-              files are not supported for preview. Please convert to{" "}
-              <span className="font-mono text-white/60">.pptx</span> or
-              download.
-            </>
-          ) : (
-            <>
-              PowerPoint preview uses{" "}
-              <span className="text-white/70">Microsoft Office Online</span>{" "}
-              and requires the app to be deployed to a public URL.
-            </>
-          )}
-        </p>
-        <p className="text-xs text-white/30 mb-6">
-          On <span className="font-mono">localhost</span>, external viewers
-          cannot access your files.
-        </p>
+        {isLegacy ? (
+          <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-5 mb-4">
+            <p className="text-white/70 text-sm">
+              Legacy <span className="font-mono text-white/90">.ppt</span> files (PowerPoint 97–2003)
+              can be previewed via Office Online once the app is deployed.
+              Convert to <span className="font-mono text-white/90">.pptx</span> for best results.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Step-by-step */}
+            <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] overflow-hidden mb-4">
+              <div className="px-5 py-3 border-b border-white/[0.06]">
+                <p className="text-white/60 text-xs font-medium uppercase tracking-wider">
+                  Enable on localhost using ngrok
+                </p>
+              </div>
+              <div className="divide-y divide-white/[0.05]">
+                {[
+                  {
+                    n: "1",
+                    label: "Install ngrok",
+                    code: "winget install ngrok",
+                  },
+                  {
+                    n: "2",
+                    label: "Start a tunnel (while your app runs on :3000)",
+                    code: "ngrok http 3000",
+                  },
+                  {
+                    n: "3",
+                    label: "Copy the https URL, add to .env.local, restart",
+                    code: "NEXT_PUBLIC_APP_URL=https://xxxx.ngrok.io",
+                  },
+                ].map(({ n, label, code }) => (
+                  <div key={n} className="flex gap-3 px-5 py-3.5">
+                    <span className="w-5 h-5 rounded-full bg-[#0078d4]/30 text-[#0078d4] text-[11px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {n}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-white/60 text-xs mb-1.5">{label}</p>
+                      <div className="flex items-center gap-2 bg-black/30 rounded-md px-3 py-1.5">
+                        <Terminal className="h-3 w-3 text-white/30 flex-shrink-0" />
+                        <code className="text-[11px] text-green-400 font-mono">{code}</code>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-        <div className="flex items-center justify-center gap-3 flex-wrap">
-          {onDownload && (
+            <p className="text-white/30 text-xs text-center mb-5">
+              On production (Vercel / Railway) this works automatically — no env var needed.
+            </p>
+          </>
+        )}
+
+        {onDownload && (
+          <div className="flex justify-center">
             <button
               onClick={onDownload}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#8ab4f8] text-[#202124] rounded-full text-sm font-medium hover:bg-[#aecbfa] transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0078d4] text-white rounded-full text-sm font-medium hover:bg-[#106ebe] transition-colors"
             >
-              <Download className="h-4 w-4" /> Download File
+              <Download className="h-4 w-4" /> Download to view locally
             </button>
-          )}
-          {!isLegacy && (
-            <a
-              href="https://www.microsoft.com/en-us/microsoft-365/free-office-online-for-the-web"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 text-white/70 rounded-full text-sm hover:bg-white/15 transition-colors"
-            >
-              <ExternalLink className="h-4 w-4" /> Open in Office Online
-            </a>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
