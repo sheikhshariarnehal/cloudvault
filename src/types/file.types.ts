@@ -141,7 +141,7 @@ export interface UploadQueueItem {
   progress: number;
   bytesLoaded: number;
   bytesTotal: number;
-  status: "pending" | "uploading" | "success" | "error";
+  status: "pending" | "uploading" | "success" | "error" | "duplicate";
   error?: string;
 }
 

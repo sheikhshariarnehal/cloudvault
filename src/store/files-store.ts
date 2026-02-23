@@ -131,7 +131,9 @@ export const useFilesStore = create<FilesState>((set) => ({
   clearUploadQueue: () => set({ uploadQueue: [] }),
   cancelAllUploads: () =>
     set((state) => ({
-      uploadQueue: state.uploadQueue.filter((item) => item.status === "success"),
+      uploadQueue: state.uploadQueue.filter(
+        (item) => item.status === "success" || item.status === "duplicate"
+      ),
     })),
 
   // UI actions
