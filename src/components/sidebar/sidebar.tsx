@@ -56,17 +56,17 @@ export function Sidebar() {
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-white border-r border-gray-200">
+    <div className="flex flex-col h-full w-full bg-transparent">
       {/* Brand */}
-      <div className="flex items-center gap-3 px-6 h-[64px] shrink-0">
+      <div className="flex items-center gap-2 px-5 h-16 shrink-0">
         <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600">
-          <Cloud className="h-5 w-5 text-white" />
+          <Cloud className="h-6 w-6 text-white" />
         </div>
-        <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">CloudVault</span>
+        <span className="text-[22px] font-normal tracking-tight text-gray-600">CloudVault</span>
       </div>
 
       {/* + New Button */}
-      <div className="px-4 py-3 shrink-0">
+      <div className="px-4 py-2 shrink-0 mt-1">
         <input
           ref={folderInputRef}
           type="file"
@@ -80,9 +80,9 @@ export function Sidebar() {
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
-              className="w-fit h-10 px-5 rounded-2xl shadow-md hover:shadow-lg border border-gray-200 bg-white text-gray-700 font-medium text-sm gap-2 transition-shadow"
+              className="w-fit h-14 px-5 rounded-2xl shadow-sm hover:shadow-md border-none bg-white text-gray-700 font-medium text-sm gap-3 transition-shadow"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-6 w-6" />
               New
             </Button>
           </DropdownMenuTrigger>
@@ -123,7 +123,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5 mt-2">
         {navItems.map((item) => (
           <NavItem
             key={item.href}
@@ -136,10 +136,7 @@ export function Sidebar() {
         ))}
 
         {/* Folder Tree */}
-        <div className="px-1 mt-2">
-          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 px-2">
-            Folders
-          </p>
+        <div className="px-1 mt-4">
           <FolderTree folders={folders.filter((f) => !f.parent_id)} allFolders={folders} />
         </div>
       </nav>
@@ -153,7 +150,7 @@ export function Sidebar() {
       {(isGuest || !user) && (
         <div className="px-4 pb-4">
           <Link href="/auth/signup">
-            <Button className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md hover:shadow-lg transition-all h-10 text-sm font-semibold">
+            <Button className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md hover:shadow-lg transition-all h-10 text-sm font-medium rounded-full">
               <Crown className="h-4 w-4 mr-2" />
               Sign Up for Full Access
             </Button>

@@ -49,7 +49,7 @@ function FolderTreeItem({
   return (
     <div>
       <div
-        className="flex items-center gap-1 py-1.5 px-1 rounded-md hover:bg-muted cursor-pointer group"
+        className="flex items-center gap-1 py-1.5 px-1 rounded-full hover:bg-gray-200/50 cursor-pointer group"
         style={{ paddingLeft: `${level * 16 + 4}px` }}
       >
         {hasChildren ? (
@@ -69,14 +69,14 @@ function FolderTreeItem({
         )}
         <Link
           href={`/dashboard/folder/${folder.id}`}
-          className="flex items-center gap-2 flex-1 min-w-0"
+          className="flex items-center gap-3 flex-1 min-w-0"
         >
           <Folder
-            className="h-4 w-4 flex-shrink-0"
-            style={{ color: folder.color || "#EAB308" }}
-            fill={folder.color || "#EAB308"}
+            className="h-5 w-5 flex-shrink-0"
+            style={{ color: folder.color || "#5f6368" }}
+            fill={folder.color || "#5f6368"}
           />
-          <span className="text-sm truncate">{folder.name}</span>
+          <span className="text-sm truncate text-gray-700 font-medium">{folder.name}</span>
         </Link>
       </div>
       {expanded && hasChildren && (

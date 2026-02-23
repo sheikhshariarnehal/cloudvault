@@ -154,9 +154,9 @@ const MAX_VISIBLE_ROWS = 20;
 // ─── Filter Chip ─────────────────────────────────────────────────────
 function FilterChip({ label }: { label: string }) {
   return (
-    <button className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#dadce0] text-[14px] text-[#3c4043] hover:bg-[#f1f3f4] transition-colors duration-100">
+    <button className="inline-flex items-center gap-1 sm:gap-1.5 h-7 sm:h-8 px-2.5 sm:px-3 rounded-lg border border-[#dadce0] text-[13px] sm:text-[14px] text-[#3c4043] hover:bg-[#f1f3f4] transition-colors duration-100">
       {label}
-      <ChevronDown className="h-4 w-4 text-[#5f6368]" />
+      <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#5f6368]" />
     </button>
   );
 }
@@ -226,10 +226,10 @@ function TopActionBar({
   // ─ Default filter chips ───────────────────────────────────────────
   return (
     <div
-      className="flex items-center px-2 sm:px-3 border-b border-[#e8eaed] overflow-x-auto scrollbar-none"
+      className="flex items-center px-2 sm:px-3 border-b border-[#e8eaed] overflow-x-auto scrollbar-none hide-scrollbar"
       style={{ height: FILTER_BAR_HEIGHT }}
     >
-      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 pb-1 sm:pb-0">
         <FilterChip label="Type" />
         <FilterChip label="People" />
         <FilterChip label="Modified" />
@@ -330,7 +330,7 @@ function FolderRow({ folder, isSelected, onToggle }: { folder: DbFolder; isSelec
       {/* Context menu - visible on hover */}
       <div
         className={`${COL.actions} flex-shrink-0 flex items-center justify-center transition-opacity duration-75 ${
-          isSelected ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+          isSelected ? "opacity-100" : "opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
         }`}
         data-no-preview
         onClick={(e) => e.stopPropagation()}
