@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
 import { FileContextMenu } from "@/components/context-menu/file-context-menu";
+import { FolderContextMenu } from "@/components/context-menu/folder-context-menu";
 import {
   FileText,
   Image as ImageIcon,
@@ -251,14 +252,26 @@ const COL = {
 
 // ─── Folder Row ──────────────────────────────────────────────────────
 function FolderRow({ folder, isSelected, onToggle }: { folder: DbFolder; isSelected: boolean; onToggle: (id: string) => void }) {
+  const handleRowClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-no-preview]")) return;
+
+    if (e.ctrlKey || e.metaKey) {
+      onToggle(folder.id);
+      return;
+    }
+
+    window.location.href = `/dashboard/folder/${folder.id}`;
+  };
+
   return (
-    <Link
-      href={`/dashboard/folder/${folder.id}`}
+    <div
       className={`group relative flex items-center h-12 border-b border-[#e8eaed] cursor-pointer select-none transition-colors duration-75 ${
         isSelected ? "bg-[#c2e7ff] hover:bg-[#b0d8f5]" : "hover:bg-[#f5f5f5]"
       }`}
       role="row"
       aria-selected={isSelected}
+      onClick={handleRowClick}
     >
       {/* Checkbox / Icon area */}
       <div className={`${COL.icon} flex-shrink-0 flex items-center justify-center relative`}>
@@ -315,15 +328,17 @@ function FolderRow({ folder, isSelected, onToggle }: { folder: DbFolder; isSelec
       </div>
 
       {/* Context menu - visible on hover */}
-      <div className={`${COL.actions} flex-shrink-0 flex items-center justify-center`} data-no-preview>
-        <button
-          className="p-1.5 rounded-full opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/5 transition-all duration-75"
-          onClick={(e) => e.preventDefault()}
-        >
-          <MoreVertical className="h-4 w-4 text-[#5f6368]" />
-        </button>
+      <div
+        className={`${COL.actions} flex-shrink-0 flex items-center justify-center transition-opacity duration-75 ${
+          isSelected ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+        }`}
+        data-no-preview
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <FolderContextMenu folder={folder} />
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -463,9 +478,14 @@ function FileRow({
       </div>
 
       {/* Three dots context menu — always at the end */}
-      <div className={`${COL.actions} flex-shrink-0 flex items-center justify-center transition-opacity duration-75 ${
-        isSelected ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-      }`} data-no-preview>
+      <div
+        className={`${COL.actions} flex-shrink-0 flex items-center justify-center transition-opacity duration-75 ${
+          isSelected ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+        }`}
+        data-no-preview
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <FileContextMenu file={file} />
       </div>
 

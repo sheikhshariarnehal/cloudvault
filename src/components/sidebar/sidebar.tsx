@@ -37,7 +37,7 @@ const navItems = [
   { href: "/dashboard", label: "All Files", icon: FolderOpen },
   { href: "/dashboard/recent", label: "Recent", icon: Image },
   { href: "/dashboard/starred", label: "Starred", icon: Star },
-  { href: "/dashboard/shared", label: "Shared Files", icon: Users, badge: "Soon" },
+  { href: "/dashboard/shared", label: "Shared Files", icon: Users },
   { href: "/dashboard/trash", label: "Trash", icon: Trash2 },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

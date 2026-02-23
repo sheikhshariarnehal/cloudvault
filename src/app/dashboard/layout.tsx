@@ -26,6 +26,7 @@ export default function DashboardLayout({
   const { setFiles, setFolders, setIsLoading, currentFolderId } = useFilesStore();
   const { sidebarOpen, setSidebarOpen, isOnline, setIsOnline } = useUIStore();
 
+
   // Set up realtime subscriptions
   useRealtimeFiles(user?.id ?? null, guestSessionId);
 

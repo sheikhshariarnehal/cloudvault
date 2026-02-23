@@ -3,9 +3,9 @@ import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 
 // POST - Create a share link for a file or folder
+// Requires an authenticated user (userId).
 export async function POST(request: NextRequest) {
   try {
-    // Use service role client to bypass RLS for guest users
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
         },
       }
     );
-    const { fileId, folderId, userId, guestSessionId } = await request.json();
+    const { fileId, folderId, userId, regenerate } = await request.json();
 
     if (!fileId && !folderId) {
       return NextResponse.json(
@@ -25,64 +25,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let createdBy: string | undefined;
-
-    // For guest users, create a temporary user record if it doesn't exist
-    if (!userId && guestSessionId) {
-      const { data: existingGuestUser } = await supabase
-        .from("users")
-        .select("id")
-        .eq("guest_session_id", guestSessionId)
-        .single();
-
-      if (!existingGuestUser) {
-        // Create a guest user record
-        const { data: newGuestUser, error: userError } = await supabase
-          .from("users")
-          .insert({
-            guest_session_id: guestSessionId,
-            display_name: "Guest User",
-          })
-          .select("id")
-          .single();
-
-        if (userError) {
-          console.error("Failed to create guest user:", userError);
-          return NextResponse.json(
-            { error: "Failed to create user session" },
-            { status: 500 }
-          );
-        }
-
-        createdBy = newGuestUser.id;
-      } else {
-        createdBy = existingGuestUser.id;
-      }
-    } else if (userId) {
-      createdBy = userId;
-    }
-
-    if (!createdBy) {
+    if (!userId) {
       return NextResponse.json(
-        { error: "Authentication required" },
+        { error: "Sign in required to share files and folders" },
         { status: 401 }
       );
     }
 
-    // Verify ownership based on whether it's a file or folder share
+    // Ensure authenticated user has a public.users profile
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
+
+    if (!existingUser) {
+      const { error: profileError } = await supabase
+        .from("users")
+        .upsert({ id: userId, display_name: "User" }, { onConflict: "id" });
+
+      if (profileError) {
+        console.error("Failed to ensure user profile:", profileError);
+        return NextResponse.json(
+          { error: "Failed to verify user account" },
+          { status: 500 }
+        );
+      }
+    }
+
+    const createdBy = userId;
+
+    // Verify ownership — check user_id on the file/folder
     if (fileId) {
-      let fileQuery = supabase
+      const { data: file, error: fileError } = await supabase
         .from("files")
         .select("id")
-        .eq("id", fileId);
-
-      if (userId) {
-        fileQuery = fileQuery.eq("user_id", userId);
-      } else if (guestSessionId) {
-        fileQuery = fileQuery.eq("guest_session_id", guestSessionId);
-      }
-
-      const { data: file, error: fileError } = await fileQuery.single();
+        .eq("id", fileId)
+        .eq("user_id", userId)
+        .single();
 
       if (fileError || !file) {
         console.error("File verification error:", fileError);
@@ -102,7 +82,14 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (existingLink) {
-        return NextResponse.json({ token: existingLink.token });
+        if (!regenerate) {
+          return NextResponse.json({ token: existingLink.token });
+        }
+        // Deactivate old link before creating a new one
+        await supabase
+          .from("shared_links")
+          .update({ is_active: false })
+          .eq("id", existingLink.id);
       }
 
       // Generate a unique token
@@ -133,18 +120,12 @@ export async function POST(request: NextRequest) {
 
     // Folder sharing
     if (folderId) {
-      let folderQuery = supabase
+      const { data: folder, error: folderError } = await supabase
         .from("folders")
         .select("id")
-        .eq("id", folderId);
-
-      if (userId) {
-        folderQuery = folderQuery.eq("user_id", userId);
-      } else if (guestSessionId) {
-        folderQuery = folderQuery.eq("guest_session_id", guestSessionId);
-      }
-
-      const { data: folder, error: folderError } = await folderQuery.single();
+        .eq("id", folderId)
+        .eq("user_id", userId)
+        .single();
 
       if (folderError || !folder) {
         console.error("Folder verification error:", folderError);
@@ -164,7 +145,14 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (existingLink) {
-        return NextResponse.json({ token: existingLink.token });
+        if (!regenerate) {
+          return NextResponse.json({ token: existingLink.token });
+        }
+        // Deactivate old link before creating a new one
+        await supabase
+          .from("shared_links")
+          .update({ is_active: false })
+          .eq("id", existingLink.id);
       }
 
       // Generate a unique token
