@@ -147,58 +147,11 @@ export default function FolderPage({
         </TooltipProvider>
       </div>
 
-      {/* Subfolders */}
-      {subFolders.length > 0 && (
-        <section>
-          <h2 className="text-sm font-medium text-[#202124] mb-3">Folders</h2>
-          {viewMode === "grid" ? (
-            <FolderGrid folders={subFolders} />
-          ) : (
-            <div className="bg-white rounded-lg border">
-              {subFolders.map((folder) => (
-                <Link
-                  key={folder.id}
-                  href={`/dashboard/folder/${folder.id}`}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b last:border-b-0"
-                >
-                  <div
-                    className="flex items-center justify-center w-10 h-10 rounded-lg"
-                    style={{ backgroundColor: (folder.color || "#EAB308") + "20" }}
-                  >
-                    <FolderOpen
-                      className="h-5 w-5"
-                      style={{ color: folder.color || "#EAB308" }}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {folder.name}
-                    </p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Files */}
-      {folderFiles.length > 0 ? (
-        <section>
-          <h2 className="text-sm font-medium text-[#202124] mb-3">Files</h2>
-          {viewMode === "grid" ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {folderFiles.map((file) => (
-                <FileCard key={file.id} file={file} />
-              ))}
-            </div>
-          ) : (
-            <FileList files={folderFiles} folders={[]} />
-          )}
-        </section>
-      ) : (
-        subFolders.length === 0 && (
+      {/* List view — folders and files unified in a single FileList (mirrors dashboard behaviour) */}
+      {viewMode === "list" ? (
+        subFolders.length > 0 || folderFiles.length > 0 ? (
+          <FileList files={folderFiles} folders={subFolders} />
+        ) : (
           <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
             <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold">This folder is empty</h3>
@@ -211,6 +164,41 @@ export default function FolderPage({
             </Button>
           </div>
         )
+      ) : (
+        /* Grid view — keep separate Folders / Files sections */
+        <>
+          {subFolders.length > 0 && (
+            <section>
+              <h2 className="text-sm font-medium text-[#202124] mb-3">Folders</h2>
+              <FolderGrid folders={subFolders} />
+            </section>
+          )}
+
+          {folderFiles.length > 0 ? (
+            <section>
+              <h2 className="text-sm font-medium text-[#202124] mb-3">Files</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                {folderFiles.map((file) => (
+                  <FileCard key={file.id} file={file} />
+                ))}
+              </div>
+            </section>
+          ) : (
+            subFolders.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold">This folder is empty</h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Drag & drop files here, or click Upload to add files
+                </p>
+                <Button onClick={() => openFilePicker?.()}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Files
+                </Button>
+              </div>
+            )
+          )}
+        </>
       )}
     </div>
   );

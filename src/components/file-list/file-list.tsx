@@ -775,7 +775,7 @@ export function FileList({ files, folders = [], topRightSlot }: FileListProps) {
   }
 
   return (
-    <div ref={containerRef} className="w-full mt-2">
+    <div ref={containerRef} className="w-full mt-2 overflow-x-hidden">
       {/* ─── Top Action Bar (filters / selection) ─────────────────── */}
       <TopActionBar
         hasSelection={hasSelection}
