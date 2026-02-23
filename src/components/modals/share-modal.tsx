@@ -244,7 +244,7 @@ export function ShareModal() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={generateShareLink}
+                onClick={() => generateShareLink()}
                 className="gap-2"
               >
                 <RefreshCw className="h-3.5 w-3.5" />

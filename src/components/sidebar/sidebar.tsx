@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { LucideIcon } from "lucide-react";
 import {
   Cloud,
   FolderOpen,
@@ -33,7 +34,7 @@ import {
   FolderUp,
 } from "lucide-react";
 
-const navItems = [
+const navItems: Array<{ href: string; label: string; icon: LucideIcon; badge?: string }> = [
   { href: "/dashboard", label: "All Files", icon: FolderOpen },
   { href: "/dashboard/recent", label: "Recent", icon: Image },
   { href: "/dashboard/starred", label: "Starred", icon: Star },
