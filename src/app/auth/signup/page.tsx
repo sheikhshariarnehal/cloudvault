@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
-import { Cloud, Mail, Eye, EyeOff } from "lucide-react";
+import { Mail, Eye, EyeOff } from "lucide-react";
+import NextImage from "next/image";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("");
@@ -65,7 +66,7 @@ export default function SignUpPage() {
       <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 px-4">
         <div className="w-full max-w-sm text-center space-y-5 py-8">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-green-100 rounded-full">
-            <Cloud className="h-7 w-7 text-green-600" />
+            <NextImage src="/logo.webp" alt="CloudVault" width={32} height={32} />
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Check your email</h2>
           <p className="text-sm text-gray-500 leading-relaxed">
@@ -87,9 +88,7 @@ export default function SignUpPage() {
 
         {/* Logo */}
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-11 h-11 bg-blue-600 rounded-xl mb-3">
-            <Cloud className="h-5 w-5 text-white" />
-          </div>
+          <NextImage src="/logo.webp" alt="CloudVault" width={52} height={52} className="mx-auto mb-3" priority />
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create your account</h1>
           <p className="text-sm text-gray-500 mt-1">Free forever. No credit card required.</p>
         </div>
