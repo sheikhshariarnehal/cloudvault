@@ -47,7 +47,7 @@ export default function LoginPage() {
         password,
       });
       if (error) throw error;
-      router.push("/dashboard");
+      router.push("/drive");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -57,7 +57,7 @@ export default function LoginPage() {
 
   const handleGuestMode = () => {
     getGuestSessionId();
-    router.push("/dashboard");
+    router.push("/drive");
   };
 
   return (

@@ -68,8 +68,8 @@ export default function FolderPage({
               <Link
                 href={
                   crumb.id
-                    ? `/dashboard/folder/${crumb.id}`
-                    : "/dashboard"
+                    ? `/drive/folder/${crumb.id}`
+                    : "/drive"
                 }
                 className="text-muted-foreground hover:text-foreground"
               >

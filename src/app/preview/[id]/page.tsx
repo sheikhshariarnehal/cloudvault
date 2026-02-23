@@ -43,7 +43,7 @@ export default async function PreviewPage({
       <header className="bg-[#202124] h-16 px-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <a
-            href="/dashboard"
+            href="/drive"
             className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
           >
             <ArrowLeft className="h-5 w-5" />

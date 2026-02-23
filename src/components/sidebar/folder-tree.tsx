@@ -68,7 +68,7 @@ function FolderTreeItem({
           <span className="w-4" />
         )}
         <Link
-          href={`/dashboard/folder/${folder.id}`}
+          href={`/drive/folder/${folder.id}`}
           className="flex items-center gap-3 flex-1 min-w-0"
         >
           <Folder

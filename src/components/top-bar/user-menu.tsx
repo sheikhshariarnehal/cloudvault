@@ -85,7 +85,7 @@ export function UserMenu() {
 
         <DropdownMenuItem
           className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 cursor-pointer"
-          onClick={() => router.push("/dashboard/settings")}
+          onClick={() => router.push("/drive/settings")}
         >
           <UserRound className="h-4 w-4 text-gray-500 flex-shrink-0" />
           Profile
@@ -93,7 +93,7 @@ export function UserMenu() {
 
         <DropdownMenuItem
           className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 cursor-pointer"
-          onClick={() => router.push("/dashboard/settings")}
+          onClick={() => router.push("/drive/settings")}
         >
           <Settings className="h-4 w-4 text-gray-500 flex-shrink-0" />
           Settings

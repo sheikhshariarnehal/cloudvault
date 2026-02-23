@@ -35,12 +35,12 @@ import {
 } from "lucide-react";
 
 const navItems: Array<{ href: string; label: string; icon: LucideIcon; badge?: string }> = [
-  { href: "/dashboard", label: "All Files", icon: FolderOpen },
-  { href: "/dashboard/recent", label: "Recent", icon: Image },
-  { href: "/dashboard/starred", label: "Starred", icon: Star },
-  { href: "/dashboard/shared", label: "Shared Files", icon: Users },
-  { href: "/dashboard/trash", label: "Trash", icon: Trash2 },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/drive", label: "All Files", icon: FolderOpen },
+  { href: "/drive/recent", label: "Recent", icon: Image },
+  { href: "/drive/starred", label: "Starred", icon: Star },
+  { href: "/drive/shared", label: "Shared Files", icon: Users },
+  { href: "/drive/trash", label: "Trash", icon: Trash2 },
+  { href: "/drive/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {

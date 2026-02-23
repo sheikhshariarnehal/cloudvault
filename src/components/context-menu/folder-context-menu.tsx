@@ -62,7 +62,7 @@ export function FolderContextMenu({ folder }: FolderContextMenuProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
         <DropdownMenuItem asChild>
-          <NextLink href={`/dashboard/folder/${folder.id}`}>
+          <NextLink href={`/drive/folder/${folder.id}`}>
             <FolderOpen className="h-4 w-4 mr-2" /> Open
           </NextLink>
         </DropdownMenuItem>

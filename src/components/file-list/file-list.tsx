@@ -261,7 +261,7 @@ function FolderRow({ folder, isSelected, onToggle }: { folder: DbFolder; isSelec
       return;
     }
 
-    window.location.href = `/dashboard/folder/${folder.id}`;
+    window.location.href = `/drive/folder/${folder.id}`;
   };
 
   return (

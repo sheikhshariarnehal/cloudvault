@@ -20,7 +20,7 @@ export function FolderGrid({ folders }: FolderGridProps) {
           className="group relative flex items-center gap-3 rounded-xl border border-[#dadce0] bg-white px-3 py-2.5 hover:shadow-md transition-shadow duration-200 cursor-pointer"
         >
           <Link
-            href={`/dashboard/folder/${folder.id}`}
+            href={`/drive/folder/${folder.id}`}
             className="flex items-center gap-3 flex-1 min-w-0"
           >
             <Folder
