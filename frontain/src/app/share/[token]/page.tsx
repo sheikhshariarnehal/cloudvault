@@ -615,7 +615,7 @@ export default function SharePage() {
               <h2 className="text-xs font-medium text-white/40 uppercase tracking-wider mb-3">
                 Files
               </h2>
-              <div className="bg-white/5 rounded-lg overflow-hidden divide-y divide-white/5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {files.map((file) => {
                   const category = getFileCategory(file.mime_type);
                   const downloadUrl = `/api/share/${token}?downloadFileId=${file.id}`;
@@ -626,58 +626,56 @@ export default function SharePage() {
                   return (
                     <div
                       key={file.id}
-                      className={`flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors group ${canPreview ? "cursor-pointer" : ""}`}
+                      className={`group relative flex flex-col bg-white/5 rounded-xl border border-white/10 overflow-hidden hover:bg-white/10 transition-colors ${canPreview ? "cursor-pointer" : ""}`}
                       onClick={() => canPreview && setPreviewFileId(file.id)}
                     >
-                      {/* Thumbnail for images */}
-                      {isImage ? (
-                        <div className="h-10 w-10 rounded overflow-hidden bg-white/10 shrink-0">
+                      {/* Thumbnail area */}
+                      <div className="aspect-square w-full bg-black/20 flex items-center justify-center relative overflow-hidden">
+                        {isImage ? (
                           <img
                             src={previewUrl}
                             alt={file.name}
                             className="h-full w-full object-cover"
                             loading="lazy"
                           />
-                        </div>
-                      ) : (
-                        <div
-                          className={`shrink-0 ${getFileIconColor(file.mime_type)}`}
+                        ) : (
+                          <div className={getFileIconColor(file.mime_type)}>
+                            {getCategoryIcon(category, "lg")}
+                          </div>
+                        )}
+                        
+                        {/* Hover overlay for actions */}
+                        <div 
+                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3" 
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {getCategoryIcon(category, "sm")}
+                          {canPreview && (
+                            <button
+                              onClick={() => setPreviewFileId(file.id)}
+                              className="p-2.5 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors backdrop-blur-sm"
+                              title="Preview"
+                            >
+                              <Eye className="h-5 w-5" />
+                            </button>
+                          )}
+                          <a
+                            href={downloadUrl}
+                            className="p-2.5 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors backdrop-blur-sm"
+                            title="Download"
+                          >
+                            <Download className="h-5 w-5" />
+                          </a>
                         </div>
-                      )}
+                      </div>
 
                       {/* File info */}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-white/90 truncate">
+                      <div className="p-3 flex flex-col gap-0.5">
+                        <p className="text-sm text-white/90 truncate font-medium" title={file.name}>
                           {file.name}
                         </p>
                         <p className="text-xs text-white/40">
                           {formatFileSize(file.size_bytes)}
                         </p>
-                      </div>
-
-                      {/* Actions */}
-                      <div
-                        className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {canPreview && (
-                          <button
-                            onClick={() => setPreviewFileId(file.id)}
-                            className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors"
-                            title="Preview"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                        )}
-                        <a
-                          href={downloadUrl}
-                          className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors"
-                          title="Download"
-                        >
-                          <Download className="h-4 w-4" />
-                        </a>
                       </div>
                     </div>
                   );

@@ -26,6 +26,7 @@ export default function DashboardLayout({
   const { setFiles, setFolders, setIsLoading, currentFolderId } = useFilesStore();
   const { sidebarOpen, setSidebarOpen, isOnline, setIsOnline } = useUIStore();
 
+
   // Set up realtime subscriptions
   useRealtimeFiles(user?.id ?? null, guestSessionId);
 
@@ -117,7 +118,7 @@ export default function DashboardLayout({
 
   return (
     <UploadZone folderId={currentFolderId}>
-      <div className="flex h-dvh bg-gray-50 overflow-hidden">
+      <div className="flex h-dvh bg-[#f8fafd] overflow-hidden">
         {/* Desktop Sidebar — fixed, full height */}
         <aside className="hidden lg:flex w-[280px] flex-shrink-0">
           <Sidebar />
@@ -142,9 +143,11 @@ export default function DashboardLayout({
 
           <TopBar />
 
-          <main className="flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-[1600px] px-5 sm:px-8 lg:px-10 py-6 sm:py-8">
-              {children}
+          <main className="flex-1 overflow-hidden px-2 pb-2 sm:px-3 sm:pb-3">
+            <div className="bg-white rounded-2xl h-full shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+              <div className="flex-1 overflow-y-auto mx-auto w-full max-w-[1600px] px-5 sm:px-8 lg:px-10 py-5 sm:py-6">
+                {children}
+              </div>
             </div>
           </main>
         </div>

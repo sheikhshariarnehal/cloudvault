@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Loader2, AlertCircle, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Loader2,
+  AlertCircle,
+  Download,
+  RefreshCw,
+  ExternalLink,
+  Terminal,
+} from "lucide-react";
+
+/* ═══════════════════════════════════════════════════════════════
+   Types
+   ═══════════════════════════════════════════════════════════════ */
 
 interface PptxPreviewProps {
   src: string;
@@ -9,410 +20,303 @@ interface PptxPreviewProps {
   onDownload?: () => void;
 }
 
-/** Represents a text block extracted from a shape on a slide. */
-interface TextBlock {
-  /** "title" | "ctrTitle" | "subTitle" | "body" | "other" */
-  role: string;
-  paragraphs: string[];
-  /** Bullet level per paragraph (0 = no bullet) */
-  levels: number[];
+type ViewerMode = "office" | "google";
+
+/* ═══════════════════════════════════════════════════════════════
+   Helpers
+   ═══════════════════════════════════════════════════════════════ */
+
+function getPublicOrigin(): string {
+  if (typeof window === "undefined") return "";
+  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+    window.location.origin;
 }
 
-interface SlideData {
-  index: number;
-  blocks: TextBlock[];
-  notes: string;
+function isRunningOnLocalhost(): boolean {
+  if (typeof window === "undefined") return false;
+  const h = window.location.hostname;
+  return h === "localhost" || h === "127.0.0.1" || h === "[::1]";
 }
 
-/* ── Namespace helpers ── */
-const NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main";
-const NS_P = "http://schemas.openxmlformats.org/presentationml/2006/main";
+/* ═══════════════════════════════════════════════════════════════
+   Main exported component
+   ═══════════════════════════════════════════════════════════════ */
 
-/** Walk <p:sp> shapes and group text by placeholder type. */
-function extractShapeBlocks(doc: Document): TextBlock[] {
-  const shapes = doc.getElementsByTagNameNS(NS_P, "sp");
-  const blocks: TextBlock[] = [];
-
-  for (let s = 0; s < shapes.length; s++) {
-    const shape = shapes[s];
-
-    // Determine placeholder type  <p:ph type="title|ctrTitle|subTitle|body|..."/>
-    let role = "other";
-    const phElements = shape.getElementsByTagNameNS(NS_P, "ph");
-    if (phElements.length > 0) {
-      role = phElements[0].getAttribute("type") || "body";
-    }
-
-    // Extract paragraphs (<a:p>) from the shape's text body
-    const txBody = shape.getElementsByTagNameNS(NS_P, "txBody");
-    const bodyEl = txBody.length > 0 ? txBody[0] : shape;
-    const paras = bodyEl.getElementsByTagNameNS(NS_A, "p");
-    const paragraphs: string[] = [];
-    const levels: number[] = [];
-
-    for (let p = 0; p < paras.length; p++) {
-      const pNode = paras[p];
-      const runs = pNode.getElementsByTagNameNS(NS_A, "t");
-      let text = "";
-      for (let r = 0; r < runs.length; r++) {
-        text += runs[r].textContent || "";
-      }
-      if (text.trim()) {
-        paragraphs.push(text);
-        // Bullet level from <a:pPr lvl="1">
-        const pPr = pNode.getElementsByTagNameNS(NS_A, "pPr");
-        const lvl = pPr.length > 0 ? parseInt(pPr[0].getAttribute("lvl") || "0", 10) : 0;
-        levels.push(lvl);
-      }
-    }
-
-    if (paragraphs.length > 0) {
-      blocks.push({ role, paragraphs, levels });
-    }
-  }
-  return blocks;
-}
-
-/**
- * Client-side PPTX preview — Google-Slides-style layout with a left
- * thumbnail panel, a centred slide card, and keyboard navigation.
- */
 export function PptxPreview({ src, fileName, onDownload }: PptxPreviewProps) {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [slides, setSlides] = useState<SlideData[]>([]);
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [showNotes, setShowNotes] = useState(false);
-  const thumbListRef = useRef<HTMLDivElement>(null);
+  const [publicOrigin, setPublicOrigin] = useState<string | null>(null);
 
-  /* ── Keyboard navigation ── */
-  const goPrev = useCallback(() => setCurrentSlide((s) => Math.max(0, s - 1)), []);
-  const goNext = useCallback(
-    () => setCurrentSlide((s) => Math.min(slides.length - 1, s + 1)),
-    [slides.length]
-  );
+  useEffect(() => { setPublicOrigin(getPublicOrigin()); }, []);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); goPrev(); }
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); goNext(); }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [goPrev, goNext]);
-
-  /* ── Auto-scroll thumbnail into view ── */
-  useEffect(() => {
-    const list = thumbListRef.current;
-    if (!list) return;
-    const active = list.querySelector(`[data-slide-index="${currentSlide}"]`) as HTMLElement | null;
-    active?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [currentSlide]);
-
-  /* ── Parse PPTX ── */
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const res = await fetch(src);
-        if (!res.ok) throw new Error(`Failed to fetch file (${res.status})`);
-        const buffer = await res.arrayBuffer();
-        if (cancelled) return;
-
-        const JSZip = (await import("jszip")).default;
-        const zip = await JSZip.loadAsync(buffer);
-
-        // Collect slide file entries
-        const slideFiles: { index: number; path: string }[] = [];
-        zip.forEach((p) => {
-          const m = p.match(/^ppt\/slides\/slide(\d+)\.xml$/);
-          if (m) slideFiles.push({ index: parseInt(m[1], 10), path: p });
-        });
-        slideFiles.sort((a, b) => a.index - b.index);
-
-        if (slideFiles.length === 0) throw new Error("No slides found in this file");
-
-        const parser = new DOMParser();
-        const extracted: SlideData[] = [];
-
-        for (const sf of slideFiles) {
-          const xml = await zip.file(sf.path)!.async("string");
-          const doc = parser.parseFromString(xml, "application/xml");
-          const blocks = extractShapeBlocks(doc);
-
-          // Notes
-          let notes = "";
-          const noteFile = zip.file(`ppt/notesSlides/notesSlide${sf.index}.xml`);
-          if (noteFile) {
-            try {
-              const nxml = await noteFile.async("string");
-              const ndoc = parser.parseFromString(nxml, "application/xml");
-              const nts = ndoc.getElementsByTagNameNS(NS_A, "t");
-              const parts: string[] = [];
-              for (let i = 0; i < nts.length; i++) {
-                const t = nts[i].textContent?.trim();
-                if (t && !/^\d+$/.test(t)) parts.push(t);
-              }
-              notes = parts.join(" ");
-            } catch { /* ignore */ }
-          }
-
-          extracted.push({ index: sf.index, blocks, notes });
-        }
-
-        if (!cancelled) { setSlides(extracted); setCurrentSlide(0); }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to parse PPTX");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [src]);
-
-  /* ── Loading state ── */
-  if (loading) {
+  if (publicOrigin === null) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
-        <div className="text-center">
-          <Loader2 className="h-10 w-10 text-white/40 animate-spin mx-auto mb-3" />
-          <p className="text-sm text-white/50">Parsing PowerPoint…</p>
-        </div>
+        <Loader2 className="h-8 w-8 text-white/30 animate-spin" />
       </div>
     );
   }
 
-  /* ── Error state ── */
-  if (error) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]">
-        <div className="text-center max-w-md">
-          <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-3" />
-          <p className="text-white font-medium mb-2">Cannot preview PowerPoint</p>
-          <p className="text-sm text-white/50 mb-4">{error}</p>
-          {onDownload && (
-            <button onClick={onDownload} className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#8ab4f8] text-[#202124] rounded-full text-sm font-medium hover:bg-[#aecbfa] transition-colors">
-              <Download className="h-4 w-4" /> Download File
-            </button>
-          )}
-        </div>
-      </div>
-    );
+  if (isRunningOnLocalhost() && !process.env.NEXT_PUBLIC_APP_URL) {
+    return <LocalhostSetupGuide fileName={fileName} onDownload={onDownload} />;
   }
-
-  const slide = slides[currentSlide];
-  const hasAnyNotes = slides.some((s) => s.notes);
 
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden bg-[#1a1a1a]">
-      {/* ═══ Main area: thumbnail sidebar + slide ═══ */}
-      <div className="flex-1 flex overflow-hidden">
+    <IframeViewer
+      fileUrl={publicOrigin + src}
+      fileName={fileName}
+      onDownload={onDownload}
+    />
+  );
+}
 
-        {/* ── Left: Slide thumbnail panel ── */}
-        <div
-          ref={thumbListRef}
-          className="w-[180px] flex-shrink-0 overflow-y-auto border-r border-white/[0.08] bg-[#1e1e1e] py-3 px-3 space-y-2 hidden md:block"
-        >
-          {slides.map((s, idx) => {
-            const isActive = idx === currentSlide;
-            const title = s.blocks.find((b) => b.role === "title" || b.role === "ctrTitle")?.paragraphs[0]
-              || s.blocks[0]?.paragraphs[0]
-              || "";
-            const subtitle = s.blocks.find((b) => b.role === "subTitle")?.paragraphs[0]
-              || (s.blocks.find((b) => b.role === "body")?.paragraphs[0])
-              || "";
+/* ═══════════════════════════════════════════════════════════════
+   Iframe viewer — full-view, auto-hiding switcher
+   ═══════════════════════════════════════════════════════════════ */
 
-            return (
-              <div
-                key={idx}
-                data-slide-index={idx}
-                onClick={() => setCurrentSlide(idx)}
-                className={`group relative cursor-pointer rounded-md transition-all duration-150 ${
-                  isActive
-                    ? "ring-2 ring-[#4285f4]"
-                    : "ring-1 ring-white/[0.08] hover:ring-white/20"
-                }`}
-              >
-                {/* Slide number badge */}
-                <span className={`absolute -left-0.5 top-1 text-[10px] font-medium w-5 text-center ${
-                  isActive ? "text-[#8ab4f8]" : "text-white/30"
-                }`}>
-                  {idx + 1}
-                </span>
+function IframeViewer({
+  fileUrl,
+  fileName,
+  onDownload,
+}: {
+  fileUrl: string;
+  fileName: string;
+  onDownload?: () => void;
+}) {
+  const [mode, setMode] = useState<ViewerMode>("office");
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [showSwitcher, setShowSwitcher] = useState(true);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-                {/* Mini slide card */}
-                <div className="bg-white rounded-[4px] aspect-[16/10] overflow-hidden px-3 py-2 flex flex-col justify-center ml-1">
-                  {title && (
-                    <p className="text-[7px] font-bold text-gray-900 leading-tight truncate">
-                      {title}
-                    </p>
-                  )}
-                  {subtitle && (
-                    <p className="text-[6px] text-gray-500 leading-tight truncate mt-0.5">
-                      {subtitle}
-                    </p>
-                  )}
-                  {!title && !subtitle && (
-                    <p className="text-[6px] text-gray-300 italic text-center">Empty</p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+  // Office Online: wdAr=2 enables 16:9 widescreen, action=embedview for full embed
+  const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}&wdAr=2`;
+  const googleUrl = `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+  const viewerUrl = mode === "office" ? officeUrl : googleUrl;
 
-        {/* ── Centre: Current slide view ── */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Slide canvas area */}
-          <div className="flex-1 flex items-center justify-center p-4 md:p-8 relative">
-            {/* Prev button */}
-            <button
-              onClick={goPrev}
-              disabled={currentSlide === 0}
-              className="absolute left-2 md:left-5 z-10 p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-full disabled:opacity-0 disabled:pointer-events-none transition-all"
-              title="Previous slide"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
+  const currentViewer = mode === "office" ? "Microsoft Office Online" : "Google Docs Viewer";
+  const otherViewer  = mode === "office" ? "Google Docs" : "Office Online";
 
-            {/* ─ Slide card ─ */}
-            <div className="w-full max-w-4xl mx-auto">
-              <div className="relative bg-white rounded shadow-[0_2px_20px_rgba(0,0,0,0.35)] aspect-[16/9.5] overflow-hidden">
-                <div className="absolute inset-0 overflow-auto px-[8%] py-[6%] flex flex-col">
-                  {slide && slide.blocks.length > 0 ? (
-                    slide.blocks.map((block, bi) => {
-                      // Title shapes
-                      if (block.role === "title" || block.role === "ctrTitle") {
-                        const isCentre = block.role === "ctrTitle";
-                        return (
-                          <div key={bi} className={`mb-5 ${isCentre ? "text-center mt-auto" : ""}`}>
-                            {block.paragraphs.map((t, pi) => (
-                              <h2
-                                key={pi}
-                                className={`font-bold text-[#1a1a2e] leading-tight ${
-                                  isCentre
-                                    ? "text-2xl md:text-4xl"
-                                    : "text-xl md:text-3xl"
-                                }`}
-                              >
-                                {t}
-                              </h2>
-                            ))}
-                          </div>
-                        );
-                      }
+  // Reset loading state on viewer/url change
+  useEffect(() => {
+    setLoading(true);
+    setFailed(false);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => { setLoading(false); setFailed(true); }, 30_000);
+    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
+  }, [mode, fileUrl]);
 
-                      // Subtitle shapes
-                      if (block.role === "subTitle") {
-                        return (
-                          <div key={bi} className="mb-5 text-center">
-                            {block.paragraphs.map((t, pi) => (
-                              <p key={pi} className="text-base md:text-xl text-gray-500 leading-snug">
-                                {t}
-                              </p>
-                            ))}
-                          </div>
-                        );
-                      }
+  // Auto-hide switcher after 3s once loaded
+  useEffect(() => {
+    if (!loading && !failed) {
+      hideTimerRef.current = setTimeout(() => setShowSwitcher(false), 3000);
+    } else {
+      setShowSwitcher(true);
+    }
+    return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
+  }, [loading, failed]);
 
-                      // Body / bullet content
-                      return (
-                        <div key={bi} className="mb-4">
-                          {block.paragraphs.map((t, pi) => {
-                            const lvl = block.levels[pi] || 0;
-                            const ml = lvl * 20;
-                            const bullet = lvl === 0 ? "•" : lvl === 1 ? "◦" : "▪";
-                            return (
-                              <div
-                                key={pi}
-                                className="flex items-start gap-2 mb-1"
-                                style={{ marginLeft: ml }}
-                              >
-                                <span className="text-gray-400 mt-[3px] flex-shrink-0 text-sm select-none">
-                                  {bullet}
-                                </span>
-                                <p className="text-sm md:text-base text-gray-700 leading-relaxed">
-                                  {t}
-                                </p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="flex-1 flex items-center justify-center">
-                      <p className="text-gray-300 italic text-sm">(No text content on this slide)</p>
-                    </div>
-                  )}
-                </div>
+  const handleLoad = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setLoading(false);
+    setFailed(false);
+  }, []);
 
-                {/* Slide number watermark */}
-                <span className="absolute bottom-3 right-4 text-[11px] text-gray-300 font-medium select-none">
-                  {currentSlide + 1}
-                </span>
-              </div>
-            </div>
+  const retry = useCallback(() => {
+    setLoading(true);
+    setFailed(false);
+    if (iframeRef.current) {
+      const u = new URL(viewerUrl);
+      u.searchParams.set("_t", Date.now().toString());
+      iframeRef.current.src = u.toString();
+    }
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => { setLoading(false); setFailed(true); }, 30_000);
+  }, [viewerUrl]);
 
-            {/* Next button */}
-            <button
-              onClick={goNext}
-              disabled={currentSlide === slides.length - 1}
-              className="absolute right-2 md:right-5 z-10 p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-full disabled:opacity-0 disabled:pointer-events-none transition-all"
-              title="Next slide"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </button>
-          </div>
+  const handleMouseMove = useCallback(() => {
+    setShowSwitcher(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    if (!loading && !failed) {
+      hideTimerRef.current = setTimeout(() => setShowSwitcher(false), 3000);
+    }
+  }, [loading, failed]);
 
-          {/* Speaker notes panel (collapsible) */}
-          {hasAnyNotes && showNotes && slide?.notes && (
-            <div className="border-t border-white/[0.08] bg-[#252526] px-6 py-3 max-h-28 overflow-y-auto flex-shrink-0">
-              <p className="text-[11px] text-white/30 uppercase tracking-wider mb-1 font-medium">Speaker Notes</p>
-              <p className="text-sm text-white/60 leading-relaxed">{slide.notes}</p>
-            </div>
-          )}
-        </div>
+  return (
+    <div
+      className="w-full h-full relative overflow-hidden bg-[#1a1a1a]"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => { if (!loading && !failed) setShowSwitcher(false); }}
+    >
+      {/* ── Floating viewer switcher — auto-hides ── */}
+      <div
+        className={`absolute top-2 right-2 z-30 flex items-center gap-0.5 rounded-lg bg-black/60 backdrop-blur-md p-0.5 shadow-xl transition-all duration-300 ${
+          showSwitcher ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none"
+        }`}
+      >
+        {(["office", "google"] as ViewerMode[]).map((v) => (
+          <button
+            key={v}
+            onClick={() => setMode(v)}
+            className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all ${
+              mode === v
+                ? "bg-[#0078d4] text-white shadow-md"
+                : "text-white/50 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            {v === "office" ? "Office" : "Google"}
+          </button>
+        ))}
       </div>
 
-      {/* ═══ Bottom bar ═══ */}
-      <div className="flex items-center justify-between h-10 px-4 bg-[#252526] border-t border-white/[0.08] flex-shrink-0">
-        {/* Left: slide position */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-white/50">
-            Slide <span className="text-white/80 font-medium">{currentSlide + 1}</span> of{" "}
-            <span className="text-white/80 font-medium">{slides.length}</span>
-          </span>
+      {/* Loading */}
+      {loading && !failed && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-[#1a1a1a]">
+          <Loader2 className="h-10 w-10 text-[#0078d4] animate-spin" />
+          <p className="text-sm text-white/50">
+            Loading <span className="text-white/70 font-medium">{currentViewer}</span>…
+          </p>
+        </div>
+      )}
+
+      {/* Error */}
+      {failed && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#1a1a1a]">
+          <div className="text-center max-w-md px-6">
+            <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+            <p className="text-white font-semibold text-base mb-1">Preview failed</p>
+            <p className="text-sm text-white/50 mb-6">
+              {currentViewer} could not load this file. It may be too large or not publicly reachable.
+            </p>
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <button onClick={retry} className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/15 transition-colors">
+                <RefreshCw className="h-4 w-4" /> Retry
+              </button>
+              <button onClick={() => setMode(mode === "office" ? "google" : "office")} className="inline-flex items-center gap-2 px-4 py-2 bg-[#0078d4]/80 text-white rounded-lg text-sm hover:bg-[#0078d4] transition-colors">
+                <ExternalLink className="h-4 w-4" /> Try {otherViewer}
+              </button>
+              {onDownload && (
+                <button onClick={onDownload} className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white/80 rounded-lg text-sm hover:bg-white/15 transition-colors">
+                  <Download className="h-4 w-4" /> Download
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-screen iframe — no wrappers, no padding, 100% of container */}
+      <iframe
+        ref={iframeRef}
+        src={viewerUrl}
+        onLoad={handleLoad}
+        title={`PowerPoint: ${fileName}`}
+        className="absolute inset-0 w-full h-full border-0"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"
+        allowFullScreen
+      />
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Localhost setup guide — shown when NEXT_PUBLIC_APP_URL is not set
+   ═══════════════════════════════════════════════════════════════ */
+
+function LocalhostSetupGuide({
+  fileName,
+  onDownload,
+}: {
+  fileName: string;
+  onDownload?: () => void;
+}) {
+  const isLegacy = fileName.toLowerCase().endsWith(".ppt") &&
+    !fileName.toLowerCase().endsWith(".pptx");
+
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a] p-6">
+      <div className="w-full max-w-lg">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-xl bg-[#0078d4]/20 flex items-center justify-center flex-shrink-0">
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+              <rect x="2" y="3" width="20" height="18" rx="2" fill="#0078d4" fillOpacity=".7"/>
+              <path d="M7 8h10M7 12h8M7 16h6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm">Microsoft Office Online Preview</p>
+            <p className="text-white/40 text-xs">Requires a public URL to fetch your file</p>
+          </div>
         </div>
 
-        {/* Centre: mini pager (mobile replacement for sidebar) */}
-        <div className="flex items-center gap-1 md:hidden">
-          <button onClick={goPrev} disabled={currentSlide === 0} className="p-1 text-white/40 hover:text-white disabled:opacity-30 transition-colors">
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button onClick={goNext} disabled={currentSlide === slides.length - 1} className="p-1 text-white/40 hover:text-white disabled:opacity-30 transition-colors">
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
+        {isLegacy ? (
+          <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-5 mb-4">
+            <p className="text-white/70 text-sm">
+              Legacy <span className="font-mono text-white/90">.ppt</span> files (PowerPoint 97–2003)
+              can be previewed via Office Online once the app is deployed.
+              Convert to <span className="font-mono text-white/90">.pptx</span> for best results.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Step-by-step */}
+            <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] overflow-hidden mb-4">
+              <div className="px-5 py-3 border-b border-white/[0.06]">
+                <p className="text-white/60 text-xs font-medium uppercase tracking-wider">
+                  Enable on localhost using ngrok
+                </p>
+              </div>
+              <div className="divide-y divide-white/[0.05]">
+                {[
+                  {
+                    n: "1",
+                    label: "Install ngrok",
+                    code: "winget install ngrok",
+                  },
+                  {
+                    n: "2",
+                    label: "Start a tunnel (while your app runs on :3000)",
+                    code: "ngrok http 3000",
+                  },
+                  {
+                    n: "3",
+                    label: "Copy the https URL, add to .env.local, restart",
+                    code: "NEXT_PUBLIC_APP_URL=https://xxxx.ngrok.io",
+                  },
+                ].map(({ n, label, code }) => (
+                  <div key={n} className="flex gap-3 px-5 py-3.5">
+                    <span className="w-5 h-5 rounded-full bg-[#0078d4]/30 text-[#0078d4] text-[11px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {n}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-white/60 text-xs mb-1.5">{label}</p>
+                      <div className="flex items-center gap-2 bg-black/30 rounded-md px-3 py-1.5">
+                        <Terminal className="h-3 w-3 text-white/30 flex-shrink-0" />
+                        <code className="text-[11px] text-green-400 font-mono">{code}</code>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-        {/* Right: notes toggle */}
-        <div className="flex items-center gap-2">
-          {hasAnyNotes && (
+            <p className="text-white/30 text-xs text-center mb-5">
+              On production (Vercel / Railway) this works automatically — no env var needed.
+            </p>
+          </>
+        )}
+
+        {onDownload && (
+          <div className="flex justify-center">
             <button
-              onClick={() => setShowNotes((n) => !n)}
-              className={`px-2.5 py-1 text-[11px] rounded transition-colors ${
-                showNotes ? "bg-white/10 text-white/80" : "text-white/40 hover:text-white/60"
-              }`}
+              onClick={onDownload}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0078d4] text-white rounded-full text-sm font-medium hover:bg-[#106ebe] transition-colors"
             >
-              Notes
+              <Download className="h-4 w-4" /> Download to view locally
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

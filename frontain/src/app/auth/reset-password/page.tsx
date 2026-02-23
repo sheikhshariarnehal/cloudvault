@@ -61,7 +61,7 @@ export default function ResetPasswordPage() {
       });
       if (error) throw error;
       setSuccess(true);
-      setTimeout(() => router.push("/dashboard"), 2000);
+      setTimeout(() => router.push("/drive"), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reset password");
     } finally {
@@ -77,7 +77,7 @@ export default function ResetPasswordPage() {
             <CheckCircle className="h-7 w-7 text-green-600" />
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Password updated!</h2>
-          <p className="text-sm text-gray-500">Redirecting to your dashboard...</p>
+          <p className="text-sm text-gray-500">Redirecting to your drive...</p>
         </div>
       </div>
     );

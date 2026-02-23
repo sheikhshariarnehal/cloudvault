@@ -6,7 +6,7 @@ import { NotificationPopover } from "@/components/top-bar/notification-popover";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/store/ui-store";
 import { useAuth } from "@/app/providers/auth-provider";
-import { Menu, Upload, LogIn, UserRoundPlus } from "lucide-react";
+import { Menu, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export function TopBar() {
@@ -17,63 +17,62 @@ export function TopBar() {
   const isAuthenticated = !isGuest && !!user;
 
   return (
-    <header className="flex items-center gap-2 sm:gap-4 px-4 sm:px-6 lg:px-8 h-16 bg-white border-b border-gray-100 shrink-0 shadow-sm">
-      {/* Mobile hamburger */}
+    <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 h-16 bg-[#f8fafd] shrink-0 sticky top-0 z-40">
+      {/* Mobile hamburger — hidden on desktop */}
       <Button
         variant="ghost"
         size="icon"
-        className="lg:hidden h-9 w-9 flex-shrink-0 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+        className="flex-shrink-0 lg:hidden h-9 w-9 text-gray-600 hover:text-gray-900 hover:bg-gray-200/70 rounded-full"
         onClick={toggleSidebar}
         aria-label="Toggle sidebar"
       >
         <Menu className="h-5 w-5" />
       </Button>
 
-      {/* Search */}
-      <div className="flex-1 min-w-0 max-w-xl">
+      {/* Search — grows to fill available space, centered within it */}
+      <div className="flex-1 min-w-0 flex items-center justify-center">
         <SearchBar />
       </div>
 
       {/* Right actions */}
-      <div className="flex items-center gap-1 sm:gap-2 ml-auto flex-shrink-0">
+      <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
         {/* Mobile upload shortcut */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="lg:hidden h-9 w-9 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-          onClick={() => openFilePicker?.()}
-          aria-label="Upload file"
-        >
-          <Upload className="h-5 w-5" />
-        </Button>
+        {isAuthenticated && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden h-9 w-9 text-gray-600 hover:text-gray-900 hover:bg-gray-200/70 rounded-full"
+            onClick={() => openFilePicker?.()}
+            aria-label="Upload file"
+          >
+            <Upload className="h-4.5 w-4.5" />
+          </Button>
+        )}
 
-        {/* Notifications — only for authenticated users */}
+        {/* Notifications */}
         {isAuthenticated && <NotificationPopover />}
 
-        {/* Auth state: guest → login + signup buttons; loading → skeleton; logged in → user menu */}
+        {/* Auth state */}
         {isLoading ? (
-          <div className="h-8 w-8 rounded-full bg-gray-100 animate-pulse" />
+          <div className="h-9 w-9 rounded-full bg-gray-200 animate-pulse" />
         ) : isAuthenticated ? (
           <UserMenu />
         ) : (
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-2">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-9 px-3 sm:px-4 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+              className="hidden sm:flex h-9 px-5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-full shadow-none transition-colors"
               onClick={() => router.push("/auth/login")}
             >
-              <LogIn className="h-4 w-4 sm:mr-1.5 shrink-0" />
-              <span className="hidden sm:inline">Log in</span>
+              Login
             </Button>
             <Button
-              variant="default"
               size="sm"
-              className="h-9 px-3 sm:px-4 text-sm font-semibold bg-gray-900 hover:bg-gray-800 text-white rounded-lg shadow-sm"
+              className="h-9 px-5 text-sm font-medium bg-[#1a73e8] hover:bg-[#1558b0] text-white border-0 rounded-full shadow-none transition-colors"
               onClick={() => router.push("/auth/signup")}
             >
-              <UserRoundPlus className="h-4 w-4 sm:mr-1.5 shrink-0" />
-              <span className="hidden sm:inline">Sign up</span>
+              Sign up
             </Button>
           </div>
         )}

@@ -47,7 +47,7 @@ export default function SignUpPage() {
 
       // If user is auto-confirmed (session exists), redirect to dashboard directly
       if (data.session) {
-        router.push("/dashboard");
+        router.push("/drive");
         return;
       }
 

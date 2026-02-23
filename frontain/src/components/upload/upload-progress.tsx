@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useFilesStore } from "@/store/files-store";
-import { X, ChevronDown, ChevronUp, Check, AlertCircle, Share2 } from "lucide-react";
+import { X, ChevronDown, ChevronUp, Check, AlertCircle, Share2, Copy } from "lucide-react";
 
 /* ── helpers ─────────────────────────────────────────────────────── */
 
@@ -57,6 +57,10 @@ export function UploadProgress() {
     () => uploadQueue.filter((i) => i.status === "success").length,
     [uploadQueue],
   );
+  const duplicateCount = useMemo(
+    () => uploadQueue.filter((i) => i.status === "duplicate").length,
+    [uploadQueue],
+  );
   const activeCount = useMemo(
     () => uploadQueue.filter((i) => i.status === "uploading" || i.status === "pending").length,
     [uploadQueue],
@@ -65,6 +69,7 @@ export function UploadProgress() {
     () => uploadQueue.filter((i) => i.status === "error").length,
     [uploadQueue],
   );
+  const doneCount = successCount + duplicateCount;
   const allDone = activeCount === 0 && uploadQueue.length > 0;
   const totalCount = uploadQueue.length;
 
@@ -104,7 +109,7 @@ export function UploadProgress() {
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
               {allDone
-                ? `${successCount} of ${totalCount} transfers completed`
+                ? `${doneCount} of ${totalCount} completed${duplicateCount > 0 ? ` · ${duplicateCount} duplicate${duplicateCount > 1 ? "s" : ""}` : ""}`
                 : `${overallPercent}% completed`}
             </p>
           </div>
@@ -163,6 +168,11 @@ export function UploadProgress() {
                     <Check className="h-3 w-3 text-white" strokeWidth={3} />
                   </div>
                 )}
+                {item.status === "duplicate" && (
+                  <div className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center">
+                    <Copy className="h-3 w-3 text-white" strokeWidth={3} />
+                  </div>
+                )}
                 {item.status === "error" && (
                   <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
                     <AlertCircle className="h-3 w-3 text-white" strokeWidth={3} />
@@ -180,6 +190,9 @@ export function UploadProgress() {
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5 leading-tight">
                   {item.status === "success" && "Uploaded"}
+                  {item.status === "duplicate" && (
+                    <span className="text-amber-600">Duplicate — linked to existing file</span>
+                  )}
                   {item.status === "error" && (
                     <span className="text-red-500">{item.error || "Upload failed"}</span>
                   )}

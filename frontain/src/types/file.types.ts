@@ -20,12 +20,10 @@ const OFFICE_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",     // .docx
   "application/vnd.ms-excel",                                                    // .xls
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",           // .xlsx
-  "application/vnd.ms-powerpoint",                                               // .ppt
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",   // .pptx
 ];
 
-/** Extensions accepted by the Office Online Viewer. */
-const OFFICE_EXTENSIONS = ["doc", "docx", "xls", "xlsx", "ppt", "pptx"];
+/** Extensions accepted by the Office client-side previewer (Word & Excel only). */
+const OFFICE_EXTENSIONS = ["doc", "docx", "xls", "xlsx"];
 
 /**
  * Returns true when the file can be previewed with Microsoft Office Online.
@@ -50,12 +48,21 @@ export function isCsvFile(mimeType: string, fileName?: string): boolean {
   return false;
 }
 
-/** Extensions recognised as PowerPoint presentations. */
-const PPTX_EXTENSIONS = ["ppt", "pptx"];
+/** Extensions recognised as PowerPoint presentations (modern XML-based only). */
+const PPTX_EXTENSIONS = ["pptx"];
 const PPTX_MIME_TYPES = [
-  "application/vnd.ms-powerpoint",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ];
+
+/**
+ * Returns true when the file is a legacy binary PowerPoint (.ppt) that
+ * cannot be previewed client-side.
+ */
+export function isLegacyPptFile(mimeType: string, fileName?: string): boolean {
+  if (mimeType === "application/vnd.ms-powerpoint") return true;
+  if (fileName) return fileName.toLowerCase().endsWith(".ppt") && !fileName.toLowerCase().endsWith(".pptx");
+  return false;
+}
 
 /**
  * Returns true when the file is a PowerPoint presentation.
@@ -134,7 +141,7 @@ export interface UploadQueueItem {
   progress: number;
   bytesLoaded: number;
   bytesTotal: number;
-  status: "pending" | "uploading" | "success" | "error";
+  status: "pending" | "uploading" | "success" | "error" | "duplicate";
   error?: string;
 }
 
@@ -163,10 +170,33 @@ export function getFileCategory(mimeType: string): FileCategory {
     mimeType.includes("presentation") ||
     mimeType.includes("msword") ||
     mimeType.includes("json") ||
-    mimeType.includes("xml")
+    mimeType.includes("xml") ||
+    mimeType.includes("javascript") ||
+    mimeType.includes("typescript") ||
+    mimeType.includes("sql") ||
+    mimeType.includes("yaml") ||
+    mimeType.includes("markdown") ||
+    mimeType.includes("x-python") ||
+    mimeType.includes("x-httpd-php") ||
+    mimeType.includes("x-sh")
   )
     return "document";
   return "other";
+}
+
+/**
+ * Returns true when the file can be previewed by any of the built-in
+ * previewers (text, JSON, CSV, Office, PPTX). Useful for fallback logic.
+ */
+export function isPreviewableFile(mimeType: string, fileName?: string): boolean {
+  return (
+    isTextFile(mimeType, fileName) ||
+    isJsonFile(mimeType, fileName) ||
+    isCsvFile(mimeType, fileName) ||
+    isOfficeFile(mimeType, fileName) ||
+    isPptxFile(mimeType, fileName) ||
+    isLegacyPptFile(mimeType, fileName)
+  );
 }
 
 export function getFileExtension(filename: string): string {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { downloadFromTelegram, TelegramDownloadError } from "@/lib/telegram/download";
 import { decodeFileToken } from "@/lib/utils";
 
@@ -7,39 +7,100 @@ import { decodeFileToken } from "@/lib/utils";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
+/**
+ * Service-role Supabase client — bypasses RLS so external viewers
+ * (Office Online, Google Docs) can fetch files without user cookies.
+ */
+function getServiceClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
+
+/** CORS + cache headers shared by every response from this route. */
+function corsHeaders(): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+    "Access-Control-Allow-Headers": "Range, Content-Type",
+    "Access-Control-Expose-Headers": "Content-Length, Content-Type, Content-Disposition",
+  };
+}
+
+/** Resolve token → file record (or error response). */
+async function resolveFile(segments: string[]) {
+  const token = segments[0];
+  if (!token) {
+    return { error: NextResponse.json({ error: "File token required" }, { status: 400, headers: corsHeaders() }) };
+  }
+
+  let id: string;
+  try {
+    id = decodeFileToken(token);
+  } catch {
+    return { error: NextResponse.json({ error: "Invalid file token" }, { status: 400, headers: corsHeaders() }) };
+  }
+
+  const supabase = getServiceClient();
+  const { data: file, error } = await supabase
+    .from("files")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !file) {
+    return { error: NextResponse.json({ error: "File not found" }, { status: 404, headers: corsHeaders() }) };
+  }
+
+  return { file };
+}
+
+/* ── OPTIONS (CORS preflight) ────────────────────────────────── */
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+}
+
+/* ── HEAD (required by Office Online / Google Docs) ──────────── */
+export async function HEAD(
+  request: NextRequest,
+  { params }: { params: Promise<{ params: string[] }> }
+) {
+  try {
+    const { params: segments } = await params;
+    const result = await resolveFile(segments);
+    if ("error" in result) return result.error;
+    const file = result.file;
+
+    const headers: Record<string, string> = {
+      ...corsHeaders(),
+      "Content-Type": file.mime_type || "application/octet-stream",
+      "Content-Disposition": `inline; filename="${encodeURIComponent(file.original_name)}"`,
+      "Cache-Control": "public, max-age=3600",
+      "Accept-Ranges": "bytes",
+    };
+
+    if (file.size) {
+      headers["Content-Length"] = String(file.size);
+    }
+
+    return new NextResponse(null, { status: 200, headers });
+  } catch {
+    return new NextResponse(null, { status: 500, headers: corsHeaders() });
+  }
+}
+
+/* ── GET (stream the file) ───────────────────────────────────── */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ params: string[] }> }
 ) {
   try {
-    // params[0] = encoded token, params[1+] = filename segments (cosmetic)
     const { params: segments } = await params;
-    const token = segments[0];
-
-    if (!token) {
-      return NextResponse.json({ error: "File token required" }, { status: 400 });
-    }
-
-    // Decode the compact token back to a UUID
-    let id: string;
-    try {
-      id = decodeFileToken(token);
-    } catch {
-      return NextResponse.json({ error: "Invalid file token" }, { status: 400 });
-    }
-
-    const supabase = await createClient();
-
-    // Fetch file record
-    const { data: file, error } = await supabase
-      .from("files")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error || !file) {
-      return NextResponse.json({ error: "File not found" }, { status: 404 });
-    }
+    const result = await resolveFile(segments);
+    if ("error" in result) return result.error;
+    const file = result.file;
 
     // Download from Telegram via TDLib service using the remote file_id
     const { stream, contentType, contentLength } = await downloadFromTelegram(
@@ -54,13 +115,14 @@ export async function GET(
     // Use the mime_type from the database instead of Telegram's content-type
     const finalContentType = file.mime_type || contentType;
 
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
+      ...corsHeaders(),
       "Content-Type": finalContentType,
-      "Cache-Control": "private, max-age=3600",
+      "Cache-Control": "public, max-age=3600",
       "Accept-Ranges": "bytes",
     };
 
-    // Forward Content-Length so browsers know the download size
+    // Forward Content-Length so browsers / external viewers know the size
     if (contentLength) {
       headers["Content-Length"] = String(contentLength);
     }
@@ -79,9 +141,9 @@ export async function GET(
       const msg = status === 404
         ? "File not found on storage"
         : `Storage service error: ${error.message}`;
-      return NextResponse.json({ error: msg }, { status });
+      return NextResponse.json({ error: msg }, { status, headers: corsHeaders() });
     }
     console.error("[File Route] Unexpected download error:", error);
-    return NextResponse.json({ error: "Download failed" }, { status: 500 });
+    return NextResponse.json({ error: "Download failed" }, { status: 500, headers: corsHeaders() });
   }
 }

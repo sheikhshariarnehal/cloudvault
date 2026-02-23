@@ -50,7 +50,7 @@ export default function MigratePage() {
 
       const guestData = getGuestSessionData();
       if (!guestData) {
-        router.push("/dashboard");
+        router.push("/drive");
         return;
       }
 
@@ -71,7 +71,7 @@ export default function MigratePage() {
       if (foldersError) throw foldersError;
 
       clearGuestSession();
-      router.push("/dashboard");
+      router.push("/drive");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Migration failed");
     } finally {
@@ -81,7 +81,7 @@ export default function MigratePage() {
 
   const handleSkip = () => {
     clearGuestSession();
-    router.push("/dashboard");
+    router.push("/drive");
   };
 
   return (

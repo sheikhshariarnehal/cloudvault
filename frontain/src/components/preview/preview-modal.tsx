@@ -21,7 +21,7 @@ import {
   Printer,
   MoreVertical,
 } from "lucide-react";
-import { getFileCategory, formatFileSize, isOfficeFile, isCsvFile, isPptxFile, isJsonFile, isTextFile } from "@/types/file.types";
+import { getFileCategory, formatFileSize, isOfficeFile, isCsvFile, isPptxFile, isJsonFile, isTextFile, isPreviewableFile, isLegacyPptFile } from "@/types/file.types";
 import { getFileUrl } from "@/lib/utils";
 
 export function PreviewModal() {
@@ -221,44 +221,44 @@ export function PreviewModal() {
                 </div>
               )}
               {/* Office documents (Word, Excel) — NOT PowerPoint */}
-              {category === "document" && isOfficeFile(file.mime_type, file.name) && !isPptxFile(file.mime_type, file.name) && (
+              {isOfficeFile(file.mime_type, file.name) && !isPptxFile(file.mime_type, file.name) && (
                 <div className="w-full h-full">
                   <OfficePreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
                 </div>
               )}
-              {/* PowerPoint presentations */}
-              {category === "document" && isPptxFile(file.mime_type, file.name) && (
+              {/* PowerPoint presentations (.pptx) */}
+              {isPptxFile(file.mime_type, file.name) && (
+                <div className="w-full h-full">
+                  <PptxPreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
+                </div>
+              )}
+              {/* Legacy PowerPoint (.ppt) — show friendly download prompt */}
+              {isLegacyPptFile(file.mime_type, file.name) && (
                 <div className="w-full h-full">
                   <PptxPreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
                 </div>
               )}
               {/* CSV files */}
-              {category === "document" && isCsvFile(file.mime_type, file.name) && (
+              {isCsvFile(file.mime_type, file.name) && (
                 <div className="w-full h-full">
                   <CsvPreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
                 </div>
               )}
               {/* JSON files */}
-              {category === "document" && isJsonFile(file.mime_type, file.name) && (
+              {isJsonFile(file.mime_type, file.name) && (
                 <div className="w-full h-full">
                   <JsonPreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
                 </div>
               )}
-              {/* Text / code files */}
-              {category === "document" && isTextFile(file.mime_type, file.name) && (
+              {/* Text / code files (.md, .sql, .html, .css, .js, .py, .txt, etc.) */}
+              {isTextFile(file.mime_type, file.name) && (
                 <div className="w-full h-full">
                   <TextPreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
                 </div>
               )}
               {/* Other non-previewable files */}
-              {(category === "document" &&
-                !isOfficeFile(file.mime_type, file.name) &&
-                !isCsvFile(file.mime_type, file.name) &&
-                !isJsonFile(file.mime_type, file.name) &&
-                !isTextFile(file.mime_type, file.name) &&
-                !isPptxFile(file.mime_type, file.name)) ||
-                category === "archive" ||
-                category === "other" ? (
+              {!isImage && category !== "pdf" && category !== "video" && category !== "audio" &&
+                !isPreviewableFile(file.mime_type, file.name) ? (
                 <div className="p-8 text-center">
                   <FileIcon className="h-20 w-20 text-white/30 mx-auto mb-6" />
                   <p className="text-lg font-medium mb-2 text-white">

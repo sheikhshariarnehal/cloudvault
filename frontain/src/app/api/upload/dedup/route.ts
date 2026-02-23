@@ -5,17 +5,17 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/upload/dedup
- * Check if a file with the same SHA-256 hash already exists.
- * If it does, create a new file record pointing to the same Telegram message
- * (instant "upload" — no data transferred to Telegram).
+ * Check if a file with the same name already exists in the same folder
+ * for the same user/session. If it does, skip the upload and return the
+ * existing file record so the UI can mark it as a duplicate.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fileHash, fileName, fileSize, mimeType, userId, guestSessionId, folderId } = body;
+    const { fileName, userId, guestSessionId, folderId } = body;
 
-    if (!fileHash) {
-      return NextResponse.json({ error: "Missing fileHash" }, { status: 400 });
+    if (!fileName) {
+      return NextResponse.json({ error: "Missing fileName" }, { status: 400 });
     }
     if (!userId && !guestSessionId) {
       return NextResponse.json(
@@ -26,49 +26,34 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // Look for any non-trashed file with the same hash (global dedup)
-    const { data: existing, error: lookupError } = await supabase
+    // Build a query scoped to this user/session, same folder, same name
+    let query = supabase
       .from("files")
       .select()
-      .eq("file_hash", fileHash)
-      .eq("is_trashed", false)
-      .limit(1)
-      .single();
+      .eq("name", fileName)
+      .eq("is_trashed", false);
+
+    if (userId) {
+      query = query.eq("user_id", userId);
+    } else {
+      query = query.eq("guest_session_id", guestSessionId);
+    }
+
+    if (folderId) {
+      query = query.eq("folder_id", folderId);
+    } else {
+      query = query.is("folder_id", null);
+    }
+
+    const { data: existing, error: lookupError } = await query.limit(1).single();
 
     if (lookupError || !existing) {
-      // No match — caller should proceed with normal upload
+      // No name collision in this folder — proceed with normal upload
       return NextResponse.json({ duplicate: false });
     }
 
-    // Match found — create a new file record reusing the same Telegram pointers
-    const { data: fileRecord, error: insertError } = await supabase
-      .from("files")
-      .insert({
-        user_id: userId || null,
-        guest_session_id: guestSessionId || null,
-        folder_id: folderId || null,
-        name: fileName,
-        original_name: fileName,
-        mime_type: mimeType || existing.mime_type,
-        size_bytes: fileSize ?? existing.size_bytes,
-        telegram_file_id: existing.telegram_file_id,
-        telegram_message_id: existing.telegram_message_id,
-        tdlib_file_id: existing.tdlib_file_id || null,
-        thumbnail_url: existing.thumbnail_url || null,
-        file_hash: fileHash,
-      })
-      .select()
-      .single();
-
-    if (insertError || !fileRecord) {
-      console.error("[dedup] Insert failed:", insertError);
-      return NextResponse.json(
-        { error: `Database insert failed: ${insertError?.message}` },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ duplicate: true, file: fileRecord }, { status: 201 });
+    // Same-name file already exists in this folder — return it as-is
+    return NextResponse.json({ duplicate: true, file: existing });
   } catch (error) {
     console.error("[dedup] Error:", error);
     return NextResponse.json(

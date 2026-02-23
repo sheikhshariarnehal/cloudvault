@@ -393,36 +393,31 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       console.warn("[Upload] Hash computation failed, skipping dedup:", hashErr);
     }
 
-    // ── Dedup check: if an identical file exists, skip upload entirely ──
-    if (fileHash) {
-      try {
-        const dedupRes = await fetch("/api/upload/dedup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileHash,
-            fileName: file.name,
-            fileSize: file.size,
-            mimeType: file.type || "application/octet-stream",
-            userId: user?.id || null,
-            guestSessionId: guestSessionId || null,
-            folderId: targetFolderId,
-          }),
-        });
+    // ── Dedup check: skip upload if same-name file already exists in this folder ──
+    try {
+      const dedupRes = await fetch("/api/upload/dedup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          userId: user?.id || null,
+          guestSessionId: guestSessionId || null,
+          folderId: targetFolderId,
+        }),
+      });
 
-        if (dedupRes.ok) {
-          const dedupData = await dedupRes.json();
-          if (dedupData.duplicate && dedupData.file) {
-            console.log("[Upload] Dedup hit — skipped upload for", file.name);
-            updateUploadProgress(queueId, 100);
-            addFile(dedupData.file);
-            updateUploadStatus(queueId, "success");
-            return;
-          }
+      if (dedupRes.ok) {
+        const dedupData = await dedupRes.json();
+        if (dedupData.duplicate && dedupData.file) {
+          console.log("[Upload] Duplicate name in folder — skipped upload for", file.name);
+          updateUploadProgress(queueId, 100);
+          addFile(dedupData.file);
+          updateUploadStatus(queueId, "duplicate");
+          return;
         }
-      } catch (dedupErr) {
-        console.warn("[Upload] Dedup check failed, proceeding with upload:", dedupErr);
       }
+    } catch (dedupErr) {
+      console.warn("[Upload] Dedup check failed, proceeding with upload:", dedupErr);
     }
 
     console.log("Starting upload:", {

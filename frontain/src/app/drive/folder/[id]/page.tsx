@@ -68,8 +68,8 @@ export default function FolderPage({
               <Link
                 href={
                   crumb.id
-                    ? `/dashboard/folder/${crumb.id}`
-                    : "/dashboard"
+                    ? `/drive/folder/${crumb.id}`
+                    : "/drive"
                 }
                 className="text-muted-foreground hover:text-foreground"
               >
@@ -147,30 +147,11 @@ export default function FolderPage({
         </TooltipProvider>
       </div>
 
-      {/* Subfolders (grid view only – list view inlines them in FileList) */}
-      {viewMode === "grid" && subFolders.length > 0 && (
-        <section>
-          <h2 className="text-sm font-medium text-[#202124] mb-3">Folders</h2>
-          <FolderGrid folders={subFolders} />
-        </section>
-      )}
-
-      {/* Files */}
-      {folderFiles.length > 0 ? (
-        <section>
-          <h2 className="text-sm font-medium text-[#202124] mb-3">Files</h2>
-          {viewMode === "grid" ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {folderFiles.map((file) => (
-                <FileCard key={file.id} file={file} />
-              ))}
-            </div>
-          ) : (
-            <FileList files={folderFiles} folders={subFolders} />
-          )}
-        </section>
-      ) : (
-        subFolders.length === 0 && (
+      {/* List view — folders and files unified in a single FileList (mirrors dashboard behaviour) */}
+      {viewMode === "list" ? (
+        subFolders.length > 0 || folderFiles.length > 0 ? (
+          <FileList files={folderFiles} folders={subFolders} />
+        ) : (
           <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
             <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold">This folder is empty</h3>
@@ -183,6 +164,41 @@ export default function FolderPage({
             </Button>
           </div>
         )
+      ) : (
+        /* Grid view — keep separate Folders / Files sections */
+        <>
+          {subFolders.length > 0 && (
+            <section>
+              <h2 className="text-sm font-medium text-[#202124] mb-3">Folders</h2>
+              <FolderGrid folders={subFolders} />
+            </section>
+          )}
+
+          {folderFiles.length > 0 ? (
+            <section>
+              <h2 className="text-sm font-medium text-[#202124] mb-3">Files</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                {folderFiles.map((file) => (
+                  <FileCard key={file.id} file={file} />
+                ))}
+              </div>
+            </section>
+          ) : (
+            subFolders.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold">This folder is empty</h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Drag & drop files here, or click Upload to add files
+                </p>
+                <Button onClick={() => openFilePicker?.()}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Files
+                </Button>
+              </div>
+            )
+          )}
+        </>
       )}
     </div>
   );
