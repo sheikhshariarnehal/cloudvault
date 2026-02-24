@@ -8,6 +8,7 @@ config({ path: join(__dirname, "..", ".env") });
 
 import express from "express";
 import { authMiddleware } from "./middleware/auth.js";
+import { signedUrlAuth } from "./middleware/signed-url-auth.js";
 import { getTDLibClient, closeTDLibClient, isClientReady } from "./tdlib-client.js";
 import { cleanupOldTempFiles } from "./utils/temp-file.js";
 import uploadRouter from "./routes/upload.js";
@@ -22,13 +23,14 @@ const PORT = parseInt(process.env.PORT || "3001", 10);
 // ─── Global Middleware ───────────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));
 
-// CORS for direct chunk uploads from browser
+// CORS for direct browser access (chunk uploads + signed-URL downloads)
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin) {
     res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Upload-Id, X-Chunk-Index");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, HEAD, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Upload-Id, X-Chunk-Index, Range");
+    res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Type, Content-Disposition, Content-Range, Accept-Ranges");
     res.setHeader("Access-Control-Max-Age", "86400");
   }
   if (req.method === "OPTIONS") {
@@ -69,6 +71,23 @@ app.use("/api/upload", authMiddleware, uploadRouter);
 app.use("/api/download", authMiddleware, downloadRouter);
 app.use("/api/thumbnail", authMiddleware, thumbnailRouter);
 app.use("/api/message", authMiddleware, deleteRouter);
+
+// ─── Public signed-URL download route ────────────────────────────────
+// Browser fetches files directly via signed short-lived tokens.
+// signedUrlAuth verifies HMAC, injects payload, then reuses the same
+// download handler — zero code duplication.
+const requireSignedUrl = (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) => {
+  if (!req.signedPayload) {
+    res.status(401).json({ error: "Signed URL required" });
+    return;
+  }
+  next();
+};
+app.use("/api/dl", signedUrlAuth, requireSignedUrl, downloadRouter);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -172,6 +191,7 @@ async function start() {
     console.log(`  POST   /api/chunked-upload/complete`);
     console.log(`  GET    /api/download/:remoteFileId`);
     console.log(`  GET    /api/download/status/:remoteFileId`);
+    console.log(`  GET    /api/dl/:remoteFileId?sig=TOKEN  (public, signed-URL)`);
     console.log(`  GET    /api/thumbnail/:remoteFileId`);
     console.log(`  POST   /api/thumbnail/from-message`);
     console.log(`  DELETE /api/message/:chatId/:messageId`);
