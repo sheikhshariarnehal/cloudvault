@@ -12,7 +12,7 @@ import { getTDLibClient, closeTDLibClient, isClientReady } from "./tdlib-client.
 import { cleanupOldTempFiles } from "./utils/temp-file.js";
 import uploadRouter from "./routes/upload.js";
 import chunkedUploadRouter from "./routes/chunked-upload.js";
-import downloadRouter from "./routes/download.js";
+import downloadRouter, { logDiskStats } from "./routes/download.js";
 import thumbnailRouter from "./routes/thumbnail.js";
 import deleteRouter from "./routes/delete.js";
 
@@ -108,10 +108,57 @@ async function start() {
     process.exit(1);
   }
 
-  // Start periodic temp file cleanup (every 30 minutes)
+  // Log disk/cache stats once at startup so we can see disk usage in logs
+  logDiskStats();
+
+  // Start periodic temp file cleanup (every 30 minutes, files older than 1 hour)
   setInterval(() => {
-    cleanupOldTempFiles(3600000); // Clean files older than 1 hour
-  }, 30 * 60 * 1000);
+    cleanupOldTempFiles(3600000);
+  }, 30 * 60 * 1000).unref();
+
+  // ── TDLib storage optimisation ────────────────────────────────────────
+  // TDLib accumulates downloaded files in tdlib-files/ indefinitely.
+  // optimizeStorage tells TDLib to delete files it has already fully sent
+  // or that haven't been accessed recently, keeping disk use under control.
+  // Runs once at startup (after 60 s delay) then every 6 hours.
+  const runOptimizeStorage = async () => {
+    try {
+      const client = await getTDLibClient();
+      // Keep only files accessed in the last 6 hours; cap total at 8 GB.
+      // Thumbnails are excluded (small, useful for quick preview).
+      const result = await client.invoke({
+        _: "optimizeStorage",
+        size: 8 * 1024 * 1024 * 1024,   // 8 GB hard cap for TDLib files
+        ttl: 6 * 60 * 60,               // delete files not accessed in 6 h
+        count: 0,
+        immunity_delay: 60,
+        file_types: [
+          { _: "fileTypeDocument" },
+          { _: "fileTypeVideo" },
+          { _: "fileTypeAudio" },
+          { _: "fileTypePhoto" },
+          { _: "fileTypeAnimation" },
+        ],
+        chat_ids: [],
+        exclude_chat_ids: [],
+        return_deleted_file_statistics: true,
+      }) as { size: number; count: number };
+      const freedMB = Math.round((result.size || 0) / 1024 / 1024);
+      const files   = result.count || 0;
+      if (files > 0) {
+        console.log(`[TDLib] optimizeStorage freed ${freedMB} MB (${files} files removed)`);
+      } else {
+        console.log(`[TDLib] optimizeStorage: nothing to clean up`);
+      }
+      // Re-log disk stats so we can see the effect in logs
+      logDiskStats();
+    } catch (err) {
+      console.warn("[TDLib] optimizeStorage failed:", err instanceof Error ? err.message : err);
+    }
+  };
+
+  setTimeout(runOptimizeStorage, 60_000);                    // 60 s after boot
+  setInterval(runOptimizeStorage, 6 * 60 * 60 * 1000).unref(); // then every 6 h
 
   // Start HTTP server
   app.listen(PORT, "0.0.0.0", () => {

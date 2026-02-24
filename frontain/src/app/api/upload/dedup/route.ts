@@ -45,15 +45,25 @@ export async function POST(request: NextRequest) {
       query = query.is("folder_id", null);
     }
 
-    const { data: existing, error: lookupError } = await query.limit(1).single();
+    const { data: existing, error: lookupError } = await query.limit(1).maybeSingle();
 
-    if (lookupError || !existing) {
+    if (lookupError) {
+      console.error("[dedup] Lookup error:", lookupError);
+      // Lookup failed — let the upload proceed rather than blocking
+      return NextResponse.json({ duplicate: false });
+    }
+
+    if (!existing) {
       // No name collision in this folder — proceed with normal upload
       return NextResponse.json({ duplicate: false });
     }
 
-    // Same-name file already exists in this folder — return it as-is
-    return NextResponse.json({ duplicate: true, file: existing });
+    // Same-name file already exists in this folder — return it
+    return NextResponse.json({
+      duplicate: true,
+      file: existing,
+      existingName: existing.name,
+    });
   } catch (error) {
     console.error("[dedup] Error:", error);
     return NextResponse.json(

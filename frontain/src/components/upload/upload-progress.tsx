@@ -79,7 +79,7 @@ export function UploadProgress() {
     let loadedBytes = 0;
     for (const item of uploadQueue) {
       totalBytes += item.bytesTotal || item.file.size;
-      if (item.status === "success") {
+      if (item.status === "success" || item.status === "duplicate") {
         loadedBytes += item.bytesTotal || item.file.size;
       } else {
         loadedBytes += item.bytesLoaded || 0;
@@ -95,7 +95,15 @@ export function UploadProgress() {
 
   if (uploadQueue.length === 0) return null;
 
-  const barColor = allDone ? "bg-emerald-500" : "bg-teal-500";
+  const allDuplicates = allDone && duplicateCount === totalCount;
+  const hasDuplicates = duplicateCount > 0;
+  const barColor = allDone
+    ? allDuplicates
+      ? "bg-amber-400"
+      : hasDuplicates
+        ? "bg-emerald-500"
+        : "bg-emerald-500"
+    : "bg-teal-500";
   const headerColor = allDone ? "text-gray-900" : "text-teal-600";
 
   return (
@@ -105,11 +113,17 @@ export function UploadProgress() {
         <div className="flex items-start justify-between">
           <div className="min-w-0">
             <h3 className={`text-[15px] font-semibold leading-tight ${headerColor}`}>
-              {allDone ? "Done" : "In progress"}
+              {allDone
+                ? allDuplicates
+                  ? "All files already exist"
+                  : "Done"
+                : "In progress"}
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
               {allDone
-                ? `${doneCount} of ${totalCount} completed${duplicateCount > 0 ? ` · ${duplicateCount} duplicate${duplicateCount > 1 ? "s" : ""}` : ""}`
+                ? duplicateCount > 0
+                  ? `${successCount} uploaded · ${duplicateCount} duplicate${duplicateCount > 1 ? "s" : ""} skipped${errorCount > 0 ? ` · ${errorCount} failed` : ""}`
+                  : `${successCount} of ${totalCount} uploaded${errorCount > 0 ? ` · ${errorCount} failed` : ""}`
                 : `${overallPercent}% completed`}
             </p>
           </div>
@@ -191,7 +205,7 @@ export function UploadProgress() {
                 <p className="text-xs text-gray-500 mt-0.5 leading-tight">
                   {item.status === "success" && "Uploaded"}
                   {item.status === "duplicate" && (
-                    <span className="text-amber-600">Duplicate — linked to existing file</span>
+                    <span className="text-amber-600">Skipped — file already exists in this folder</span>
                   )}
                   {item.status === "error" && (
                     <span className="text-red-500">{item.error || "Upload failed"}</span>

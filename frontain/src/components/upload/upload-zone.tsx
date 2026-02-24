@@ -383,18 +383,9 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
     updateUploadStatus(queueId, "uploading");
 
-    // ── Compute SHA-256 hash for dedup ──────────────────────────────
-    let fileHash: string | null = null;
-    try {
-      updateUploadProgress(queueId, 1); // show activity during hashing
-      fileHash = await computeFileHash(file);
-      updateUploadProgress(queueId, 5);
-    } catch (hashErr) {
-      console.warn("[Upload] Hash computation failed, skipping dedup:", hashErr);
-    }
-
     // ── Dedup check: skip upload if same-name file already exists in this folder ──
     try {
+      updateUploadProgress(queueId, 2); // show activity during check
       const dedupRes = await fetch("/api/upload/dedup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -411,13 +402,23 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
         if (dedupData.duplicate && dedupData.file) {
           console.log("[Upload] Duplicate name in folder — skipped upload for", file.name);
           updateUploadProgress(queueId, 100);
-          addFile(dedupData.file);
+          updateUploadBytes(queueId, file.size, file.size);
           updateUploadStatus(queueId, "duplicate");
           return;
         }
       }
     } catch (dedupErr) {
       console.warn("[Upload] Dedup check failed, proceeding with upload:", dedupErr);
+    }
+
+    // ── Compute SHA-256 hash (only for actual uploads, skipped for duplicates) ──
+    let fileHash: string | null = null;
+    try {
+      updateUploadProgress(queueId, 3);
+      fileHash = await computeFileHash(file);
+      updateUploadProgress(queueId, 5);
+    } catch (hashErr) {
+      console.warn("[Upload] Hash computation failed, skipping hash:", hashErr);
     }
 
     console.log("Starting upload:", {

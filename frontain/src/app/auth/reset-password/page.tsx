@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Cloud, Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
+import NextImage from "next/image";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -87,9 +88,7 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center py-8 px-4 sm:px-6">
         <div className="w-full max-w-sm mx-auto text-center space-y-4">
-          <div className="inline-flex items-center justify-center w-11 h-11 bg-blue-600 rounded-xl">
-            <Cloud className="h-5 w-5 text-white" />
-          </div>
+          <NextImage src="/logo.webp" alt="CloudVault" width={52} height={52} className="mx-auto" priority />
           <p className="text-sm text-gray-500">Verifying your reset link...</p>
         </div>
       </div>
@@ -102,9 +101,7 @@ export default function ResetPasswordPage() {
 
         {/* Logo */}
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-11 h-11 bg-blue-600 rounded-xl mb-3">
-            <Cloud className="h-5 w-5 text-white" />
-          </div>
+          <NextImage src="/logo.webp" alt="CloudVault" width={52} height={52} className="mx-auto mb-3" priority />
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">New password</h1>
           <p className="text-sm text-gray-500 mt-1">Choose a strong password</p>
         </div>

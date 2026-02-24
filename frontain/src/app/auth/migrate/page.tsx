@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getGuestSessionData, clearGuestSession } from "@/lib/guest-session";
 import { Button } from "@/components/ui/button";
-import { Cloud, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
+import NextImage from "next/image";
 
 export default function MigratePage() {
   const [isMigrating, setIsMigrating] = useState(false);
@@ -87,7 +88,7 @@ export default function MigratePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md space-y-8 text-center">
-        <Cloud className="h-12 w-12 text-primary mx-auto" />
+        <NextImage src="/logo.webp" alt="CloudVault" width={52} height={52} className="mx-auto" />
         <h2 className="text-2xl font-bold">Migrate Guest Files</h2>
         <p className="text-muted-foreground">
           You have <strong>{fileCount} files</strong> from your guest session.

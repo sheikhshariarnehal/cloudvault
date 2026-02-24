@@ -6,6 +6,186 @@ import { streamFileToResponse } from "../utils/stream.js";
 
 const router = Router();
 
+// ── Application-level file cache ─────────────────────────────────────────────
+// Survives TDLib state resets and avoids re-downloading files already on disk.
+//
+// Two classes of cached files are tracked differently:
+//   • TDLib-managed  – files in tdlib-files/documents|videos|photos|…
+//                      TDLib owns their lifecycle; we only store the path in-memory
+//                      and never delete them from disk ourselves.
+//   • App-managed     – files we wrote to tdlib-files/temp/ (Bot API fallback,
+//                      forward-refresh).  We are responsible for deleting them
+//                      when they are evicted.
+//
+// Eviction strategy (runs every CACHE_SWEEP_INTERVAL_MS):
+//   1. TTL  : evict app-managed entries untouched for > CACHE_TTL_MS.
+//   2. Size : if total app-managed bytes > CACHE_MAX_BYTES, evict LRU entries
+//             until under the cap.
+//   3. Map  : if in-memory Map > MAX_MAP_ENTRIES, evict LRU entries from the
+//             Map only (TDLib-managed files are not deleted from disk).
+//
+// Tunable via environment variables:
+//   CACHE_MAX_SIZE_MB   (default 512 = 512 MB  — safe for a 25 GB DigitalOcean droplet)
+//   CACHE_TTL_HOURS     (default 6  — free disk sooner on a small server)
+//
+// DigitalOcean / Railway disk budget (25 GB typical):
+//   OS + Node + TDLib binary  ~2 GB
+//   TDLib db + binlog          ~0.5 GB
+//   TDLib downloaded files     up to ~10 GB (managed by optimizeStorage)
+//   Uploads staging (temp)     up to ~2 GB
+//   App-managed cache          CACHE_MAX_SIZE_MB  (default 512 MB)
+//   Headroom                   ~10 GB free
+
+interface CacheEntry {
+  localPath: string;
+  fileSize: number;       // bytes; 0 if unknown
+  lastAccessedAt: number; // ms since epoch
+  createdAt: number;
+  isAppManaged: boolean;  // true → we may delete this file from disk
+}
+
+const fileCache = new Map<string, CacheEntry>();
+
+// DigitalOcean 1 GB RAM droplet defaults — set env vars to override
+const CACHE_MAX_BYTES =
+  parseInt(process.env.CACHE_MAX_SIZE_MB || "512", 10) * 1024 * 1024;
+const CACHE_TTL_MS =
+  parseFloat(process.env.CACHE_TTL_HOURS || "6") * 60 * 60 * 1000;
+const MAX_MAP_ENTRIES = 500;             // ~150 KB RAM for the Map itself
+const CACHE_SWEEP_INTERVAL_MS = 5 * 60 * 1000; // sweep every 5 minutes
+
+/** True if this path was written by us (Bot API / forward-refresh downloads). */
+function isAppManagedPath(p: string): boolean {
+  return p.includes(`${path.sep}temp${path.sep}botapi_`) ||
+         p.replace(/\\/g, "/").includes("/temp/botapi_");
+}
+
+/** Return cached local path (updates LRU timestamp), or null on miss/stale. */
+function getCachedPath(remoteFileId: string): string | null {
+  const entry = fileCache.get(remoteFileId);
+  if (!entry) return null;
+  if (fs.existsSync(entry.localPath)) {
+    entry.lastAccessedAt = Date.now(); // LRU touch
+    return entry.localPath;
+  }
+  // File deleted externally — evict stale entry
+  fileCache.delete(remoteFileId);
+  return null;
+}
+
+/** Store a successful download in the app-level cache. */
+function cacheFile(remoteFileId: string, localPath: string): void {
+  let fileSize = 0;
+  try { fileSize = fs.statSync(localPath).size; } catch { /* best effort */ }
+
+  fileCache.set(remoteFileId, {
+    localPath,
+    fileSize,
+    lastAccessedAt: Date.now(),
+    createdAt: Date.now(),
+    isAppManaged: isAppManagedPath(localPath),
+  });
+}
+
+/** Evict a single cache entry, deleting app-managed files from disk. */
+function evictEntry(remoteFileId: string, entry: CacheEntry): void {
+  fileCache.delete(remoteFileId);
+  if (entry.isAppManaged) {
+    try {
+      if (fs.existsSync(entry.localPath)) fs.unlinkSync(entry.localPath);
+    } catch { /* best effort */ }
+  }
+}
+
+/** Periodic sweep: TTL expiry → size cap → Map size cap. */
+function runCacheSweep(): void {
+  const now = Date.now();
+  let appManagedBytes = 0;
+
+  // Pass 1: evict TTL-expired app-managed entries & sum sizes
+  for (const [id, entry] of fileCache) {
+    if (entry.isAppManaged) {
+      if (now - entry.lastAccessedAt > CACHE_TTL_MS) {
+        console.log(`[Cache] TTL evict: ${entry.localPath} (idle ${Math.round((now - entry.lastAccessedAt) / 3600000)}h)`);
+        evictEntry(id, entry);
+      } else {
+        appManagedBytes += entry.fileSize;
+      }
+    }
+  }
+
+  // Pass 2: size cap — evict LRU app-managed entries until under CACHE_MAX_BYTES
+  if (appManagedBytes > CACHE_MAX_BYTES) {
+    const appEntries = [...fileCache.entries()]
+      .filter(([, e]) => e.isAppManaged)
+      .sort(([, a], [, b]) => a.lastAccessedAt - b.lastAccessedAt); // oldest first
+
+    for (const [id, entry] of appEntries) {
+      if (appManagedBytes <= CACHE_MAX_BYTES) break;
+      console.log(`[Cache] Size evict (${Math.round(appManagedBytes / 1024 / 1024)}MB > ${Math.round(CACHE_MAX_BYTES / 1024 / 1024)}MB): ${entry.localPath}`);
+      appManagedBytes -= entry.fileSize;
+      evictEntry(id, entry);
+    }
+  }
+
+  // Pass 3: Map cap — evict oldest LRU entries (just from Map, not disk) if too many
+  if (fileCache.size > MAX_MAP_ENTRIES) {
+    const all = [...fileCache.entries()]
+      .sort(([, a], [, b]) => a.lastAccessedAt - b.lastAccessedAt);
+    const toRemove = fileCache.size - MAX_MAP_ENTRIES;
+    for (let i = 0; i < toRemove; i++) {
+      const [id, entry] = all[i];
+      console.log(`[Cache] Map-cap evict: ${id.substring(0, 20)}…`);
+      evictEntry(id, entry);
+    }
+  }
+
+  const totalEntries = fileCache.size;
+  const appMB = Math.round(appManagedBytes / 1024 / 1024);
+  if (totalEntries > 0) {
+    console.log(`[Cache] Sweep done — entries: ${totalEntries}, app-managed disk: ${appMB} MB`);
+  }
+}
+
+// Start the periodic sweep
+setInterval(runCacheSweep, CACHE_SWEEP_INTERVAL_MS).unref();
+
+/** Log disk usage of the tdlib-files directory (best-effort, non-blocking). */
+export function logDiskStats(): void {
+  try {
+    const rawFilesPath = process.env.TDLIB_FILES_PATH || "./tdlib-files";
+    const filesBase = path.isAbsolute(rawFilesPath)
+      ? rawFilesPath
+      : path.join(process.cwd(), rawFilesPath);
+
+    function dirSize(dir: string): number {
+      if (!fs.existsSync(dir)) return 0;
+      return fs.readdirSync(dir).reduce((acc, name) => {
+        const full = path.join(dir, name);
+        try {
+          const stat = fs.statSync(full);
+          return acc + (stat.isDirectory() ? dirSize(full) : stat.size);
+        } catch { return acc; }
+      }, 0);
+    }
+
+    const totalBytes = dirSize(filesBase);
+    const totalMB = Math.round(totalBytes / 1024 / 1024);
+    const cacheMB = Math.round(CACHE_MAX_BYTES / 1024 / 1024);
+    const ttlH = Math.round(CACHE_TTL_MS / 3600000);
+
+    console.log("[Cache] ── Disk / Cache Configuration ─────────────────────────────");
+    console.log(`[Cache]   tdlib-files total on disk : ${totalMB} MB`);
+    console.log(`[Cache]   app-managed cache cap     : ${cacheMB} MB  (CACHE_MAX_SIZE_MB)`);
+    console.log(`[Cache]   app-managed TTL           : ${ttlH}h  (CACHE_TTL_HOURS)`);
+    console.log(`[Cache]   in-memory Map cap         : ${MAX_MAP_ENTRIES} entries`);
+    console.log(`[Cache]   sweep interval            : ${CACHE_SWEEP_INTERVAL_MS / 60000} min`);
+    console.log("[Cache] ───────────────────────────────────────────────────────────");
+  } catch (err) {
+    console.warn("[Cache] Could not compute disk stats:", err);
+  }
+}
+
 /** Read config lazily so dotenv has time to load. */
 function getChannelId(): number {
   return parseInt(process.env.TELEGRAM_CHANNEL_ID || "0", 10);
@@ -207,6 +387,14 @@ router.get(
 
     const streamOpts = { fileName, mimeType, inline, rangeHeader: req.headers.range };
 
+    // ─── 0. App-level cache (instant, no TDLib calls) ─────────────
+    const cachedPath = getCachedPath(remoteFileId);
+    if (cachedPath) {
+      console.log(`[Download] App-cache HIT for ${remoteFileId.substring(0, 20)}… → ${cachedPath}`);
+      streamFileToResponse(cachedPath, res, streamOpts);
+      return;
+    }
+
     try {
       const client = await getTDLibClient();
 
@@ -249,11 +437,12 @@ router.get(
         return;
       }
 
-      // ─── 2. Check local cache ─────────────────────────────────────
+      // ─── 2. Check TDLib local cache ────────────────────────────────
       {
         const info = await client.invoke({ _: "getFile", file_id: tdlibFileId });
         const local = info.local as Record<string, unknown> | undefined;
         if (local?.is_downloading_completed && local.path && fs.existsSync(local.path as string)) {
+          cacheFile(remoteFileId, local.path as string);
           streamFileToResponse(local.path as string, res, streamOpts);
           return;
         }
@@ -262,6 +451,7 @@ router.get(
       // ─── 3. Try direct TDLib download ─────────────────────────────
       let localPath = await tryDownloadSync(tdlibFileId);
       if (localPath) {
+        cacheFile(remoteFileId, localPath);
         streamFileToResponse(localPath, res, streamOpts);
         return;
       }
@@ -277,6 +467,7 @@ router.get(
 
       localPath = await tryDownloadSync(tdlibFileId);
       if (localPath) {
+        cacheFile(remoteFileId, localPath);
         streamFileToResponse(localPath, res, streamOpts);
         return;
       }
@@ -287,10 +478,9 @@ router.get(
         console.log(`[Download] Refreshing via forwardMessage (tdlib_msg_id=${messageId})...`);
         const result = await refreshViaForward(messageId, remoteFileId);
         if (result) {
+          cacheFile(remoteFileId, result.localPath);
           streamFileToResponse(result.localPath, res, streamOpts);
-          setTimeout(() => {
-            try { if (fs.existsSync(result.localPath)) fs.unlinkSync(result.localPath); } catch {}
-          }, 60_000);
+          // File is now cached — don't delete it
           return;
         }
       }
@@ -299,11 +489,9 @@ router.get(
       console.log(`[Download] TDLib recovery failed, trying Bot HTTP API fallback...`);
       const botApiPath = await downloadViaBotApi(remoteFileId);
       if (botApiPath) {
+        cacheFile(remoteFileId, botApiPath);
         streamFileToResponse(botApiPath, res, streamOpts);
-        // Schedule cleanup after a delay (stream needs time to read)
-        setTimeout(() => {
-          try { if (fs.existsSync(botApiPath)) fs.unlinkSync(botApiPath); } catch {}
-        }, 60_000);
+        // File is now cached — don't delete it
         return;
       }
 

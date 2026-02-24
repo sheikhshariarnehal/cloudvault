@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import NextImage from "next/image";
 import { useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/app/providers/auth-provider";
@@ -20,7 +21,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { LucideIcon } from "lucide-react";
 import {
-  Cloud,
   FolderOpen,
   Image,
   Star,
@@ -60,9 +60,14 @@ export function Sidebar() {
     <div className="flex flex-col h-full w-full bg-transparent">
       {/* Brand */}
       <div className="flex items-center gap-2 px-5 h-16 shrink-0">
-        <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600">
-          <Cloud className="h-6 w-6 text-white" />
-        </div>
+        <NextImage
+          src="/logo.webp"
+          alt="CloudVault"
+          width={36}
+          height={36}
+          className="flex-shrink-0"
+          priority
+        />
         <span className="text-[22px] font-normal tracking-tight text-gray-600">CloudVault</span>
       </div>
 

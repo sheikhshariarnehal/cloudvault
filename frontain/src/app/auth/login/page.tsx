@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
-import { Cloud, Mail, Eye, EyeOff } from "lucide-react";
+import { Mail, Eye, EyeOff } from "lucide-react";
+import NextImage from "next/image";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -66,9 +67,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-11 h-11 bg-blue-600 rounded-xl mb-3">
-            <Cloud className="h-5 w-5 text-white" />
-          </div>
+          <NextImage src="/logo.webp" alt="CloudVault" width={52} height={52} className="mx-auto mb-3" priority />
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Welcome back</h1>
           <p className="text-sm text-gray-500 mt-1">Sign in to your CloudVault account</p>
         </div>
