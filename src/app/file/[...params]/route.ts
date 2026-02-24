@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { downloadFromTelegram, TelegramDownloadError } from "@/lib/telegram/download";
 import { decodeFileToken } from "@/lib/utils";
+import { createSignedToken, buildDirectUrl } from "@/lib/signed-url";
 
-// Allow up to 5 minutes — TDLib must fully download the file from Telegram before streaming
-export const maxDuration = 300;
 export const dynamic = "force-dynamic";
+
+const BACKEND_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
+const PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_TDLIB_CHUNK_URL || BACKEND_URL;
+const API_KEY = process.env.TDLIB_SERVICE_API_KEY || "";
 
 /**
  * Service-role Supabase client — bypasses RLS so external viewers
@@ -25,7 +27,8 @@ function corsHeaders(): Record<string, string> {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
     "Access-Control-Allow-Headers": "Range, Content-Type",
-    "Access-Control-Expose-Headers": "Content-Length, Content-Type, Content-Disposition",
+    "Access-Control-Expose-Headers":
+      "Content-Length, Content-Type, Content-Disposition, Content-Range, Accept-Ranges, Location",
   };
 }
 
@@ -46,7 +49,7 @@ async function resolveFile(segments: string[]) {
   const supabase = getServiceClient();
   const { data: file, error } = await supabase
     .from("files")
-    .select("*")
+    .select("id, telegram_file_id, telegram_message_id, mime_type, original_name, name, size_bytes")
     .eq("id", id)
     .single();
 
@@ -76,13 +79,13 @@ export async function HEAD(
     const headers: Record<string, string> = {
       ...corsHeaders(),
       "Content-Type": file.mime_type || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${encodeURIComponent(file.original_name)}"`,
+      "Content-Disposition": `inline; filename="${encodeURIComponent(file.original_name || file.name)}"`,
       "Cache-Control": "public, max-age=3600",
       "Accept-Ranges": "bytes",
     };
 
-    if (file.size) {
-      headers["Content-Length"] = String(file.size);
+    if (file.size_bytes) {
+      headers["Content-Length"] = String(file.size_bytes);
     }
 
     return new NextResponse(null, { status: 200, headers });
@@ -91,7 +94,7 @@ export async function HEAD(
   }
 }
 
-/* ── GET (stream the file) ───────────────────────────────────── */
+/* ── GET — redirect to signed URL on TDLib service ───────────── */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ params: string[] }> }
@@ -102,53 +105,46 @@ export async function GET(
     if ("error" in result) return result.error;
     const file = result.file;
 
-    // Forward Range header so video seeking works through this public route
-    const rangeHeader = request.headers.get("range") ?? undefined;
+    const fileName = file.original_name || file.name;
 
-    // Download from Telegram via TDLib service using the remote file_id
-    const { stream, contentType, contentLength, contentRange, status } =
-      await downloadFromTelegram(
-        file.telegram_file_id,
-        file.mime_type || "application/octet-stream",
-        file.telegram_message_id,
-        { rangeHeader },
-      );
+    // Create signed token (15 min TTL)
+    const token = createSignedToken(
+      {
+        fid: file.telegram_file_id,
+        mid: file.telegram_message_id || undefined,
+        ct: file.mime_type || "application/octet-stream",
+        fn: fileName,
+        sz: file.size_bytes || undefined,
+      },
+      API_KEY,
+    );
 
-    const isDownload =
-      request.nextUrl.searchParams.get("download") === "true";
+    const isDownload = request.nextUrl.searchParams.get("download") === "true";
 
-    // Use the mime_type from the database instead of Telegram's content-type
-    const finalContentType = file.mime_type || contentType;
+    let directUrl = buildDirectUrl(
+      PUBLIC_BACKEND_URL,
+      token,
+      file.telegram_file_id,
+      fileName,
+    );
 
-    const headers: Record<string, string> = {
-      ...corsHeaders(),
-      "Content-Type": finalContentType,
-      "Cache-Control": "public, max-age=3600",
-      "Accept-Ranges": "bytes",
-    };
-
-    // Forward size / range headers so browsers and Office Online can seek/stream
-    if (contentLength) headers["Content-Length"] = String(contentLength);
-    if (contentRange)  headers["Content-Range"]  = contentRange;
-
-    if (isDownload) {
-      headers["Content-Disposition"] = `attachment; filename="${encodeURIComponent(file.original_name)}"`;
+    if (!isDownload) {
+      directUrl += "&inline=true";
     } else {
-      headers["Content-Disposition"] = `inline; filename="${encodeURIComponent(file.original_name)}"`;
+      directUrl += "&inline=false";
     }
 
-    // Return 206 for Range responses, 200 otherwise
-    return new NextResponse(stream, { status, headers });
+    // 302 redirect — the browser / fetch() follows automatically.
+    // The TDLib service has Access-Control-Allow-Origin: * for cross-origin
+    // fetch() calls from preview components.
+    return NextResponse.redirect(directUrl, {
+      headers: corsHeaders(),
+    });
   } catch (error) {
-    if (error instanceof TelegramDownloadError) {
-      console.error(`[File Route] TDLib download error (HTTP ${error.statusCode}):`, error.message);
-      const status = error.statusCode === 404 || error.statusCode === 410 ? 404 : 502;
-      const msg = status === 404
-        ? "File not found on storage"
-        : `Storage service error: ${error.message}`;
-      return NextResponse.json({ error: msg }, { status, headers: corsHeaders() });
-    }
-    console.error("[File Route] Unexpected download error:", error);
-    return NextResponse.json({ error: "Download failed" }, { status: 500, headers: corsHeaders() });
+    console.error("[File Route] Error generating signed URL:", error);
+    return NextResponse.json(
+      { error: "Download failed" },
+      { status: 500, headers: corsHeaders() },
+    );
   }
 }
