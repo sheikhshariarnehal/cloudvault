@@ -102,12 +102,17 @@ export async function GET(
     if ("error" in result) return result.error;
     const file = result.file;
 
+    // Forward Range header so video seeking works through this public route
+    const rangeHeader = request.headers.get("range") ?? undefined;
+
     // Download from Telegram via TDLib service using the remote file_id
-    const { stream, contentType, contentLength } = await downloadFromTelegram(
-      file.telegram_file_id,
-      file.mime_type || "application/octet-stream",
-      file.telegram_message_id,
-    );
+    const { stream, contentType, contentLength, contentRange, status } =
+      await downloadFromTelegram(
+        file.telegram_file_id,
+        file.mime_type || "application/octet-stream",
+        file.telegram_message_id,
+        { rangeHeader },
+      );
 
     const isDownload =
       request.nextUrl.searchParams.get("download") === "true";
@@ -122,10 +127,9 @@ export async function GET(
       "Accept-Ranges": "bytes",
     };
 
-    // Forward Content-Length so browsers / external viewers know the size
-    if (contentLength) {
-      headers["Content-Length"] = String(contentLength);
-    }
+    // Forward size / range headers so browsers and Office Online can seek/stream
+    if (contentLength) headers["Content-Length"] = String(contentLength);
+    if (contentRange)  headers["Content-Range"]  = contentRange;
 
     if (isDownload) {
       headers["Content-Disposition"] = `attachment; filename="${encodeURIComponent(file.original_name)}"`;
@@ -133,7 +137,8 @@ export async function GET(
       headers["Content-Disposition"] = `inline; filename="${encodeURIComponent(file.original_name)}"`;
     }
 
-    return new NextResponse(stream, { headers });
+    // Return 206 for Range responses, 200 otherwise
+    return new NextResponse(stream, { status, headers });
   } catch (error) {
     if (error instanceof TelegramDownloadError) {
       console.error(`[File Route] TDLib download error (HTTP ${error.statusCode}):`, error.message);
