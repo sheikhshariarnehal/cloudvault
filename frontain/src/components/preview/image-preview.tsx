@@ -18,11 +18,14 @@ export function ImagePreview({ src, alt, fallbackSrc }: ImagePreviewProps) {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);      // full-res image ready
+  const [hasError, setHasError] = useState(false);      // full-res image failed
   const [usingFallback, setUsingFallback] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // True while full image is still loading AND we have a thumbnail to show
+  const showThumbnailPlaceholder = !isLoaded && !hasError && !!fallbackSrc;
 
   const handleZoomIn = useCallback(() => {
     setZoom((prev) => Math.min(prev + ZOOM_STEP, MAX_ZOOM));
@@ -111,14 +114,37 @@ export function ImagePreview({ src, alt, fallbackSrc }: ImagePreviewProps) {
           cursor: zoom > 1 ? (isDragging ? "grabbing" : "grab") : "zoom-in",
         }}
       >
-        {/* Loading spinner */}
-        {!isLoaded && !hasError && (
+        {/* ── Thumbnail placeholder (shown IMMEDIATELY while full image loads) ── */}
+        {/* Blurred, low-opacity background — gives instant visual feedback.      */}
+        {/* Fades out the moment the full-res image is ready.                     */}
+        {fallbackSrc && (
+          <img
+            src={fallbackSrc}
+            alt=""
+            aria-hidden
+            className={`absolute max-w-full max-h-full object-contain pointer-events-none select-none
+              transition-opacity duration-500 blur-sm scale-105
+              ${isLoaded || hasError ? "opacity-0" : "opacity-60"}`}
+            draggable={false}
+          />
+        )}
+
+        {/* Loading spinner — only shown when no thumbnail exists */}
+        {!isLoaded && !hasError && !fallbackSrc && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-10 h-10 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           </div>
         )}
 
-        {/* Error state */}
+        {/* Subtle spinner overlay when thumbnail IS showing (user knows something is loading) */}
+        {showThumbnailPlaceholder && (
+          <div className="absolute bottom-20 right-6 flex items-center gap-2 bg-black/40 rounded-full px-3 py-1.5">
+            <div className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />
+            <span className="text-[11px] text-white/60">Loading full image…</span>
+          </div>
+        )}
+
+        {/* Error state (full-res failed AND no fallback, or both failed) */}
         {hasError && !usingFallback && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/60">
             <svg className="w-16 h-16 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -135,11 +161,12 @@ export function ImagePreview({ src, alt, fallbackSrc }: ImagePreviewProps) {
           </div>
         )}
 
+        {/* Full-resolution image — hidden (opacity-0) until loaded, then fades in */}
         <img
           key={retryKey}
           src={usingFallback && fallbackSrc ? fallbackSrc : src}
           alt={alt}
-          className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${
+          className={`max-w-full max-h-full object-contain transition-opacity duration-500 ${
             isLoaded && !hasError ? "opacity-100" : "opacity-0"
           }`}
           style={{
@@ -162,7 +189,7 @@ export function ImagePreview({ src, alt, fallbackSrc }: ImagePreviewProps) {
         />
       </div>
 
-      {/* Fallback quality banner */}
+      {/* Fallback quality banner (shown when permanently on thumbnail after full-res fails) */}
       {usingFallback && isLoaded && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#2d2e30]/90 backdrop-blur rounded-full px-4 py-2 shadow-lg z-10">
           <span className="text-xs text-white/70">Showing thumbnail preview</span>
