@@ -383,14 +383,29 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
     updateUploadStatus(queueId, "uploading");
 
-    // ── Dedup check: skip upload if same-name file already exists in this folder ──
+    // ── Compute SHA-256 hash (used for dedup — skipped for files > 100 MB) ──
+    let fileHash: string | null = null;
     try {
-      updateUploadProgress(queueId, 2); // show activity during check
+      updateUploadProgress(queueId, 2);
+      if (file.size <= 100 * 1024 * 1024) {
+        fileHash = await computeFileHash(file);
+      } else {
+        console.log(`[Upload] Skipping hash for large file (${Math.round(file.size / 1024 / 1024)} MB)`);
+      }
+      updateUploadProgress(queueId, 4);
+    } catch (hashErr) {
+      console.warn("[Upload] Hash computation failed, skipping hash:", hashErr);
+    }
+
+    // ── Dedup check: skip upload if same-name OR same-hash file exists ──
+    try {
+      updateUploadProgress(queueId, 5);
       const dedupRes = await fetch("/api/upload/dedup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fileName: file.name,
+          fileHash: fileHash || undefined,
           userId: user?.id || null,
           guestSessionId: guestSessionId || null,
           folderId: targetFolderId,
@@ -400,25 +415,46 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       if (dedupRes.ok) {
         const dedupData = await dedupRes.json();
         if (dedupData.duplicate && dedupData.file) {
-          console.log("[Upload] Duplicate name in folder — skipped upload for", file.name);
-          updateUploadProgress(queueId, 100);
-          updateUploadBytes(queueId, file.size, file.size);
-          updateUploadStatus(queueId, "duplicate");
-          return;
+          // For hash-based duplicates in a different folder or with a different name,
+          // create a new DB record pointing to the same Telegram file
+          if (dedupData.reason === "hash" && dedupData.file.name !== file.name) {
+            try {
+              const copyRes = await fetch("/api/upload/copy", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sourceFileId: dedupData.file.id,
+                  newName: file.name,
+                  folderId: targetFolderId,
+                  userId: user?.id || null,
+                  guestSessionId: guestSessionId || null,
+                  fileHash,
+                }),
+              });
+              if (copyRes.ok) {
+                const copyData = await copyRes.json();
+                console.log("[Upload] Hash dedup — created copy record for", file.name);
+                updateUploadProgress(queueId, 100);
+                updateUploadBytes(queueId, file.size, file.size);
+                addFile(copyData.file);
+                updateUploadStatus(queueId, "duplicate");
+                return;
+              }
+              // If copy fails, fall through to normal upload
+            } catch (copyErr) {
+              console.warn("[Upload] Hash dedup copy failed, uploading normally:", copyErr);
+            }
+          } else {
+            console.log(`[Upload] Duplicate (${dedupData.reason || "name"}) in folder — skipped upload for`, file.name);
+            updateUploadProgress(queueId, 100);
+            updateUploadBytes(queueId, file.size, file.size);
+            updateUploadStatus(queueId, "duplicate");
+            return;
+          }
         }
       }
     } catch (dedupErr) {
       console.warn("[Upload] Dedup check failed, proceeding with upload:", dedupErr);
-    }
-
-    // ── Compute SHA-256 hash (only for actual uploads, skipped for duplicates) ──
-    let fileHash: string | null = null;
-    try {
-      updateUploadProgress(queueId, 3);
-      fileHash = await computeFileHash(file);
-      updateUploadProgress(queueId, 5);
-    } catch (hashErr) {
-      console.warn("[Upload] Hash computation failed, skipping hash:", hashErr);
     }
 
     console.log("Starting upload:", {

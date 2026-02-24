@@ -20,7 +20,18 @@ import os from "os";
 import { fileURLToPath } from "url";
 import { getTDLibClient } from "../tdlib-client.js";
 import { cleanupTempFile } from "../utils/temp-file.js";
-import { fileToBase64DataUri } from "../utils/stream.js";
+import {
+  invokeWithSlot,
+  isMediaRejection,
+  waitForMessageSent,
+  extractFileInfo,
+  getThumbnailDataUri,
+  buildSendParams,
+  buildDocumentFallbackParams,
+  ensureChannelLoaded,
+  parseFloodWait,
+  type ProgressSession,
+} from "../utils/upload-helpers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVICE_ROOT = path.resolve(__dirname, "..", "..");
@@ -30,31 +41,6 @@ const CHUNKS_DIR = path.join(os.tmpdir(), "cloudvault-tdlib", "chunks");
 // Ensure base chunks directory exists
 if (!fs.existsSync(CHUNKS_DIR)) {
   fs.mkdirSync(CHUNKS_DIR, { recursive: true });
-}
-
-// ── Concurrency limiter (shared idea with upload.ts) ─────────────────────────
-const MAX_CONCURRENT = 3;
-let activeUploads = 0;
-const uploadQueue: Array<() => void> = [];
-
-function acquireUploadSlot(): Promise<void> {
-  return new Promise((resolve) => {
-    if (activeUploads < MAX_CONCURRENT) {
-      activeUploads++;
-      resolve();
-    } else {
-      uploadQueue.push(() => {
-        activeUploads++;
-        resolve();
-      });
-    }
-  });
-}
-
-function releaseUploadSlot(): void {
-  activeUploads--;
-  const next = uploadQueue.shift();
-  if (next) next();
 }
 
 // ── In-memory session map ────────────────────────────────────────────────────
@@ -76,7 +62,7 @@ interface UploadSession {
 const sessions = new Map<string, UploadSession>();
 
 // Clean up stale sessions every 15 minutes
-setInterval(() => {
+const sessionCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [id, session] of sessions) {
     if (now - session.createdAt > 60 * 60 * 1000) {
@@ -88,6 +74,7 @@ setInterval(() => {
     }
   }
 }, 15 * 60 * 1000);
+sessionCleanupTimer.unref(); // allow clean shutdown
 
 function cleanupSessionDir(dir: string) {
   try {
@@ -170,7 +157,7 @@ router.post("/init", (req: Request, res: Response) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/chunked-upload/chunk
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/chunk", chunkUpload.single("chunk"), (req: Request, res: Response) => {
+router.post("/chunk", chunkUpload.single("chunk"), async (req: Request, res: Response) => {
   const uploadId = req.body.uploadId || req.headers["x-upload-id"];
   const chunkIndex = parseInt(req.body.chunkIndex ?? req.headers["x-chunk-index"], 10);
 
@@ -205,16 +192,25 @@ router.post("/chunk", chunkUpload.single("chunk"), (req: Request, res: Response)
   session.receivedChunks.add(chunkIndex);
 
   // ── Progressive flush: append sequential chunks to output file ─────────
-  // This keeps disk usage minimal — only out-of-order chunks stay on disk.
-  // With 5 parallel uploads, max buffered = 4 chunks × 10MB = 40MB.
+  // Uses streams instead of readFileSync to keep memory usage low on 1 GB server.
+  // Only out-of-order chunks stay on disk. With 5 parallel uploads, max buffered = 4 chunks × 10MB = 40MB.
   try {
     while (session.receivedChunks.has(session.nextFlushIndex)) {
       const flushPath = path.join(session.dir, String(session.nextFlushIndex));
       if (fs.existsSync(flushPath)) {
-        const chunkData = fs.readFileSync(flushPath);
-        fs.appendFileSync(session.assembledPath, chunkData);
-        session.assembledBytes += chunkData.length;
-        fs.unlinkSync(flushPath); // free disk space immediately
+        const chunkSize = fs.statSync(flushPath).size;
+        await new Promise<void>((resolve, reject) => {
+          const readStream = fs.createReadStream(flushPath);
+          const writeStream = fs.createWriteStream(session.assembledPath, { flags: "a" });
+          readStream.pipe(writeStream);
+          writeStream.on("finish", () => {
+            session.assembledBytes += chunkSize;
+            try { fs.unlinkSync(flushPath); } catch { /* ignore */ }
+            resolve();
+          });
+          readStream.on("error", reject);
+          writeStream.on("error", reject);
+        });
       }
       session.nextFlushIndex++;
     }
@@ -317,7 +313,7 @@ router.post("/complete", async (req: Request, res: Response) => {
       return;
     }
 
-    // ── Upload to Telegram (reuse logic from upload.ts) ────────────────────
+    // ── Upload to Telegram (using shared helpers) ────────────────────────
     const client = await getTDLibClient();
     const channelId = process.env.TELEGRAM_CHANNEL_ID;
 
@@ -331,88 +327,29 @@ router.post("/complete", async (req: Request, res: Response) => {
     const mimeType = session.mimeType;
     const fileName = session.fileName;
 
-    const caption = { _: "formattedText" as const, text: fileName };
-    const inputFile = { _: "inputFileLocal" as const, path: assembledPath };
-
-    let sendParams: Parameters<typeof client.invoke>[0];
-
-    // Always send images as documents to preserve original quality (no Telegram compression)
-    if (mimeType.startsWith("video/")) {
-      sendParams = {
-        _: "sendMessage",
-        chat_id: parseInt(channelId, 10),
-        input_message_content: { _: "inputMessageVideo", video: inputFile, caption },
-      };
-    } else if (mimeType.startsWith("audio/")) {
-      sendParams = {
-        _: "sendMessage",
-        chat_id: parseInt(channelId, 10),
-        input_message_content: { _: "inputMessageAudio", audio: inputFile, caption },
-      };
-    } else {
-      sendParams = {
-        _: "sendMessage",
-        chat_id: parseInt(channelId, 10),
-        input_message_content: { _: "inputMessageDocument", document: inputFile, caption },
-      };
-    }
+    const sendParams = buildSendParams(channelId, assembledPath, fileName, mimeType);
+    const documentFallbackParams = buildDocumentFallbackParams(channelId, assembledPath, fileName);
 
     // Ensure channel is loaded
-    const chatIdNum = parseInt(channelId, 10);
     try {
-      await client.invoke({ _: "getChat", chat_id: chatIdNum });
-    } catch {
-      console.log("[ChunkedUpload] Channel not in cache, loading chats...");
-      try {
-        await client.invoke({ _: "loadChats", chat_list: { _: "chatListMain" }, limit: 100 });
-        await client.invoke({ _: "getChat", chat_id: chatIdNum });
-      } catch (loadErr) {
-        cleanupTempFile(assembledPath);
-        sessions.delete(uploadId);
-        res.status(400).json({
-          error: `Channel not accessible. Details: ${loadErr}`,
-        });
-        return;
-      }
+      await ensureChannelLoaded(client, channelId);
+    } catch (chErr) {
+      cleanupTempFile(assembledPath);
+      sessions.delete(uploadId);
+      res.status(400).json({ error: (chErr as Error).message });
+      return;
     }
 
-    // sendMessage with concurrency management
-    const isMediaRejection = (msg: string) =>
-      msg.includes("IMAGE_PROCESS_FAILED") ||
-      msg.includes("PHOTO_INVALID_DIMENSIONS") ||
-      msg.includes("MEDIA_INVALID") ||
-      msg.includes("too big for a photo");
-
-    const documentFallbackParams = {
-      _: "sendMessage" as const,
-      chat_id: parseInt(channelId, 10),
-      input_message_content: {
-        _: "inputMessageDocument" as const,
-        document: inputFile,
-        caption: { _: "formattedText" as const, text: fileName },
-      },
-    };
-
-    async function invokeWithSlot(
-      params: Parameters<typeof client.invoke>[0]
-    ): Promise<Record<string, unknown>> {
-      await acquireUploadSlot();
-      try {
-        return (await client.invoke(params)) as Record<string, unknown>;
-      } finally {
-        releaseUploadSlot();
-      }
-    }
-
+    // sendMessage with media rejection fallback
     let sentMessage: Record<string, unknown>;
     try {
-      const pending = await invokeWithSlot(sendParams);
+      const pending = await invokeWithSlot(client, sendParams);
       sentMessage = await waitForMessageSent(client, pending, session.fileSize, session);
     } catch (sendErr) {
       const sendErrMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
       if (isMediaRejection(sendErrMsg)) {
         console.warn(`[ChunkedUpload] Media rejected (${sendErrMsg}), retrying as document...`);
-        const pending = await invokeWithSlot(documentFallbackParams);
+        const pending = await invokeWithSlot(client, documentFallbackParams);
         sentMessage = await waitForMessageSent(client, pending, session.fileSize, session);
       } else {
         throw sendErr;
@@ -436,22 +373,7 @@ router.post("/complete", async (req: Request, res: Response) => {
     }
 
     // Thumbnail
-    let thumbnailData: string | null = null;
-    if (fileInfo.thumbnailFileId) {
-      try {
-        const thumbFile = await client.invoke({
-          _: "downloadFile",
-          file_id: fileInfo.thumbnailFileId,
-          priority: 32,
-          synchronous: true,
-        });
-        if (thumbFile.local?.path && fs.existsSync(thumbFile.local.path)) {
-          thumbnailData = fileToBase64DataUri(thumbFile.local.path, "image/jpeg");
-        }
-      } catch (err) {
-        console.warn("[ChunkedUpload] Failed to download thumbnail:", err);
-      }
-    }
+    const thumbnailData = await getThumbnailDataUri(client, fileInfo.thumbnailFileId);
 
     // Cleanup
     cleanupTempFile(assembledPath);
@@ -472,16 +394,8 @@ router.post("/complete", async (req: Request, res: Response) => {
     const errMsg = err instanceof Error ? err.message : String(err);
 
     // Surface Telegram rate-limit errors
-    const floodMatch =
-      errMsg.match(/FLOOD_WAIT[_\s](\d+)/i) ||
-      errMsg.match(/retry after (\d+)/i) ||
-      errMsg.match(/\[429\]/i);
-    if (floodMatch) {
-      const retryMatch =
-        errMsg.match(/(\d+)\s*$/) ||
-        errMsg.match(/retry after (\d+)/i) ||
-        errMsg.match(/FLOOD_WAIT[_\s](\d+)/i);
-      const waitSec = retryMatch ? parseInt(retryMatch[1], 10) : 30;
+    const waitSec = parseFloodWait(errMsg);
+    if (waitSec !== null) {
       res
         .status(429)
         .set("Retry-After", String(waitSec))
@@ -492,148 +406,5 @@ router.post("/complete", async (req: Request, res: Response) => {
     res.status(500).json({ error: `Chunked upload failed: ${errMsg}` });
   }
 });
-
-// ── Helpers (duplicated from upload.ts to keep module self-contained) ────────
-
-/**
- * Wait for TDLib to confirm the message was sent (uploaded to Telegram).
- * Timeout scales with file size and resets whenever TDLib reports upload progress,
- * so even very large files (1-2 GB) won't time out as long as the upload is moving.
- */
-async function waitForMessageSent(
-  client: Awaited<ReturnType<typeof getTDLibClient>>,
-  pendingMessage: Record<string, unknown>,
-  fileSize: number = 0,
-  session?: UploadSession,
-): Promise<Record<string, unknown>> {
-  if (!pendingMessage.sending_state) return pendingMessage;
-
-  // Base: 2 min. Add 1 min per 100 MB, min 2 min, max 30 min.
-  const baseTotalMs = Math.max(
-    2 * 60 * 1000,
-    Math.min(30 * 60 * 1000, 2 * 60 * 1000 + Math.ceil(fileSize / (100 * 1024 * 1024)) * 60 * 1000)
-  );
-  // Per-tick idle timeout: if no progress event for 3 min, give up
-  const idleTimeoutMs = 3 * 60 * 1000;
-
-  return new Promise((resolve, reject) => {
-    const messageId = pendingMessage.id as number;
-    let lastActivity = Date.now();
-
-    // Absolute deadline
-    const absoluteTimer = setTimeout(() => {
-      cleanup();
-      reject(new Error(`Message send timeout after ${Math.round(baseTotalMs / 1000)}s (file: ${Math.round(fileSize / 1024 / 1024)} MB)`));
-    }, baseTotalMs);
-
-    // Idle timer — resets every time we see upload progress
-    let idleTimer = setTimeout(checkIdle, idleTimeoutMs);
-
-    function checkIdle() {
-      if (Date.now() - lastActivity >= idleTimeoutMs) {
-        cleanup();
-        reject(new Error(`Message send stalled — no upload progress for ${Math.round(idleTimeoutMs / 1000)}s`));
-      } else {
-        idleTimer = setTimeout(checkIdle, idleTimeoutMs);
-      }
-    }
-
-    function cleanup() {
-      clearTimeout(absoluteTimer);
-      clearTimeout(idleTimer);
-      client.off("update", handler);
-    }
-
-    const handler = (update: Record<string, unknown>) => {
-      // Upload progress — reset idle timer
-      if (update._ === "updateFile") {
-        const file = update.file as Record<string, unknown> | undefined;
-        const remote = file?.remote as Record<string, unknown> | undefined;
-        if (remote?.is_uploading_active) {
-          const uploaded = remote.uploaded_size as number || 0;
-          lastActivity = Date.now();
-          if (uploaded > 0 && fileSize > 0) {
-            const ratio = uploaded / fileSize;
-            if (session) session.telegramProgress = ratio;
-            const pct = Math.round(ratio * 100);
-            if (pct % 10 === 0) {
-              console.log(`[ChunkedUpload] Telegram upload progress: ${pct}% (${Math.round(uploaded / 1024 / 1024)} MB / ${Math.round(fileSize / 1024 / 1024)} MB)`);
-            }
-          }
-        }
-      }
-
-      if (update._ === "updateMessageSendSucceeded" && (update.old_message_id as number) === messageId) {
-        cleanup();
-        resolve(update.message as Record<string, unknown>);
-      } else if (update._ === "updateMessageSendFailed" && (update.old_message_id as number) === messageId) {
-        cleanup();
-        const tdErr = update.error as { code?: number; message?: string } | undefined;
-        reject(new Error(`Message send failed [${tdErr?.code ?? 0}]: ${tdErr?.message || "Unknown error"}`));
-      }
-    };
-
-    client.on("update", handler);
-
-    console.log(`[ChunkedUpload] Waiting for Telegram upload (timeout: ${Math.round(baseTotalMs / 1000)}s, idle: ${Math.round(idleTimeoutMs / 1000)}s, fileSize: ${Math.round(fileSize / 1024 / 1024)} MB)`);
-  });
-}
-
-function extractFileInfo(message: Record<string, unknown>): {
-  remoteFileId: string;
-  tdlibFileId: number;
-  thumbnailFileId: number | null;
-  size: number;
-} | null {
-  const content = message.content as Record<string, unknown>;
-  if (!content) return null;
-
-  let document: Record<string, unknown> | null = null;
-  let thumbnail: Record<string, unknown> | null = null;
-
-  switch (content._) {
-    case "messagePhoto": {
-      const photo = content.photo as Record<string, unknown>;
-      const sizes = photo?.sizes as Array<Record<string, unknown>>;
-      if (sizes?.length) {
-        document = sizes[sizes.length - 1].photo as Record<string, unknown>;
-        if (sizes.length > 1) thumbnail = sizes[0].photo as Record<string, unknown>;
-      }
-      break;
-    }
-    case "messageVideo": {
-      const video = content.video as Record<string, unknown>;
-      document = video?.video as Record<string, unknown>;
-      const thumb = video?.thumbnail as Record<string, unknown>;
-      if (thumb) thumbnail = thumb.file as Record<string, unknown>;
-      break;
-    }
-    case "messageAudio": {
-      const audio = content.audio as Record<string, unknown>;
-      document = audio?.audio as Record<string, unknown>;
-      const thumb = audio?.album_cover_thumbnail as Record<string, unknown>;
-      if (thumb) thumbnail = thumb.file as Record<string, unknown>;
-      break;
-    }
-    case "messageDocument": {
-      const doc = content.document as Record<string, unknown>;
-      document = doc?.document as Record<string, unknown>;
-      const thumb = doc?.thumbnail as Record<string, unknown>;
-      if (thumb) thumbnail = thumb.file as Record<string, unknown>;
-      break;
-    }
-    default:
-      return null;
-  }
-
-  if (!document) return null;
-  const remote = document.remote as Record<string, unknown>;
-  return {
-    remoteFileId: (remote?.id as string) || "",
-    tdlibFileId: (document.id as number) || 0,
-    thumbnailFileId: thumbnail ? (thumbnail.id as number) || null : null,
-    size: (document.size as number) || (document.expected_size as number) || 0,
-  };
-}
 
 export default router;
