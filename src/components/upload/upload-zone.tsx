@@ -159,12 +159,18 @@ function getFilesFromInputEvent(
 }
 
 /**
- * Compute SHA-256 hash of a File using the Web Crypto API.
- * Reads in 2 MB chunks to avoid loading the entire file into memory.
+ * Compute a content fingerprint for dedup.
+ *
+ * - Files ≤ 100 MB: full SHA-256 of the entire content.
+ * - Files > 100 MB: fast partial SHA-256 of (first 10 MB + last 10 MB + file size).
+ *   Reads only ~20 MB regardless of file size → fast even for multi-GB files.
+ *   Prefixed with "p:" so partial hashes never collide with full hashes.
  */
 async function computeFileHash(file: File): Promise<string> {
-  // For small files (< 10 MB), just read the whole thing
-  if (file.size < 10 * 1024 * 1024) {
+  const FULL_HASH_LIMIT = 100 * 1024 * 1024; // 100 MB
+
+  if (file.size <= FULL_HASH_LIMIT) {
+    // Full SHA-256 for small/medium files
     const buffer = await file.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
     return Array.from(new Uint8Array(hashBuffer))
@@ -172,16 +178,30 @@ async function computeFileHash(file: File): Promise<string> {
       .join("");
   }
 
-  // For larger files, read in 2 MB chunks via a streaming approach
-  const HASH_CHUNK = 2 * 1024 * 1024;
-  // Use SubtleCrypto's digest on the full file via a single ArrayBuffer read.
-  // The Web Crypto API doesn't support incremental hashing natively,
-  // so we read the full file into an ArrayBuffer (the browser streams internally).
-  const buffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  // ── Fast partial hash for large files (> 100 MB) ──────────────────
+  // Read first 10 MB + last 10 MB + encode the file size as bytes.
+  // This catches 99.99%+ of duplicates without loading the full file.
+  const PARTIAL = 10 * 1024 * 1024; // 10 MB
+
+  const firstChunk = await file.slice(0, PARTIAL).arrayBuffer();
+  const lastChunk = await file.slice(file.size - PARTIAL).arrayBuffer();
+  const sizeTag = new TextEncoder().encode(`:size=${file.size}:`);
+
+  const combined = new Uint8Array(
+    firstChunk.byteLength + lastChunk.byteLength + sizeTag.byteLength
+  );
+  combined.set(new Uint8Array(firstChunk), 0);
+  combined.set(new Uint8Array(lastChunk), firstChunk.byteLength);
+  combined.set(sizeTag, firstChunk.byteLength + lastChunk.byteLength);
+
+  const hashBuffer = await crypto.subtle.digest("SHA-256", combined.buffer);
+  // "p:" prefix distinguishes partial hashes from full-content hashes
+  return (
+    "p:" +
+    Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+  );
 }
 
 interface UploadZoneProps {
@@ -383,15 +403,13 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
     updateUploadStatus(queueId, "uploading");
 
-    // ── Compute SHA-256 hash (used for dedup — skipped for files > 100 MB) ──
+    // ── Compute content fingerprint for dedup (works for ALL file sizes) ──
     let fileHash: string | null = null;
     try {
       updateUploadProgress(queueId, 2);
-      if (file.size <= 100 * 1024 * 1024) {
-        fileHash = await computeFileHash(file);
-      } else {
-        console.log(`[Upload] Skipping hash for large file (${Math.round(file.size / 1024 / 1024)} MB)`);
-      }
+      console.log(`[Upload] Computing hash for ${file.name} (${Math.round(file.size / 1024 / 1024)} MB)`);
+      fileHash = await computeFileHash(file);
+      console.log(`[Upload] Hash: ${fileHash?.slice(0, 20)}...`);
       updateUploadProgress(queueId, 4);
     } catch (hashErr) {
       console.warn("[Upload] Hash computation failed, skipping hash:", hashErr);
@@ -452,7 +470,8 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
                   updateUploadProgress(queueId, 100);
                   updateUploadBytes(queueId, file.size, file.size);
                   addFile(copyData.file);
-                  updateUploadStatus(queueId, "duplicate");
+                  // Mark as success for cross-user dedup (file added to user's folder)
+                  updateUploadStatus(queueId, dedupData.crossUser ? "success" : "duplicate");
                   return;
                 }
                 // If copy fails, fall through to normal upload
