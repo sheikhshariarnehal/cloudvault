@@ -134,19 +134,17 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
       return;
     }
 
-    // Try to get thumbnail as base64 data URI
-    const thumbnailData = await getThumbnailDataUri(client, fileInfo.thumbnailFileId);
-
-    // Clean up the uploaded temp file
-    cleanupTempFile(localFilePath);
-
+    // Send response immediately - don't wait for thumbnail
     res.status(201).json({
       file_id: fileInfo.remoteFileId,
       tdlib_file_id: fileInfo.tdlibFileId,
       message_id: sentMessage.id,
-      thumbnail_data: thumbnailData,
+      thumbnail_data: null, // Will be fetched by frontend if needed
       file_size: fileInfo.size,
     });
+
+    // Clean up in background (don't block response)
+    cleanupTempFile(localFilePath);
   } catch (err) {
     // Clean up on error
     cleanupTempFile(localFilePath);

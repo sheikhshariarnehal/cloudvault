@@ -57,6 +57,10 @@ interface UploadSession {
   telegramProgress: number;      // 0–1 fraction of Telegram upload
   createdAt: number;
   dir: string;
+  /** Persistent write stream — stays open entire session, prevents EBUSY on Windows */
+  writeStream: fs.WriteStream;
+  /** Serialises all writes to the assembled file — prevents EBUSY on Windows */
+  flushLock: Promise<void>;
 }
 
 const sessions = new Map<string, UploadSession>();
@@ -67,8 +71,7 @@ const sessionCleanupTimer = setInterval(() => {
   for (const [id, session] of sessions) {
     if (now - session.createdAt > 60 * 60 * 1000) {
       // 1 hour expiry
-      cleanupSessionDir(session.dir);
-      cleanupTempFile(session.assembledPath);
+      cleanupSession(session);
       sessions.delete(id);
       console.log(`[ChunkedUpload] Expired session ${id}`);
     }
@@ -82,6 +85,14 @@ function cleanupSessionDir(dir: string) {
   } catch {
     console.warn(`[ChunkedUpload] Failed to clean up dir: ${dir}`);
   }
+}
+
+function cleanupSession(session: UploadSession) {
+  try {
+    session.writeStream.end(); // Close stream if still open
+  } catch { /* ignore */ }
+  cleanupSessionDir(session.dir);
+  cleanupTempFile(session.assembledPath);
 }
 
 // ── multer for chunk endpoint ────────────────────────────────────────────────
@@ -133,6 +144,9 @@ router.post("/init", (req: Request, res: Response) => {
   const assembledName = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${fileName}`;
   const assembledPath = path.join(uploadsDir, assembledName);
 
+  // Create persistent write stream that stays open for entire upload session
+  const writeStream = fs.createWriteStream(assembledPath, { flags: "w" });
+
   const session: UploadSession = {
     uploadId,
     fileName,
@@ -146,6 +160,8 @@ router.post("/init", (req: Request, res: Response) => {
     telegramProgress: 0,
     createdAt: Date.now(),
     dir,
+    writeStream,
+    flushLock: Promise.resolve(),
   };
 
   sessions.set(uploadId, session);
@@ -191,32 +207,34 @@ router.post("/chunk", chunkUpload.single("chunk"), async (req: Request, res: Res
 
   session.receivedChunks.add(chunkIndex);
 
-  // ── Progressive flush: append sequential chunks to output file ─────────
-  // Uses streams instead of readFileSync to keep memory usage low on 1 GB server.
-  // Only out-of-order chunks stay on disk. With 5 parallel uploads, max buffered = 4 chunks × 10MB = 40MB.
-  try {
+  // ── Progressive flush: serialised through flushLock to prevent EBUSY ───
+  // Multiple concurrent chunk handlers call this, but only one write runs
+  // at a time thanks to the promise chain. Uses persistent WriteStream.
+  const doFlush = async () => {
     while (session.receivedChunks.has(session.nextFlushIndex)) {
       const flushPath = path.join(session.dir, String(session.nextFlushIndex));
       if (fs.existsSync(flushPath)) {
-        const chunkSize = fs.statSync(flushPath).size;
+        const chunkData = await fs.promises.readFile(flushPath);
+        // Write to persistent stream — no open/close overhead
         await new Promise<void>((resolve, reject) => {
-          const readStream = fs.createReadStream(flushPath);
-          const writeStream = fs.createWriteStream(session.assembledPath, { flags: "a" });
-          readStream.pipe(writeStream);
-          writeStream.on("finish", () => {
-            session.assembledBytes += chunkSize;
-            try { fs.unlinkSync(flushPath); } catch { /* ignore */ }
-            resolve();
+          session.writeStream.write(chunkData, (err) => {
+            if (err) reject(err);
+            else {
+              session.assembledBytes += chunkData.length;
+              try { fs.unlinkSync(flushPath); } catch { /* ignore */ }
+              resolve();
+            }
           });
-          readStream.on("error", reject);
-          writeStream.on("error", reject);
         });
       }
       session.nextFlushIndex++;
     }
-  } catch (flushErr) {
+  };
+
+  // Chain onto the lock — each flush waits for the previous one to finish
+  session.flushLock = session.flushLock.then(doFlush).catch((flushErr) => {
     console.warn(`[ChunkedUpload] Flush error for ${uploadId}:`, flushErr);
-  }
+  });
 
   const flushedMB = Math.round(session.assembledBytes / 1024 / 1024);
   const buffered = session.receivedChunks.size - session.nextFlushIndex;
@@ -280,21 +298,39 @@ router.post("/complete", async (req: Request, res: Response) => {
     return;
   }
 
+  // Wait for any in-progress flush from chunk handlers to finish
+  await session.flushLock;
+
   // Flush any remaining buffered chunks (shouldn't be many)
   try {
     while (session.nextFlushIndex < session.totalChunks) {
       const flushPath = path.join(session.dir, String(session.nextFlushIndex));
       if (fs.existsSync(flushPath)) {
-        const chunkData = fs.readFileSync(flushPath);
-        fs.appendFileSync(session.assembledPath, chunkData);
-        session.assembledBytes += chunkData.length;
-        fs.unlinkSync(flushPath);
+        const chunkData = await fs.promises.readFile(flushPath);
+        await new Promise<void>((resolve, reject) => {
+          session.writeStream.write(chunkData, (err) => {
+            if (err) reject(err);
+            else {
+              session.assembledBytes += chunkData.length;
+              try { fs.unlinkSync(flushPath); } catch { /* ignore */ }
+              resolve();
+            }
+          });
+        });
       }
       session.nextFlushIndex++;
     }
   } catch (flushErr) {
     console.error(`[ChunkedUpload] Final flush error:`, flushErr);
   }
+
+  // Close the persistent write stream and wait for it to finish
+  await new Promise<void>((resolve, reject) => {
+    session.writeStream.end((err: Error | undefined) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
 
   // Clean up chunk directory (should be empty now)
   cleanupSessionDir(session.dir);
@@ -372,20 +408,18 @@ router.post("/complete", async (req: Request, res: Response) => {
       return;
     }
 
-    // Thumbnail
-    const thumbnailData = await getThumbnailDataUri(client, fileInfo.thumbnailFileId);
-
-    // Cleanup
-    cleanupTempFile(assembledPath);
-    sessions.delete(uploadId);
-
+    // Send response immediately - don't wait for thumbnail
     res.status(201).json({
       file_id: fileInfo.remoteFileId,
       tdlib_file_id: fileInfo.tdlibFileId,
       message_id: sentMessage.id,
-      thumbnail_data: thumbnailData,
+      thumbnail_data: null, // Will be fetched by frontend if needed
       file_size: fileInfo.size,
     });
+
+    // Cleanup in background (don't block response)
+    cleanupTempFile(assembledPath);
+    sessions.delete(uploadId);
   } catch (err) {
     cleanupTempFile(assembledPath);
     sessions.delete(uploadId);
