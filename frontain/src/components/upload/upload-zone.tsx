@@ -415,41 +415,58 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       if (dedupRes.ok) {
         const dedupData = await dedupRes.json();
         if (dedupData.duplicate && dedupData.file) {
-          // For hash-based duplicates in a different folder or with a different name,
-          // create a new DB record pointing to the same Telegram file
-          if (dedupData.reason === "hash" && dedupData.file.name !== file.name) {
-            try {
-              const copyRes = await fetch("/api/upload/copy", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  sourceFileId: dedupData.file.id,
-                  newName: file.name,
-                  folderId: targetFolderId,
-                  userId: user?.id || null,
-                  guestSessionId: guestSessionId || null,
-                  fileHash,
-                }),
-              });
-              if (copyRes.ok) {
-                const copyData = await copyRes.json();
-                console.log("[Upload] Hash dedup — created copy record for", file.name);
-                updateUploadProgress(queueId, 100);
-                updateUploadBytes(queueId, file.size, file.size);
-                addFile(copyData.file);
-                updateUploadStatus(queueId, "duplicate");
-                return;
-              }
-              // If copy fails, fall through to normal upload
-            } catch (copyErr) {
-              console.warn("[Upload] Hash dedup copy failed, uploading normally:", copyErr);
-            }
-          } else {
-            console.log(`[Upload] Duplicate (${dedupData.reason || "name"}) in folder — skipped upload for`, file.name);
+          // ── Name-based duplicate (same user, same folder) — just skip ──
+          if (dedupData.reason === "name") {
+            console.log(`[Upload] Duplicate (name) in folder — skipped upload for`, file.name);
             updateUploadProgress(queueId, 100);
             updateUploadBytes(queueId, file.size, file.size);
             updateUploadStatus(queueId, "duplicate");
             return;
+          }
+
+          // ── Hash-based duplicate — same content already in Telegram ──
+          // For cross-user matches OR different name/folder, create a new
+          // DB record pointing to the same Telegram file (instant upload!)
+          if (dedupData.reason === "hash") {
+            const needsCopy = dedupData.crossUser || dedupData.file.name !== file.name;
+            if (needsCopy) {
+              try {
+                const copyRes = await fetch("/api/upload/copy", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    sourceFileId: dedupData.file.id,
+                    newName: file.name,
+                    folderId: targetFolderId,
+                    userId: user?.id || null,
+                    guestSessionId: guestSessionId || null,
+                    fileHash,
+                  }),
+                });
+                if (copyRes.ok) {
+                  const copyData = await copyRes.json();
+                  console.log(
+                    `[Upload] Hash dedup${dedupData.crossUser ? " (cross-user)" : ""} — instant upload for`,
+                    file.name
+                  );
+                  updateUploadProgress(queueId, 100);
+                  updateUploadBytes(queueId, file.size, file.size);
+                  addFile(copyData.file);
+                  updateUploadStatus(queueId, "duplicate");
+                  return;
+                }
+                // If copy fails, fall through to normal upload
+              } catch (copyErr) {
+                console.warn("[Upload] Hash dedup copy failed, uploading normally:", copyErr);
+              }
+            } else {
+              // Same user, same name, same content — already exists
+              console.log(`[Upload] Duplicate (hash, same user) — skipped upload for`, file.name);
+              updateUploadProgress(queueId, 100);
+              updateUploadBytes(queueId, file.size, file.size);
+              updateUploadStatus(queueId, "duplicate");
+              return;
+            }
           }
         }
       }

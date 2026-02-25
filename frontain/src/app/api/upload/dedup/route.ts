@@ -1,15 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createRLSClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
 /**
+ * Service-role Supabase client — bypasses RLS so we can query
+ * file hashes across ALL users for global content dedup.
+ */
+function getServiceClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
+
+/**
  * POST /api/upload/dedup
- * Check if a file with the same name OR same content hash already exists
- * in the same folder for the same user/session. If it does, skip the upload
- * and return the existing file record so the UI can mark it as a duplicate.
+ * Check if a file with the same name OR same content hash already exists.
  *
- * Precedence: name match > hash match (both scoped to user + folder).
+ * - Name dedup: scoped to same user + folder (prevents exact duplicates).
+ * - Hash dedup: **global across all users** — if ANY user has already
+ *   uploaded the same content, we re-use the Telegram file (instant upload).
+ *
+ * Precedence: name match > hash match.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -26,9 +41,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createRLSClient();
 
-    // ── 1. Name-based dedup (same name in same folder) ───────────────
+    // ── 1. Name-based dedup (same name in same folder for same user) ─
 
     let nameQuery = supabase
       .from("files")
@@ -61,26 +76,23 @@ export async function POST(request: NextRequest) {
         reason: "name",
         file: nameMatch,
         existingName: nameMatch.name,
+        crossUser: false,
       });
     }
 
-    // ── 2. Hash-based dedup (same content anywhere for this user) ────
-    // Only check if the client provided a hash
+    // ── 2. Hash-based dedup (GLOBAL — same content by ANY user) ──────
+    // Uses service-role client to bypass RLS and search all files.
 
     if (fileHash) {
-      let hashQuery = supabase
+      const serviceClient = getServiceClient();
+
+      const { data: hashMatch, error: hashLookupError } = await serviceClient
         .from("files")
-        .select()
+        .select("id, name, mime_type, size_bytes, telegram_file_id, telegram_message_id, tdlib_file_id, thumbnail_url, file_hash, user_id, guest_session_id")
         .eq("file_hash", fileHash)
-        .eq("is_trashed", false);
-
-      if (userId) {
-        hashQuery = hashQuery.eq("user_id", userId);
-      } else {
-        hashQuery = hashQuery.eq("guest_session_id", guestSessionId);
-      }
-
-      const { data: hashMatch, error: hashLookupError } = await hashQuery.limit(1).maybeSingle();
+        .eq("is_trashed", false)
+        .limit(1)
+        .maybeSingle();
 
       if (hashLookupError) {
         console.error("[dedup] Hash lookup error:", hashLookupError);
@@ -88,6 +100,16 @@ export async function POST(request: NextRequest) {
       }
 
       if (hashMatch) {
+        // Determine if this is a cross-user match
+        const isCrossUser = userId
+          ? hashMatch.user_id !== userId
+          : hashMatch.guest_session_id !== guestSessionId;
+
+        console.log(
+          `[dedup] Hash match found: file "${hashMatch.name}" (${hashMatch.id})`,
+          isCrossUser ? "(cross-user — instant upload!)" : "(same user)"
+        );
+
         // Same content exists — re-use its Telegram file_id by creating a
         // new DB record pointing to the same Telegram message. This avoids
         // re-uploading the same bytes to Telegram.
@@ -96,6 +118,7 @@ export async function POST(request: NextRequest) {
           reason: "hash",
           file: hashMatch,
           existingName: hashMatch.name,
+          crossUser: isCrossUser,
         });
       }
     }
