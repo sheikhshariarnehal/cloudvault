@@ -5,13 +5,21 @@ import { useParams } from "next/navigation";
 import { ImagePreview } from "@/components/preview/image-preview";
 import { VideoPreview } from "@/components/preview/video-preview";
 import { PdfPreview } from "@/components/preview/pdf-preview";
-import { getFileCategory, formatFileSize } from "@/types/file.types";
+import { OfficePreview } from "@/components/preview/office-preview";
+import { CsvPreview } from "@/components/preview/csv-preview";
+import { TextPreview } from "@/components/preview/text-preview";
+import { JsonPreview } from "@/components/preview/json-preview";
+import { PptxPreview } from "@/components/preview/pptx-preview";
+import { getFileCategory, formatFileSize, isOfficeFile, isCsvFile, isPptxFile, isJsonFile, isTextFile, isPreviewableFile, isLegacyPptFile } from "@/types/file.types";
 import {
   Download,
   FileIcon,
   FileText,
+  FileCode,
+  FileSpreadsheet,
+  Presentation,
   Image as ImageIcon,
-  Video,
+  Film,
   Music,
   Archive,
   Loader2,
@@ -70,43 +78,71 @@ interface FolderShareData {
 
 type ShareData = FileShareData | FolderShareData;
 
-function getCategoryIcon(category: string, size: "sm" | "lg" = "lg") {
-  const cls = size === "lg" ? "h-16 w-16" : "h-5 w-5";
-  switch (category) {
-    case "image":
-      return <ImageIcon className={`${cls} text-blue-500`} />;
-    case "video":
-      return <Video className={`${cls} text-purple-500`} />;
-    case "audio":
-      return <Music className={`${cls} text-green-500`} />;
-    case "pdf":
-      return <FileText className={`${cls} text-red-500`} />;
-    case "archive":
-      return <Archive className={`${cls} text-yellow-600`} />;
-    case "document":
-      return <FileText className={`${cls} text-blue-600`} />;
-    default:
-      return <FileIcon className={`${cls} text-gray-500`} />;
-  }
+interface SmartIconConfig {
+  Icon: React.ElementType;
+  color: string; // tailwind text color
 }
 
-function getFileIconColor(mimeType: string): string {
-  const cat = getFileCategory(mimeType);
-  switch (cat) {
-    case "image": return "text-blue-400";
-    case "video": return "text-purple-400";
-    case "audio": return "text-green-400";
-    case "pdf": return "text-red-400";
-    case "archive": return "text-yellow-500";
-    case "document": return "text-blue-500";
-    default: return "text-gray-400";
-  }
+function getSmartIconConfig(mimeType: string, fileName?: string): SmartIconConfig {
+  const m = mimeType.toLowerCase();
+  const name = (fileName ?? "").toLowerCase();
+
+  // Images
+  if (m.startsWith("image/")) return { Icon: ImageIcon, color: "text-blue-400" };
+  // Video
+  if (m.startsWith("video/")) return { Icon: Film, color: "text-purple-400" };
+  // Audio
+  if (m.startsWith("audio/")) return { Icon: Music, color: "text-green-400" };
+  // PDF
+  if (m === "application/pdf" || name.endsWith(".pdf")) return { Icon: FileText, color: "text-red-500" };
+  // Spreadsheets (Excel, CSV, ODS)
+  if (m.includes("spreadsheet") || m.includes("excel") || m.includes("csv") || m.includes(".sheet"))
+    return { Icon: FileSpreadsheet, color: "text-emerald-500" };
+  if (name.endsWith(".csv") || name.endsWith(".xlsx") || name.endsWith(".xls") || name.endsWith(".ods"))
+    return { Icon: FileSpreadsheet, color: "text-emerald-500" };
+  // Presentations (PowerPoint, PPTX, ODP)
+  if (m.includes("presentation") || m.includes("powerpoint"))
+    return { Icon: Presentation, color: "text-amber-400" };
+  if (name.endsWith(".pptx") || name.endsWith(".ppt") || name.endsWith(".odp"))
+    return { Icon: Presentation, color: "text-amber-400" };
+  // Word / rich text documents (DOC, DOCX, ODT, RTF)
+  if (m.includes("msword") || m.includes("wordprocessing") || m.includes("rtf") || m.includes("opendocument.text"))
+    return { Icon: FileText, color: "text-blue-500" };
+  if (name.endsWith(".doc") || name.endsWith(".docx") || name.endsWith(".odt") || name.endsWith(".rtf"))
+    return { Icon: FileText, color: "text-blue-500" };
+  // Archives (ZIP, RAR, 7z, tar, gz)
+  if (m.includes("zip") || m.includes("rar") || m.includes("tar") || m.includes("7z") || m.includes("gzip") || m.includes("bzip"))
+    return { Icon: Archive, color: "text-yellow-500" };
+  if (name.endsWith(".zip") || name.endsWith(".rar") || name.endsWith(".7z") || name.endsWith(".tar") || name.endsWith(".gz"))
+    return { Icon: Archive, color: "text-yellow-500" };
+  // Code / text files
+  if (
+    m.includes("javascript") || m.includes("typescript") || m.includes("x-python") ||
+    m.includes("x-sh") || m.includes("sql") || m.includes("yaml") || m.includes("markdown") ||
+    m.includes("html") || m.includes("css") || m.includes("json") || m.includes("xml")
+  ) return { Icon: FileCode, color: "text-slate-400" };
+  if (name.endsWith(".json") || name.endsWith(".xml") || name.endsWith(".yaml") || name.endsWith(".yml"))
+    return { Icon: FileCode, color: "text-slate-400" };
+  if (name.endsWith(".js") || name.endsWith(".ts") || name.endsWith(".py") || name.endsWith(".sh") ||
+      name.endsWith(".html") || name.endsWith(".css") || name.endsWith(".sql") || name.endsWith(".md"))
+    return { Icon: FileCode, color: "text-slate-400" };
+  // Plain text
+  if (m.startsWith("text/") || name.endsWith(".txt")) return { Icon: FileText, color: "text-gray-400" };
+  // Generic
+  return { Icon: FileIcon, color: "text-gray-500" };
+}
+
+function getSmartIcon(mimeType: string, fileName?: string, size: "sm" | "lg" = "lg") {
+  const { Icon, color } = getSmartIconConfig(mimeType, fileName);
+  const cls = size === "lg" ? "h-8 w-8" : "h-5 w-5";
+  return <Icon className={`${cls} ${color}`} />;
 }
 
 /** Check if a file type can be previewed inline */
-function isPreviewable(mimeType: string): boolean {
+function isPreviewable(mimeType: string, fileName?: string): boolean {
   const cat = getFileCategory(mimeType);
-  return ["image", "video", "audio", "pdf"].includes(cat);
+  if (["image", "video", "audio", "pdf"].includes(cat)) return true;
+  return isPreviewableFile(mimeType, fileName);
 }
 
 // ─────────────────────────────────────────────
@@ -130,7 +166,7 @@ function SharePreviewModal({
   const downloadUrl = `/api/share/${token}?downloadFileId=${file.id}`;
 
   // Navigable previewable files for arrow navigation
-  const previewableFiles = files.filter((f) => isPreviewable(f.mime_type));
+  const previewableFiles = files.filter((f) => isPreviewable(f.mime_type, f.name));
   const currentIndex = previewableFiles.findIndex((f) => f.id === file.id);
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < previewableFiles.length - 1;
@@ -234,6 +270,42 @@ function SharePreviewModal({
                 src={previewUrl}
                 className="w-full max-w-md mx-auto"
               />
+            </div>
+          )}
+          {/* Office documents (Word, Excel) — NOT PowerPoint */}
+          {isOfficeFile(file.mime_type, file.name) && !isPptxFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <OfficePreview src={previewUrl} fileName={file.name} />
+            </div>
+          )}
+          {/* PowerPoint presentations (.pptx) */}
+          {isPptxFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <PptxPreview src={previewUrl} fileName={file.name} />
+            </div>
+          )}
+          {/* Legacy PowerPoint (.ppt) */}
+          {isLegacyPptFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <PptxPreview src={previewUrl} fileName={file.name} />
+            </div>
+          )}
+          {/* CSV files */}
+          {isCsvFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <CsvPreview src={previewUrl} fileName={file.name} />
+            </div>
+          )}
+          {/* JSON files */}
+          {isJsonFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <JsonPreview src={previewUrl} fileName={file.name} />
+            </div>
+          )}
+          {/* Text / code files */}
+          {isTextFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <TextPreview src={previewUrl} fileName={file.name} />
             </div>
           )}
         </div>
@@ -430,12 +502,46 @@ export default function SharePage() {
               />
             </div>
           )}
-          {(category === "document" ||
-            category === "archive" ||
-            category === "other") && (
+          {/* Office documents (Word, Excel) — NOT PowerPoint */}
+          {isOfficeFile(file.mime_type, file.name) && !isPptxFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <OfficePreview src={previewUrl} fileName={file.name} />
+            </div>
+          )}
+          {/* PowerPoint presentations (.pptx) */}
+          {isPptxFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <PptxPreview src={previewUrl} fileName={file.name} />
+            </div>
+          )}
+          {/* Legacy PowerPoint (.ppt) */}
+          {isLegacyPptFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <PptxPreview src={previewUrl} fileName={file.name} />
+            </div>
+          )}
+          {/* CSV files */}
+          {isCsvFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <CsvPreview src={previewUrl} fileName={file.name} />
+            </div>
+          )}
+          {/* JSON files */}
+          {isJsonFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <JsonPreview src={previewUrl} fileName={file.name} />
+            </div>
+          )}
+          {/* Text / code files */}
+          {isTextFile(file.mime_type, file.name) && (
+            <div className="w-full h-full">
+              <TextPreview src={previewUrl} fileName={file.name} />
+            </div>
+          )}
+          {!isPreviewable(file.mime_type, file.name) && (
             <div className="text-center max-w-md w-full">
-              <div className="text-white/30 flex justify-center mb-4">
-                {getCategoryIcon(category)}
+              <div className="flex justify-center mb-4">
+                {getSmartIcon(file.mime_type, file.name, "lg")}
               </div>
               <p className="text-lg font-medium text-white mt-4 mb-1">
                 {file.name}
@@ -583,19 +689,25 @@ export default function SharePage() {
             </button>
           )}
 
+          {/* List table header */}
+          {(folders.length > 0 || files.length > 0) && (
+            <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_120px_80px] gap-4 px-3 pb-2 border-b border-white/10 text-xs font-medium text-white/30 uppercase tracking-wider">
+              <span>Name</span>
+              <span>Size</span>
+              <span className="text-right">Actions</span>
+            </div>
+          )}
+
           {/* Sub-folders */}
           {folders.length > 0 && (
-            <div className="mb-6">
-              <h2 className="text-xs font-medium text-white/40 uppercase tracking-wider mb-3">
-                Folders
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-                {folders.map((subfolder) => (
-                  <button
-                    key={subfolder.id}
-                    onClick={() => navigateToFolder(subfolder.id)}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-left group"
-                  >
+            <div className="mt-1">
+              {folders.map((subfolder) => (
+                <button
+                  key={subfolder.id}
+                  onClick={() => navigateToFolder(subfolder.id)}
+                  className="w-full grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_120px_80px] gap-4 items-center px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
                     <Folder
                       className="h-5 w-5 shrink-0"
                       style={{ color: subfolder.color || "#EAB308" }}
@@ -603,84 +715,69 @@ export default function SharePage() {
                     <span className="text-sm text-white/80 group-hover:text-white truncate">
                       {subfolder.name}
                     </span>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                  <span className="text-xs text-white/30 hidden sm:block">—</span>
+                  <span className="text-xs text-white/30 text-right">
+                    <ChevronRight className="h-4 w-4 inline-block text-white/30 group-hover:text-white/60" />
+                  </span>
+                </button>
+              ))}
             </div>
           )}
 
           {/* Files */}
           {files.length > 0 && (
-            <div>
-              <h2 className="text-xs font-medium text-white/40 uppercase tracking-wider mb-3">
-                Files
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {files.map((file) => {
-                  const category = getFileCategory(file.mime_type);
-                  const downloadUrl = `/api/share/${token}?downloadFileId=${file.id}`;
-                  const previewUrl = `/api/share/${token}?previewFileId=${file.id}`;
-                  const canPreview = isPreviewable(file.mime_type);
-                  const isImage = category === "image";
+            <div className="mt-1">
+              {files.map((file) => {
+                const downloadUrl = `/api/share/${token}?downloadFileId=${file.id}`;
+                const canPreview = isPreviewable(file.mime_type, file.name);
 
-                  return (
-                    <div
-                      key={file.id}
-                      className={`group relative flex flex-col bg-white/5 rounded-xl border border-white/10 overflow-hidden hover:bg-white/10 transition-colors ${canPreview ? "cursor-pointer" : ""}`}
-                      onClick={() => canPreview && setPreviewFileId(file.id)}
-                    >
-                      {/* Thumbnail area */}
-                      <div className="aspect-square w-full bg-black/20 flex items-center justify-center relative overflow-hidden">
-                        {isImage ? (
-                          <img
-                            src={previewUrl}
-                            alt={file.name}
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className={getFileIconColor(file.mime_type)}>
-                            {getCategoryIcon(category, "lg")}
-                          </div>
-                        )}
-                        
-                        {/* Hover overlay for actions */}
-                        <div 
-                          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3" 
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {canPreview && (
-                            <button
-                              onClick={() => setPreviewFileId(file.id)}
-                              className="p-2.5 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors backdrop-blur-sm"
-                              title="Preview"
-                            >
-                              <Eye className="h-5 w-5" />
-                            </button>
-                          )}
-                          <a
-                            href={downloadUrl}
-                            className="p-2.5 bg-white/20 hover:bg-white/40 text-white rounded-full transition-colors backdrop-blur-sm"
-                            title="Download"
-                          >
-                            <Download className="h-5 w-5" />
-                          </a>
-                        </div>
+                return (
+                  <div
+                    key={file.id}
+                    className={`group grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_120px_80px] gap-4 items-center px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors ${canPreview ? "cursor-pointer" : ""}`}
+                    onClick={() => canPreview && setPreviewFileId(file.id)}
+                  >
+                    {/* Name + icon */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="shrink-0">
+                        {getSmartIcon(file.mime_type, file.name, "sm")}
                       </div>
-
-                      {/* File info */}
-                      <div className="p-3 flex flex-col gap-0.5">
-                        <p className="text-sm text-white/90 truncate font-medium" title={file.name}>
-                          {file.name}
-                        </p>
-                        <p className="text-xs text-white/40">
-                          {formatFileSize(file.size_bytes)}
-                        </p>
-                      </div>
+                      <span className="text-sm text-white/80 group-hover:text-white truncate" title={file.name}>
+                        {file.name}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
+
+                    {/* Size */}
+                    <span className="text-xs text-white/40 hidden sm:block whitespace-nowrap">
+                      {formatFileSize(file.size_bytes)}
+                    </span>
+
+                    {/* Actions */}
+                    <div
+                      className="flex items-center justify-end gap-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {canPreview && (
+                        <button
+                          onClick={() => setPreviewFileId(file.id)}
+                          className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                          title="Preview"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      )}
+                      <a
+                        href={downloadUrl}
+                        className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                        title="Download"
+                      >
+                        <Download className="h-4 w-4" />
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
