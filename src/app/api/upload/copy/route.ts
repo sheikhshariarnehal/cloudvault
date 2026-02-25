@@ -1,16 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Service-role Supabase client — bypasses RLS so we can read
+ * source files that belong to other users (for cross-user hash dedup).
+ */
+function getServiceClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 /**
  * POST /api/upload/copy
  * Create a new file record in Supabase that points to the same Telegram
  * file as an existing record. Used by content-hash dedup when a file with
- * the same content but different name/folder is uploaded.
+ * the same content but different name/folder/user is uploaded.
  *
  * This avoids re-uploading the same bytes to Telegram — we just create a
  * new metadata row pointing to the same telegram_file_id / message_id.
+ * Works cross-user: the source file may belong to another user.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -30,9 +43,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = getServiceClient();
 
     // Fetch the source file to copy its Telegram references
+    // Uses service-role client — source may belong to another user
     const { data: source, error: fetchError } = await supabase
       .from("files")
       .select()
