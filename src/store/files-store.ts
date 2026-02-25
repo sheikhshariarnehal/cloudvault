@@ -13,6 +13,7 @@ interface FilesState {
 
   // File actions
   setFiles: (files: DbFile[]) => void;
+  mergeFiles: (files: DbFile[]) => void;
   addFile: (file: DbFile) => void;
   updateFile: (id: string, updates: Partial<DbFile>) => void;
   removeFile: (id: string) => void;
@@ -54,6 +55,13 @@ export const useFilesStore = create<FilesState>((set) => ({
 
   // File actions
   setFiles: (files) => set({ files }),
+  mergeFiles: (incoming) =>
+    set((state) => {
+      const existingIds = new Set(state.files.map((f) => f.id));
+      const newFiles = incoming.filter((f) => !existingIds.has(f.id));
+      if (newFiles.length === 0) return state;
+      return { files: [...state.files, ...newFiles] };
+    }),
   addFile: (file) =>
     set((state) => {
       // Check if file already exists to prevent duplicates

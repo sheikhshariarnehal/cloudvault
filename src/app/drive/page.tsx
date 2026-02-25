@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
+import { createClient } from "@/lib/supabase/client";
 import { FolderGrid } from "@/components/file-grid/folder-grid";
 import { FileCard } from "@/components/file-grid/file-card";
 import { FileList } from "@/components/file-list/file-list";
@@ -30,12 +32,42 @@ import {
   List,
   Loader2,
 } from "lucide-react";
+import type { DbFile } from "@/types/file.types";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
-  const { files, folders, viewMode, setViewMode, isLoading, searchQuery } =
+  const { user, guestSessionId } = useAuth();
+  const { files, folders, viewMode, setViewMode, isLoading, searchQuery, mergeFiles } =
     useFilesStore();
   const { setNewFolderModalOpen, openFilePicker, openFolderPicker } = useUIStore();
+
+  // ── Supplementary fetch: load root-level files that may have been
+  // cut off by the layout's initial limit ──────────────────────────
+  useEffect(() => {
+    const userId = user?.id;
+    const filterColumn = userId ? "user_id" : "guest_session_id";
+    const filterValue = userId || guestSessionId;
+    if (!filterValue) return;
+
+    const FILE_COLUMNS =
+      "id,user_id,guest_session_id,folder_id,name,original_name," +
+      "mime_type,size_bytes,telegram_file_id,telegram_message_id," +
+      "file_hash,tdlib_file_id,is_starred,is_trashed,trashed_at," +
+      "created_at,updated_at";
+
+    const supabase = createClient();
+    supabase
+      .from("files")
+      .select(FILE_COLUMNS)
+      .eq(filterColumn, filterValue)
+      .is("folder_id", null)
+      .eq("is_trashed", false)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          mergeFiles(data as unknown as DbFile[]);
+        }
+      });
+  }, [user?.id, guestSessionId, mergeFiles]);
 
   const displayName =
     user?.user_metadata?.display_name ||
