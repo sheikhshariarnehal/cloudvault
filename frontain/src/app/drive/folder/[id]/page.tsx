@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
+import { useAuth } from "@/app/providers/auth-provider";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
+import { createClient } from "@/lib/supabase/client";
 import { FileList } from "@/components/file-list/file-list";
 import { FileCard } from "@/components/file-grid/file-card";
 import { FolderGrid } from "@/components/file-grid/folder-grid";
@@ -21,7 +23,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ChevronRight, FolderOpen, Upload, Plus, FolderPlus, FolderUp, LayoutGrid, List } from "lucide-react";
 import Link from "next/link";
-import type { BreadcrumbItem } from "@/types/file.types";
+import type { BreadcrumbItem, DbFile } from "@/types/file.types";
 
 export default function FolderPage({
   params,
@@ -29,13 +31,45 @@ export default function FolderPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { files, folders, viewMode, setViewMode, setCurrentFolderId } = useFilesStore();
+  const { user, guestSessionId } = useAuth();
+  const { files, folders, viewMode, setViewMode, setCurrentFolderId, mergeFiles } = useFilesStore();
   const { openFilePicker, openFolderPicker, setNewFolderModalOpen } = useUIStore();
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
 
   const folderFiles = files.filter((f) => f.folder_id === id);
   const subFolders = folders.filter((f) => f.parent_id === id);
   const currentFolder = folders.find((f) => f.id === id);
+
+  // ── Supplementary fetch: load files that belong to this folder ──
+  // The layout pre-loads up to 1 000 most-recent files.  When a user has
+  // many files, older folder contents may not be in the store yet.  This
+  // effect guarantees all files for the *current* folder are present.
+  useEffect(() => {
+    const userId = user?.id;
+    const filterColumn = userId ? "user_id" : "guest_session_id";
+    const filterValue = userId || guestSessionId;
+    if (!filterValue) return;
+
+    const FILE_COLUMNS =
+      "id,user_id,guest_session_id,folder_id,name,original_name," +
+      "mime_type,size_bytes,telegram_file_id,telegram_message_id," +
+      "file_hash,tdlib_file_id,is_starred,is_trashed,trashed_at," +
+      "created_at,updated_at";
+
+    const supabase = createClient();
+    supabase
+      .from("files")
+      .select(FILE_COLUMNS)
+      .eq(filterColumn, filterValue)
+      .eq("folder_id", id)
+      .eq("is_trashed", false)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          mergeFiles(data as unknown as DbFile[]);
+        }
+      });
+  }, [id, user?.id, guestSessionId, mergeFiles]);
 
   useEffect(() => {
     setCurrentFolderId(id);
