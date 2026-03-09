@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { generateThumbnail } from "@/lib/telegram/thumbnail";
 
 const BACKEND_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
 const API_KEY = process.env.TDLIB_SERVICE_API_KEY || "";
@@ -84,6 +85,15 @@ export async function POST(request: NextRequest) {
         { error: `Database record creation failed: ${dbError?.message}` },
         { status: 500 }
       );
+    }
+
+    // Generate thumbnail for image/video files (sync with timeout, non-fatal)
+    if (
+      fileRecord.mime_type?.startsWith("image/") ||
+      fileRecord.mime_type?.startsWith("video/")
+    ) {
+      const r2Url = await generateThumbnail(fileRecord.id, fileRecord.telegram_message_id);
+      if (r2Url) fileRecord.thumbnail_url = r2Url;
     }
 
     return NextResponse.json({ file: fileRecord }, { status: 201 });

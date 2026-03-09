@@ -50,15 +50,13 @@ export default function DashboardLayout({
       }
 
       try {
-        // Select only the columns needed by the UI — intentionally
-        // omitting thumbnail_url (large base64 blob stored in DB) from
-        // list queries.  Thumbnails are rendered inline wherever they're
-        // already in memory (after upload) or lazy-loaded on demand.
+        // thumbnail_url now stores short R2 URLs (~80 chars) instead
+        // of large base64 blobs, so it's safe to include in list queries.
         const FILE_COLUMNS =
           "id,user_id,guest_session_id,folder_id,name,original_name," +
           "mime_type,size_bytes,telegram_file_id,telegram_message_id," +
           "file_hash,tdlib_file_id,is_starred,is_trashed,trashed_at," +
-          "created_at,updated_at";
+          "created_at,updated_at,thumbnail_url";
         const FOLDER_COLUMNS =
           "id,user_id,guest_session_id,parent_id,name,color," +
           "is_trashed,trashed_at,created_at,updated_at";

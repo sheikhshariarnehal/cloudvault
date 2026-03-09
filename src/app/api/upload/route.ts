@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { uploadToBackend } from "@/lib/telegram/upload";
 import { createClient } from "@/lib/supabase/server";
+import { generateThumbnail } from "@/lib/telegram/thumbnail";
 
 // Configure route to handle large file uploads
 export const maxDuration = 300; // 5 minutes
@@ -83,6 +84,15 @@ export async function POST(request: NextRequest) {
         { error: `Database record creation failed: ${dbError?.message}` },
         { status: 500 }
       );
+    }
+
+    // Generate thumbnail for image/video files (sync with timeout, non-fatal)
+    if (
+      fileRecord.mime_type?.startsWith("image/") ||
+      fileRecord.mime_type?.startsWith("video/")
+    ) {
+      const r2Url = await generateThumbnail(fileRecord.id, fileRecord.telegram_message_id);
+      if (r2Url) fileRecord.thumbnail_url = r2Url;
     }
 
     return NextResponse.json({ file: fileRecord }, { status: 201 });

@@ -1,17 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { generateThumbnail } from "@/lib/telegram/thumbnail";
 
 /**
  * GET /api/thumbnail/[id]
  *
- * Serves the stored thumbnail_url (base64 data-URI) for a file as an actual
- * image response with aggressive caching.  This avoids:
- *   1. Including giant base64 blobs in the file-list JSON payload
- *   2. Downloading the full-size file from Telegram just for a grid preview
- *
- * Responds with the decoded image bytes + proper Content-Type, or 404.
+ * Serves the thumbnail for a file:
+ *   1. If thumbnail_url is an R2 URL → 302 redirect (fast, no Vercel compute)
+ *   2. If missing or legacy base64 → fetch from TDLib backend (uploads to R2) → update DB → redirect
+ *   3. Fallback: serve legacy base64 inline
  */
 export const dynamic = "force-dynamic";
+
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || "";
+
+function isR2Url(url: string): boolean {
+  return R2_PUBLIC_URL ? url.startsWith(R2_PUBLIC_URL) : url.startsWith("https://") && url.includes(".r2.dev/");
+}
+
+function isBase64DataUri(url: string): boolean {
+  return url.startsWith("data:");
+}
+
+function parseDataUri(dataUri: string): { contentType: string; buffer: Buffer } | null {
+  const match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return { contentType: match[1], buffer: Buffer.from(match[2], "base64") };
+}
 
 export async function GET(
   _request: NextRequest,
@@ -28,35 +43,45 @@ export async function GET(
 
     const { data: file, error } = await supabase
       .from("files")
-      .select("thumbnail_url")
+      .select("thumbnail_url, telegram_message_id, mime_type")
       .eq("id", id)
       .single();
 
-    if (error || !file || !file.thumbnail_url) {
+    if (error || !file) {
       return new NextResponse(null, { status: 404 });
     }
 
-    const dataUri = file.thumbnail_url as string;
-
-    // Parse the data URI: data:<mime>;base64,<data>
-    const match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) {
-      return new NextResponse(null, { status: 404 });
+    // ── Fast path: already an R2 URL → instant redirect ──
+    if (file.thumbnail_url && isR2Url(file.thumbnail_url)) {
+      return NextResponse.redirect(file.thumbnail_url, 302);
     }
 
-    const contentType = match[1];
-    const base64Data = match[2];
-    const buffer = Buffer.from(base64Data, "base64");
+    // ── Need to fetch from TDLib backend (handles R2 upload server-side) ──
+    if (file.telegram_message_id) {
+      const r2Url = await generateThumbnail(id, file.telegram_message_id);
+      if (r2Url) {
+        return NextResponse.redirect(r2Url, 302);
+      }
+    }
 
-    return new NextResponse(buffer, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Length": String(buffer.length),
-        // Cache aggressively — thumbnails don't change
-        "Cache-Control": "public, max-age=604800, immutable",
-      },
-    });
+    // Legacy base64 fallback (no message ID or backend failed)
+    if (file.thumbnail_url && isBase64DataUri(file.thumbnail_url)) {
+      const parsed = parseDataUri(file.thumbnail_url);
+      if (parsed) {
+        const body = new Uint8Array(parsed.buffer);
+        return new NextResponse(body, {
+          headers: {
+            "Content-Type": parsed.contentType,
+            "Content-Length": String(body.length),
+            "Cache-Control": "public, max-age=604800, immutable",
+          },
+        });
+      }
+    }
+
+    return new NextResponse(null, { status: 404 });
   } catch {
     return new NextResponse(null, { status: 500 });
   }
 }
+

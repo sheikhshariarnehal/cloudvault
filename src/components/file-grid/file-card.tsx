@@ -50,22 +50,27 @@ function getSmartConfig(mimeType: string, category: string) {
 
 /**
  * Returns the thumbnail src for a file card.
- * - If a base64 thumbnail_url is already in memory (e.g. just uploaded), use it.
- * - Otherwise, for images/videos, use the lightweight /api/thumbnail/[id] route
- *   which serves the stored thumbnail with aggressive caching.
+ * - R2 URL in thumbnail_url → use directly (zero API calls)
+ * - base64 data-URI → use inline
+ * - null → fall back to /api/thumbnail/[id] which fetches from TDLib + uploads to R2
  */
 function getThumbnailSrc(file: DbFile, category: string): string | null {
-  // Inline base64 from upload — already available, no extra fetch needed
-  if (file.thumbnail_url) return file.thumbnail_url;
-  // For images/videos, use the cached thumbnail API (small, fast)
+  if (file.thumbnail_url) {
+    // R2 URL or base64 data-URI — use directly
+    if (file.thumbnail_url.startsWith("https://") || file.thumbnail_url.startsWith("data:"))
+      return file.thumbnail_url;
+  }
+  // Fallback: trigger on-demand fetch + R2 upload via API route
   if (category === "image" || category === "video") {
     return `/api/thumbnail/${file.id}`;
   }
   return null;
 }
 
-/** Whether a file category should attempt to show a thumbnail preview */
-function shouldShowThumbnail(category: string): boolean {
+/** Whether a file category should attempt to show a thumbnail preview.
+ *  SVGs are sent as documents by Telegram — no thumbnail available. */
+function shouldShowThumbnail(file: DbFile, category: string): boolean {
+  if (file.mime_type === "image/svg+xml") return false;
   return category === "image" || category === "video";
 }
 
@@ -80,7 +85,7 @@ export function FileCard({ file }: FileCardProps) {
   const [isVisible, setIsVisible] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const hasThumbnail = shouldShowThumbnail(category) && !imgError;
+  const hasThumbnail = shouldShowThumbnail(file, category) && !imgError;
   const thumbnailSrc = hasThumbnail ? getThumbnailSrc(file, category) : null;
 
   // IntersectionObserver — only load thumbnails when the card enters the viewport
