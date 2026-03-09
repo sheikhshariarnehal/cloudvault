@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import NextImage from "next/image";
-import { useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useFilesStore } from "@/store/files-store";
@@ -46,29 +46,36 @@ const navItems: Array<{ href: string; label: string; icon: LucideIcon; badge?: s
 export function Sidebar() {
   const pathname = usePathname();
   const { user, isGuest } = useAuth();
-  const { folders } = useFilesStore();
-  const { openFilePicker, openFolderPicker, setNewFolderModalOpen, uploadFiles } = useUIStore();
+  // Use granular selectors so Sidebar only re-renders when these specific values change.
+  const folders = useFilesStore((s) => s.folders);
+  const openFilePicker = useUIStore((s) => s.openFilePicker);
+  const openFolderPicker = useUIStore((s) => s.openFolderPicker);
+  const setNewFolderModalOpen = useUIStore((s) => s.setNewFolderModalOpen);
+  const uploadFiles = useUIStore((s) => s.uploadFiles);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFolderUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Memoize the root-level folder list to avoid a new array reference on every render.
+  const rootFolders = useMemo(() => folders.filter((f) => !f.parent_id), [folders]);
+
+  const handleFolderUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) uploadFiles?.(files);
     e.target.value = "";
-  };
+  }, [uploadFiles]);
 
   return (
     <div className="flex flex-col h-full w-full bg-transparent">
       {/* Brand */}
-      <div className="flex items-center gap-2 px-5 h-16 shrink-0">
+      <div className="flex items-center gap-2 px-4 h-14 shrink-0">
         <NextImage
           src="/logo.webp"
           alt="CloudVault"
-          width={36}
-          height={36}
+          width={30}
+          height={30}
           className="flex-shrink-0"
           priority
         />
-        <span className="text-[22px] font-normal tracking-tight text-gray-600">CloudVault</span>
+        <span className="text-[17px] font-normal tracking-tight text-gray-600">CloudVault</span>
       </div>
 
       {/* + New Button */}
@@ -86,9 +93,9 @@ export function Sidebar() {
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
-              className="w-fit h-14 px-5 rounded-2xl shadow-sm hover:shadow-md border-none bg-white text-gray-700 font-medium text-sm gap-3 transition-shadow"
+              className="w-fit h-10 px-4 rounded-2xl shadow-sm hover:shadow-md border-none bg-white text-gray-700 font-medium text-sm gap-2 transition-shadow"
             >
-              <Plus className="h-6 w-6" />
+              <Plus className="h-5 w-5" />
               New
             </Button>
           </DropdownMenuTrigger>
@@ -128,8 +135,8 @@ export function Sidebar() {
         </DropdownMenu>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5 mt-2">
+      {/* Navigation — overflow-y-auto with GPU-composited scroll */}
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5 mt-2" style={{ contain: "layout style" }}>
         {navItems.map((item) => (
           <NavItem
             key={item.href}
@@ -143,7 +150,7 @@ export function Sidebar() {
 
         {/* Folder Tree */}
         <div className="px-1 mt-4">
-          <FolderTree folders={folders.filter((f) => !f.parent_id)} allFolders={folders} />
+          <FolderTree folders={rootFolders} allFolders={folders} />
         </div>
       </nav>
 

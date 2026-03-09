@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useCallback } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useFilesStore } from "@/store/files-store";
@@ -13,15 +14,17 @@ interface NavItemProps {
   badge?: string;
 }
 
-export function NavItem({ href, label, icon: Icon, isActive, badge }: NavItemProps) {
-  const { setSearchQuery } = useFilesStore();
+export const NavItem = memo(function NavItem({ href, label, icon: Icon, isActive, badge }: NavItemProps) {
+  // Use a selector so this component only re-renders when setSearchQuery itself changes (never).
+  const setSearchQuery = useFilesStore((s) => s.setSearchQuery);
+  const clearSearch = useCallback(() => setSearchQuery(""), [setSearchQuery]);
 
   return (
     <Link
       href={href}
-      onClick={() => setSearchQuery("")}
+      onClick={clearSearch}
       className={cn(
-        "flex items-center gap-4 px-4 py-2.5 rounded-full text-sm font-medium transition-[background-color,color,box-shadow] duration-200",
+        "flex items-center gap-4 px-4 py-2.5 rounded-full text-sm font-medium transition-colors duration-150",
         isActive
           ? "bg-[#c2e7ff] text-[#001d35] font-semibold"
           : "text-gray-700 hover:bg-gray-200/50 hover:text-gray-900"
@@ -36,4 +39,4 @@ export function NavItem({ href, label, icon: Icon, isActive, badge }: NavItemPro
       )}
     </Link>
   );
-}
+});

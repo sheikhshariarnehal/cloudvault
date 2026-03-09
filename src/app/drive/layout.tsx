@@ -118,13 +118,13 @@ export default function DashboardLayout({
     <UploadZone folderId={currentFolderId}>
       <div className="flex h-dvh bg-[#f8fafd] overflow-hidden">
         {/* Desktop Sidebar — fixed, full height */}
-        <aside className="hidden lg:flex w-[280px] flex-shrink-0">
+        <aside className="hidden lg:flex w-[240px] flex-shrink-0">
           <Sidebar />
         </aside>
 
         {/* Mobile / Tablet Sidebar */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="p-0 w-[280px] lg:hidden">
+          <SheetContent side="left" className="p-0 w-[240px] lg:hidden">
             <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
             <Sidebar />
           </SheetContent>
@@ -141,9 +141,9 @@ export default function DashboardLayout({
 
           <TopBar />
 
-          <main className="flex-1 overflow-hidden px-2 pb-2 sm:px-3 sm:pb-3">
+          <main className="flex-1 overflow-hidden px-1.5 pb-1.5 sm:px-2 sm:pb-2">
             <div className="bg-white rounded-2xl h-full shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-              <div className="flex-1 overflow-y-auto mx-auto w-full max-w-[1600px] px-5 sm:px-8 lg:px-10 py-5 sm:py-6">
+              <div className="flex-1 overflow-y-auto w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4">
                 {children}
               </div>
             </div>
