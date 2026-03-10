@@ -6,21 +6,17 @@ import { formatFileSize, getFileCategory } from '@/types/file.types';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
-import { ChevronRight, HardDrive, Image as ImageIcon, Video, FileText, Database } from 'lucide-react';
+import { HardDrive, Image as ImageIcon, Video, FileText, Database, Layers } from 'lucide-react';
 
-
-const STORAGE_COLORS = {
-  photo: '#22c55e',
-  video: '#3b82f6',
-  document: '#9ca3af',
-  other: '#a855f7',
-  free: '#e5e7eb',
-};
+const STORAGE_SEGMENTS = [
+  { key: 'photo',    label: 'Photos',    color: '#6366f1', icon: ImageIcon },
+  { key: 'video',    label: 'Videos',    color: '#06b6d4', icon: Video     },
+  { key: 'document', label: 'Documents', color: '#f59e0b', icon: FileText  },
+  { key: 'other',    label: 'Other',     color: '#8b5cf6', icon: Database  },
+] as const;
 
 const DEFAULT_STORAGE_LIMIT =
   Number(process.env.NEXT_PUBLIC_MAX_GUEST_STORAGE_BYTES) || 107374182400;
@@ -47,110 +43,227 @@ export function StorageMeter() {
   const freeStorage = Math.max(storageLimit - breakdown.total, 0);
   const usedPercent = Math.min((breakdown.total / storageLimit) * 100, 100);
 
-  const stats = [
-    { label: 'Photo', size: breakdown.photo, color: STORAGE_COLORS.photo, icon: ImageIcon },
-    { label: 'Video', size: breakdown.video, color: STORAGE_COLORS.video, icon: Video },
-    { label: 'Document', size: breakdown.document, color: STORAGE_COLORS.document, icon: FileText },
-    { label: 'Other', size: breakdown.other, color: STORAGE_COLORS.other, icon: Database },
-    { label: 'Free Storage', size: freeStorage, color: STORAGE_COLORS.free, icon: HardDrive },
-  ];
+  // Build segmented bar with cumulative offsets
+  let accumulated = 0;
+  const segments = STORAGE_SEGMENTS.map((seg) => {
+    const pct = Math.min((breakdown[seg.key] / storageLimit) * 100, 100);
+    const offset = accumulated;
+    accumulated += pct;
+    return { ...seg, size: breakdown[seg.key], pct, offset };
+  });
+
+  const isNearFull = usedPercent > 85;
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <div
-          role='button'
-          tabIndex={0}
-          className='group rounded-2xl bg-white p-4 shadow-sm border border-gray-200/60 hover:shadow-md hover:border-gray-300 transition-all duration-300 flex flex-col space-y-4 text-left cursor-pointer'
+    <>
+      {/* ── Sidebar trigger card ── */}
+      <button
+        type='button'
+        onClick={() => setIsOpen(true)}
+        className='group w-full text-left rounded-xl px-3 py-3 hover:bg-gray-100/80 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-200'
+      >
+        {/* Header */}
+        <div className='flex items-center justify-between mb-2.5'>
+          <div className='flex items-center gap-1.5'>
+            <HardDrive className='w-3.5 h-3.5 text-gray-400' strokeWidth={2} />
+            <span className='text-[11px] font-semibold text-gray-400 uppercase tracking-widest'>
+              Storage
+            </span>
+          </div>
+          <span className='text-[11px] font-medium tabular-nums text-gray-400'>
+            {formatFileSize(breakdown.total)}
+            <span className='text-gray-300 mx-0.5'>/</span>
+            {formatFileSize(storageLimit)}
+          </span>
+        </div>
+
+        {/* Progress bar — gradient fill */}
+        <div className='relative h-1 w-full bg-gray-100 rounded-full overflow-hidden'>
+          <div
+            className='absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out'
+            style={{
+              width: `${usedPercent}%`,
+              background: isNearFull
+                ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
+                : 'linear-gradient(90deg, #6366f1, #06b6d4)',
+            }}
+          />
+        </div>
+
+        {/* Legend dots — only show categories that have data */}
+        {segments.some((s) => s.size > 0) && (
+          <div className='flex items-center gap-3 mt-2'>
+            {segments
+              .filter((s) => s.size > 0)
+              .slice(0, 3)
+              .map((seg) => (
+                <div key={seg.key} className='flex items-center gap-1'>
+                  <span
+                    className='inline-block w-1.5 h-1.5 rounded-full flex-shrink-0'
+                    style={{ backgroundColor: seg.color }}
+                  />
+                  <span className='text-[10px] font-medium text-gray-400'>{seg.label}</span>
+                </div>
+              ))}
+          </div>
+        )}
+      </button>
+
+      {/* ── Detail dialog ── */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        {/*
+          Mobile  : bottom sheet — overrides the centered `top-1/2 translate-y-[-50%]`
+                    positioning from the base DialogContent with bottom-0 + no translate.
+          Desktop : centered modal (sm: classes restore the default behaviour).
+        */}
+        <DialogContent
+          className={[
+            // Reset base padding/gap/rounding
+            'p-0 gap-0 border-0',
+            // ── Mobile: bottom sheet ──
+            'top-auto bottom-0 left-0 right-0',
+            'translate-x-0 translate-y-0',
+            'w-full max-w-full',
+            'rounded-t-2xl rounded-b-none',
+            'max-h-[90svh] flex flex-col',
+            'border-t border-x border-gray-100/80 shadow-2xl',
+            // Mobile slide animation
+            'data-[state=open]:slide-in-from-bottom-6',
+            'data-[state=closed]:slide-out-to-bottom-6',
+            // ── Desktop: centered modal ──
+            'sm:top-1/2 sm:left-1/2 sm:bottom-auto sm:right-auto',
+            'sm:-translate-x-1/2 sm:-translate-y-1/2',
+            'sm:max-w-sm sm:w-full',
+            'sm:rounded-2xl',
+            'sm:max-h-[90svh]',
+            'sm:border',
+            // Desktop zoom animation (override slide)
+            'sm:data-[state=open]:slide-in-from-bottom-0',
+            'sm:data-[state=closed]:slide-out-to-bottom-0',
+          ].join(' ')}
         >
-          <div className='flex items-center justify-between'>
-            <span className='text-sm font-semibold text-gray-900 tracking-tight'>Storage</span>
-            <div className='flex items-center gap-0.5'>
-              <span className='text-[13px] text-gray-500 font-medium'>
-                {formatFileSize(breakdown.total)} of {formatFileSize(storageLimit)}
-              </span>
-              <ChevronRight className='w-4 h-4 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-0.5 transition-all' />
-            </div>
+          {/* Drag handle — visible only on mobile */}
+          <div className='flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0'>
+            <div className='w-9 h-1 rounded-full bg-gray-200' />
           </div>
 
-          <div className='relative h-2 w-full bg-gray-100 rounded-full overflow-hidden'>
-            <div
-              className="absolute top-0 left-0 h-full bg-gray-900 rounded-full transition-all duration-700 ease-out"
-              style={{ width: `${usedPercent}%` }}
-            />
-          </div>
-        </div>
-      </DialogTrigger>
+          {/* Header — donut gauge */}
+          <div className='flex flex-col items-center px-6 pt-4 pb-5 bg-gradient-to-b from-gray-50/80 to-white border-b border-gray-100 flex-shrink-0 sm:pt-6'>
+            <DialogHeader className='mb-4 text-center'>
+              <DialogTitle className='text-[14px] font-semibold text-gray-700 tracking-tight flex items-center justify-center gap-2'>
+                <Layers className='w-3.5 h-3.5 text-gray-400' />
+                Storage Breakdown
+              </DialogTitle>
+            </DialogHeader>
 
-      <DialogContent className='sm:max-w-md p-0 overflow-hidden rounded-2xl'>
-        <div className='px-6 pt-6 pb-4 border-b border-gray-100 bg-gray-50/50'>
-          <DialogHeader>
-            <DialogTitle className='text-xl font-bold text-gray-900 tracking-tight'>
-              Storage Details
-            </DialogTitle>
-            <DialogDescription className='text-sm pt-1'>
-              Complete breakdown of your {formatFileSize(storageLimit)} storage quota.
-            </DialogDescription>
-          </DialogHeader>
-        </div>
-
-        <div className='p-6'>
-          <div className='flex flex-col items-center justify-center mb-8'>
-            <div className='relative w-36 h-36 flex items-center justify-center'>
-              <svg className='w-full h-full transform -rotate-90' viewBox='0 0 100 100'>
-                <circle cx='50' cy='50' r='42' stroke='#f3f4f6' strokeWidth='10' fill='none' />
+            {/* Donut — larger on mobile for easier reading */}
+            <div className='relative w-28 h-28 sm:w-24 sm:h-24'>
+              <svg className='w-full h-full -rotate-90' viewBox='0 0 100 100'>
+                <defs>
+                  <linearGradient id='gaugeGrad' x1='0%' y1='0%' x2='100%' y2='0%'>
+                    <stop offset='0%' stopColor='#6366f1' />
+                    <stop offset='100%' stopColor='#06b6d4' />
+                  </linearGradient>
+                </defs>
+                {/* Track */}
+                <circle cx='50' cy='50' r='40' stroke='#f3f4f6' strokeWidth='10' fill='none' />
+                {/* Arc */}
                 <circle
-                  cx='50' cy='50' r='42'
-                  stroke='#111827' strokeWidth='10' fill='none'
-                  strokeDasharray={`${usedPercent * 2.6389} 263.89`}
+                  cx='50' cy='50' r='40'
+                  fill='none'
+                  strokeWidth='10'
                   strokeLinecap='round'
+                  strokeDasharray={`${usedPercent * 2.5133} 251.33`}
+                  stroke={isNearFull ? '#ef4444' : 'url(#gaugeGrad)'}
                   className='transition-all duration-1000 ease-out'
                 />
               </svg>
               <div className='absolute inset-0 flex flex-col items-center justify-center'>
-                <span className='text-3xl font-bold text-gray-900 tracking-tighter'>
-                  {usedPercent.toFixed(1)}%
+                <span className='text-2xl sm:text-xl font-bold text-gray-900 tabular-nums leading-none'>
+                  {usedPercent.toFixed(0)}
+                  <span className='text-base sm:text-sm font-semibold text-gray-400'>%</span>
                 </span>
-                <span className='text-xs font-semibold text-gray-500 uppercase tracking-widest mt-1'>
-                  Used
+                <span className='text-[9px] font-semibold text-gray-400 uppercase tracking-widest mt-0.5'>
+                  used
                 </span>
               </div>
             </div>
 
-            <div className='mt-6 text-center'>
-              <div className='inline-flex items-baseline gap-1.5 px-3 py-1 bg-gray-100 rounded-full'>
-                <span className='text-sm font-bold text-gray-900'>{formatFileSize(breakdown.total)}</span>
-                <span className='text-xs font-medium text-gray-500'>/ {formatFileSize(storageLimit)}</span>
-              </div>
+            {/* Used / Total pill */}
+            <div className='mt-3 flex items-baseline gap-1 px-3 py-1.5 rounded-full bg-gray-100/80'>
+              <span className='text-[13px] sm:text-[12px] font-bold text-gray-800 tabular-nums'>
+                {formatFileSize(breakdown.total)}
+              </span>
+              <span className='text-[11px] sm:text-[10px] text-gray-400 font-medium'>
+                of {formatFileSize(storageLimit)}
+              </span>
             </div>
           </div>
 
-          <div className='space-y-3'>
-            {stats.map((item) => (
-              <div
-                key={item.label}
-                className='flex items-center justify-between p-3.5 rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow'
-              >
-                <div className='flex items-center gap-3.5'>
+          {/* Breakdown list — scrollable on mobile */}
+          <div className='overflow-y-auto flex-1 min-h-0'>
+            <div className='px-3 py-2 space-y-0.5'>
+              {[
+                ...segments,
+                {
+                  key: 'free',
+                  label: 'Free',
+                  color: '#d1d5db',
+                  icon: HardDrive,
+                  size: freeStorage,
+                  pct: (freeStorage / storageLimit) * 100,
+                },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
                   <div
-                    className='w-10 h-10 rounded-full flex items-center justify-center bg-gray-50 border border-gray-100'
-                    style={{ color: item.color }}
+                    key={item.key}
+                    className='flex items-center gap-3 px-3 py-3 sm:py-2 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors'
                   >
-                    <item.icon className='w-5 h-5' />
+                    {/* Color dot */}
+                    <span
+                      className='flex-shrink-0 w-2 h-2 rounded-full'
+                      style={{ backgroundColor: item.color }}
+                    />
+                    {/* Icon */}
+                    <Icon className='w-4 h-4 sm:w-3.5 sm:h-3.5 text-gray-400 flex-shrink-0' strokeWidth={1.75} />
+                    {/* Label */}
+                    <span className='flex-1 text-[13px] sm:text-[12px] font-medium text-gray-600'>
+                      {item.label}
+                    </span>
+                    {/* Percent */}
+                    <span className='text-[12px] sm:text-[11px] text-gray-400 tabular-nums w-10 text-right'>
+                      {item.pct.toFixed(1)}%
+                    </span>
+                    {/* Size */}
+                    <span className='text-[13px] sm:text-[12px] font-semibold text-gray-800 tabular-nums w-16 text-right'>
+                      {formatFileSize(item.size)}
+                    </span>
                   </div>
-                  <div className='flex flex-col'>
-                    <p className='text-sm font-semibold text-gray-900 leading-tight'>{item.label}</p>
-                    <p className='text-xs font-medium text-gray-500 mt-1'>
-                      {item.size > 0 ? `${((item.size / storageLimit) * 100).toFixed(1)}%` : "0%"}
-                    </p>
-                  </div>
-                </div>
-                <p className='text-[15px] font-bold text-gray-900'>{formatFileSize(item.size)}</p>
+                );
+              })}
+            </div>
+
+            {/* Segmented mini bar */}
+            <div className='px-4 pb-4 pt-1 flex-shrink-0'>
+              <div className='relative h-1 w-full bg-gray-100 rounded-full overflow-hidden'>
+                {segments.map((seg) => (
+                  <div
+                    key={seg.key}
+                    className='absolute top-0 h-full transition-all duration-700'
+                    style={{
+                      left: `${seg.offset}%`,
+                      width: `${seg.pct}%`,
+                      backgroundColor: seg.color,
+                    }}
+                  />
+                ))}
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
