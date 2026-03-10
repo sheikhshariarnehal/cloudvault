@@ -90,10 +90,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-5 sm:space-y-6">
+    <div className="flex flex-col">
       {/* Google Drive-style compact sticky header */}
-      <div className="flex items-center h-14 sticky top-0 z-20 bg-white -mx-3 px-3 sm:-mx-4 sm:px-4 lg:-mx-5 lg:px-5">
-        <h1 className="text-[22px] font-normal text-[#202124] flex-1 min-w-0 truncate">My Drive</h1>
+      <div className="flex items-center h-12 sm:h-14 sticky top-0 z-20 bg-white -mx-3 px-3 sm:-mx-4 sm:px-4 lg:-mx-5 lg:px-5">
+        <h1 className="text-lg sm:text-[22px] font-normal text-[#202124] flex-1 min-w-0 truncate">My Drive</h1>
         <TooltipProvider>
           <div className="flex items-center gap-0.5 flex-shrink-0">
             <Tooltip>
@@ -109,7 +109,7 @@ export default function DashboardPage() {
               </TooltipTrigger>
               <TooltipContent><p>Upload file</p></TooltipContent>
             </Tooltip>
-            <div className="hidden sm:flex items-center gap-0.5">
+            <div className="flex items-center gap-0.5">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -149,10 +149,10 @@ export default function DashboardPage() {
         </TooltipProvider>
       </div>
 
+      <div className="space-y-5 sm:space-y-6">
       {/* Folders Section (grid view only – in list view, folders are inlined in FileList) */}
       {effectiveViewMode === "grid" && filteredFolders.length > 0 && (
         <section>
-          <h2 className="text-sm font-medium text-[#202124] mb-3">Folders</h2>
           <FolderGrid folders={filteredFolders} />
         </section>
       )}
@@ -196,7 +196,7 @@ export default function DashboardPage() {
               <FileList
                 files={filteredFiles}
                 folders={filteredFolders}
-                stickyOffset={56}
+                stickyOffsetClass="top-12 sm:top-14"
                 topRightSlot={
                   <TabsList className="h-8 bg-[#f1f3f4] rounded-full px-1">
                     <TabsTrigger value="recent" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Recent</TabsTrigger>
@@ -221,7 +221,7 @@ export default function DashboardPage() {
             ) : (
               <FileList
                 files={starredFiles}
-                stickyOffset={56}
+                stickyOffsetClass="top-12 sm:top-14"
                 topRightSlot={
                   <TabsList className="h-8 bg-[#f1f3f4] rounded-full px-1">
                     <TabsTrigger value="recent" className="text-xs px-3.5 h-6 rounded-full font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">Recent</TabsTrigger>
@@ -233,6 +233,7 @@ export default function DashboardPage() {
           </TabsContent>
         </Tabs>
       </section>
+      </div>
     </div>
   );
 }

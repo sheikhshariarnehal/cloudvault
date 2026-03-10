@@ -74,6 +74,7 @@ interface FileListProps {
   folders?: DbFolder[];
   topRightSlot?: React.ReactNode;
   stickyOffset?: number;
+  stickyOffsetClass?: string;
 }
 
 // ─── Google Drive icon + color config ─────────────────────────────────
@@ -562,7 +563,7 @@ function SortHeaderButton({
 }
 
 // ─── Main FileList Component ─────────────────────────────────────────
-export function FileList({ files, folders = [], topRightSlot, stickyOffset = 0 }: FileListProps) {
+export function FileList({ files, folders = [], topRightSlot, stickyOffset = 0, stickyOffsetClass }: FileListProps) {
   const {
     selectedFiles,
     toggleFileSelection,
@@ -771,7 +772,10 @@ export function FileList({ files, folders = [], topRightSlot, stickyOffset = 0 }
   return (
     <div ref={containerRef} className="w-full mt-2 overflow-x-clip">
       {/* ─── Sticky wrapper: filter bar + column header ───────────── */}
-      <div className="sticky z-10 bg-white" style={{ top: stickyOffset }}>
+      <div
+        className={`sticky z-10 bg-white ${stickyOffsetClass ?? ""}`}
+        style={stickyOffsetClass ? undefined : { top: stickyOffset }}
+      >
         {/* ─── Top Action Bar (filters / selection) ─────────────── */}
         <TopActionBar
           hasSelection={hasSelection}
