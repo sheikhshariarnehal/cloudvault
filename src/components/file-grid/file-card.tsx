@@ -116,12 +116,12 @@ export function FileCard({ file }: FileCardProps) {
   return (
     <div
       ref={cardRef}
-      className="group flex flex-col rounded-lg border border-[#dadce0] bg-white hover:border-[#174ea6] hover:shadow-[0_1px_3px_0_rgba(60,64,67,0.3),0_4px_8px_3px_rgba(60,64,67,0.15)] transition-[box-shadow,border-color] duration-200 overflow-hidden cursor-pointer h-[200px]"
+      className="group flex flex-col rounded-lg border border-[#dadce0] bg-white hover:border-[#174ea6] hover:shadow-[0_1px_3px_0_rgba(60,64,67,0.3),0_4px_8px_3px_rgba(60,64,67,0.15)] transition-[box-shadow,border-color] duration-200 overflow-hidden cursor-pointer aspect-square"
     >
       {/* ===== TOP BAR: icon + name + ⋮ ===== */}
-      <div className="flex items-center gap-2 px-3 h-10 min-h-[40px] max-h-[40px] min-w-0 flex-shrink-0">
-        <Icon className="h-[18px] w-[18px] flex-shrink-0" style={{ color: config.color }} />
-        <span className="flex-1 min-w-0 text-[13px] font-medium text-[#202124] truncate leading-5">
+      <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 h-8 sm:h-10 min-h-[32px] sm:min-h-[40px] max-h-[32px] sm:max-h-[40px] min-w-0 flex-shrink-0">
+        <Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px] flex-shrink-0" style={{ color: config.color }} />
+        <span className="flex-1 min-w-0 text-[11px] sm:text-[13px] font-medium text-[#202124] truncate leading-4 sm:leading-5">
           {file.name}
         </span>
         <div
@@ -140,7 +140,7 @@ export function FileCard({ file }: FileCardProps) {
         {/* Placeholder background — always rendered, visible until image loads */}
         <div className={`absolute inset-0 flex items-center justify-center ${config.bgClass}`}>
           {category !== "video" && (
-            <Icon className="h-12 w-12 opacity-20" style={{ color: config.color }} />
+            <Icon className="h-8 w-8 sm:h-12 sm:w-12 opacity-20" style={{ color: config.color }} />
           )}
         </div>
 

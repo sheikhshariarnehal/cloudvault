@@ -17,7 +17,7 @@ export function TopBar() {
   const isAuthenticated = !isGuest && !!user;
 
   return (
-    <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 h-16 bg-[#f8fafd] shrink-0 sticky top-0 z-40">
+    <header className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 h-14 sm:h-16 bg-[#f8fafd] shrink-0 sticky top-0 z-40">
       {/* Mobile hamburger — hidden on desktop */}
       <Button
         variant="ghost"

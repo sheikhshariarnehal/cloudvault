@@ -17,20 +17,25 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { LayoutGrid, List, Loader2, Upload } from "lucide-react";
+import { LayoutGrid, List, Upload } from "lucide-react";
 import type { DbFile } from "@/types/file.types";
 import { useEffectiveViewMode } from "@/lib/utils/use-view-mode";
+import { GridViewSkeleton } from "@/components/skeletons/grid-view-skeleton";
+import { ListViewSkeleton } from "@/components/skeletons/list-view-skeleton";
 
 export default function DashboardPage() {
   const { user, guestSessionId } = useAuth();
-  const { files, folders, viewMode, setViewMode, isLoading, searchQuery, mergeFiles } =
+  const { files, folders, viewMode, setViewMode, isLoading, searchQuery, mergeFiles, dataLoaded } =
     useFilesStore();
   const { openFilePicker } = useUIStore();
   const effectiveViewMode = useEffectiveViewMode();
 
-  // ── Supplementary fetch: load root-level files that may have been
-  // cut off by the layout's initial limit ──────────────────────────
+  // ── Supplementary fetch: only fires when the layout hit its 1 000-file limit.
+  // On every normal load (< 1 000 files) this is skipped entirely, saving ~780 ms.
   useEffect(() => {
+    if (!dataLoaded) return;          // wait for layout's initial fetch to complete
+    if (files.length < 1000) return;  // layout got everything; no supplementary needed
+
     const userId = user?.id;
     const filterColumn = userId ? "user_id" : "guest_session_id";
     const filterValue = userId || guestSessionId;
@@ -40,7 +45,7 @@ export default function DashboardPage() {
       "id,user_id,guest_session_id,folder_id,name,original_name," +
       "mime_type,size_bytes,telegram_file_id,telegram_message_id," +
       "file_hash,tdlib_file_id,is_starred,is_trashed,trashed_at," +
-      "created_at,updated_at";
+      "created_at,updated_at,thumbnail_url";
 
     const supabase = createClient();
     supabase
@@ -55,7 +60,7 @@ export default function DashboardPage() {
           mergeFiles(data as unknown as DbFile[]);
         }
       });
-  }, [user?.id, guestSessionId, mergeFiles]);
+  }, [dataLoaded, files.length, user?.id, guestSessionId, mergeFiles]);
 
   // Filter files and folders for root level (no parent) and search
   const rootFolders = folders.filter((f) => !f.parent_id);
@@ -81,10 +86,15 @@ export default function DashboardPage() {
     )
     .slice(0, 10);
 
-  if (isLoading) {
+  if (isLoading || !dataLoaded) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex flex-col">
+        {/* Skeleton sticky header */}
+        <div className="flex items-center h-11 sm:h-14 sticky top-0 z-20 bg-white -mx-2.5 px-2.5 sm:-mx-4 sm:px-4">
+          <div className="h-5 w-24 bg-[#f1f3f4] rounded animate-pulse" />
+        </div>
+        <div className="skeleton-grid"><GridViewSkeleton /></div>
+        <div className="skeleton-list"><ListViewSkeleton /></div>
       </div>
     );
   }
@@ -92,8 +102,8 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col">
       {/* Google Drive-style compact sticky header */}
-      <div className="flex items-center h-12 sm:h-14 sticky top-0 z-20 bg-white -mx-3 px-3 sm:-mx-4 sm:px-4 lg:-mx-5 lg:px-5">
-        <h1 className="text-lg sm:text-[22px] font-normal text-[#202124] flex-1 min-w-0 truncate">My Drive</h1>
+      <div className="flex items-center h-11 sm:h-14 sticky top-0 z-20 bg-white -mx-2.5 px-2.5 sm:-mx-4 sm:px-4 lg:-mx-5 lg:px-5">
+        <h1 className="text-[17px] sm:text-[22px] font-normal text-[#202124] flex-1 min-w-0 truncate">My Drive</h1>
         <TooltipProvider>
           <div className="flex items-center gap-0.5 flex-shrink-0">
             <Tooltip>
@@ -101,7 +111,7 @@ export default function DashboardPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-full text-[#444746] hover:bg-[#f1f3f4]"
+                  className="hidden sm:flex h-9 w-9 rounded-full text-[#444746] hover:bg-[#f1f3f4]"
                   onClick={() => openFilePicker?.()}
                 >
                   <Upload className="h-[18px] w-[18px]" />
@@ -109,7 +119,7 @@ export default function DashboardPage() {
               </TooltipTrigger>
               <TooltipContent><p>Upload file</p></TooltipContent>
             </Tooltip>
-            <div className="flex items-center gap-0.5">
+            <div className="hidden sm:flex items-center gap-0.5">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -149,18 +159,18 @@ export default function DashboardPage() {
         </TooltipProvider>
       </div>
 
-      <div className="space-y-5 sm:space-y-6">
+      <div className="space-y-4 sm:space-y-6 pt-3 sm:pt-4">
       {/* Folders Section (grid view only – in list view, folders are inlined in FileList) */}
       {effectiveViewMode === "grid" && filteredFolders.length > 0 && (
-        <section>
+        <section className="space-y-2">
           <FolderGrid folders={filteredFolders} />
         </section>
       )}
 
       {/* Suggested from your activity */}
       {!searchQuery && files.length > 0 && effectiveViewMode !== "list" && (
-        <section>
-          <h2 className="text-sm font-medium text-[#202124] mb-3">
+        <section className="hidden sm:block">
+          <h2 className="text-xs sm:text-sm font-medium text-[#202124] mb-2 sm:mb-3">
             Suggested
           </h2>
           <SuggestedFiles files={recentFiles.slice(0, 6)} />
@@ -184,7 +194,7 @@ export default function DashboardPage() {
           <TabsContent value="recent">
             {effectiveViewMode === "grid" ? (
               filteredFiles.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
                   {filteredFiles.map((file) => (
                     <FileCard key={file.id} file={file} />
                   ))}
@@ -210,7 +220,7 @@ export default function DashboardPage() {
           <TabsContent value="starred">
             {effectiveViewMode === "grid" ? (
               starredFiles.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
                   {starredFiles.map((file) => (
                     <FileCard key={file.id} file={file} />
                   ))}

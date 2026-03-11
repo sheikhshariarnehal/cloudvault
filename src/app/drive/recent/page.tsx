@@ -5,9 +5,11 @@ import { FileList } from "@/components/file-list/file-list";
 import { FileCard } from "@/components/file-grid/file-card";
 import { Clock } from "lucide-react";
 import { useEffectiveViewMode } from "@/lib/utils/use-view-mode";
+import { GridViewSkeleton } from "@/components/skeletons/grid-view-skeleton";
+import { ListViewSkeleton } from "@/components/skeletons/list-view-skeleton";
 
 export default function RecentPage() {
-  const { files } = useFilesStore();
+  const { files, dataLoaded } = useFilesStore();
   const viewMode = useEffectiveViewMode();
 
   const recentFiles = [...files]
@@ -17,18 +19,31 @@ export default function RecentPage() {
     )
     .slice(0, 50);
 
+  if (!dataLoaded) {
+    return (
+      <div className="pt-2 sm:pt-4 space-y-4 sm:space-y-6">
+        <div>
+          <div className="h-6 w-32 bg-[#f1f3f4] rounded animate-pulse" />
+          <div className="h-3 w-56 bg-[#f1f3f4] rounded animate-pulse mt-2" />
+        </div>
+        <div className="skeleton-grid"><GridViewSkeleton folderCount={0} fileCount={8} /></div>
+        <div className="skeleton-list"><ListViewSkeleton rowCount={8} /></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="pt-3 sm:pt-4 space-y-6">
+    <div className="pt-2 sm:pt-4 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#202124]">Recent Files</h1>
-        <p className="text-sm text-[#5f6368]">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#202124]">Recent Files</h1>
+        <p className="text-xs sm:text-sm text-[#5f6368]">
           Your most recently modified files
         </p>
       </div>
 
       {recentFiles.length > 0 ? (
         viewMode === "grid" ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
             {recentFiles.map((file) => (
               <FileCard key={file.id} file={file} />
             ))}

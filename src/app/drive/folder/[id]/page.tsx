@@ -25,6 +25,8 @@ import { ChevronRight, FolderOpen, Upload, Plus, FolderPlus, FolderUp, LayoutGri
 import Link from "next/link";
 import type { BreadcrumbItem, DbFile } from "@/types/file.types";
 import { useEffectiveViewMode } from "@/lib/utils/use-view-mode";
+import { GridViewSkeleton } from "@/components/skeletons/grid-view-skeleton";
+import { ListViewSkeleton } from "@/components/skeletons/list-view-skeleton";
 
 export default function FolderPage({
   params,
@@ -33,7 +35,7 @@ export default function FolderPage({
 }) {
   const { id } = use(params);
   const { user, guestSessionId } = useAuth();
-  const { files, folders, viewMode, setViewMode, setCurrentFolderId, mergeFiles } = useFilesStore();
+  const { files, folders, viewMode, setViewMode, setCurrentFolderId, mergeFiles, dataLoaded } = useFilesStore();
   const { openFilePicker, openFolderPicker, setNewFolderModalOpen } = useUIStore();
   const effectiveViewMode = useEffectiveViewMode();
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
@@ -89,10 +91,24 @@ export default function FolderPage({
     return () => setCurrentFolderId(null);
   }, [id, currentFolder, folders, setCurrentFolderId]);
 
+  if (!dataLoaded) {
+    return (
+      <div className="pt-2 sm:pt-4 space-y-4 sm:space-y-6">
+        <div className="flex items-center gap-1">
+          <div className="h-4 w-16 bg-[#f1f3f4] rounded animate-pulse" />
+          <div className="h-4 w-4 bg-[#f1f3f4] rounded animate-pulse" />
+          <div className="h-4 w-24 bg-[#f1f3f4] rounded animate-pulse" />
+        </div>
+        <div className="skeleton-grid"><GridViewSkeleton folderCount={1} fileCount={8} /></div>
+        <div className="skeleton-list"><ListViewSkeleton rowCount={8} /></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="pt-3 sm:pt-4 space-y-6">
+    <div className="pt-2 sm:pt-4 space-y-4 sm:space-y-6">
       {/* Breadcrumbs */}
-      <nav className="flex items-center gap-1 text-sm flex-wrap">
+      <nav className="flex items-center gap-1 text-xs sm:text-sm flex-wrap">
         {breadcrumbs.map((crumb, index) => (
           <div key={crumb.id ?? "root"} className="flex items-center gap-1">
             {index > 0 && (
@@ -117,10 +133,10 @@ export default function FolderPage({
       </nav>
 
       {/* Action Toolbar */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-10 text-sm font-medium shadow-sm hover:shadow">
+            <Button variant="outline" size="sm" className="h-8 sm:h-10 text-xs sm:text-sm font-medium shadow-sm hover:shadow">
               <Plus className="h-4 w-4 mr-2" />
               Create
             </Button>
@@ -144,10 +160,10 @@ export default function FolderPage({
         <Button
           variant="outline"
           size="sm"
-          className="h-10 text-sm font-medium shadow-sm hover:shadow"
+          className="h-8 sm:h-10 text-xs sm:text-sm font-medium shadow-sm hover:shadow"
           onClick={() => openFilePicker?.()}
         >
-          <Upload className="h-4 w-4 mr-2" />
+          <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
           <span className="hidden xs:inline">Upload</span>
         </Button>
 
@@ -213,7 +229,7 @@ export default function FolderPage({
           {folderFiles.length > 0 ? (
             <section>
               <h2 className="text-sm font-medium text-[#202124] mb-3">Files</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3">
                 {folderFiles.map((file) => (
                   <FileCard key={file.id} file={file} />
                 ))}

@@ -10,6 +10,9 @@ interface FilesState {
   currentFolderId: string | null;
   isLoading: boolean;
   searchQuery: string;
+  /** True after the layout's initial Supabase fetch completes. Pages use this
+   *  to skip their supplementary fetch when data is already in the store. */
+  dataLoaded: boolean;
 
   // File actions
   setFiles: (files: DbFile[]) => void;
@@ -41,6 +44,7 @@ interface FilesState {
   setCurrentFolderId: (id: string | null) => void;
   setIsLoading: (loading: boolean) => void;
   setSearchQuery: (query: string) => void;
+  setDataLoaded: (loaded: boolean) => void;
 }
 
 export const useFilesStore = create<FilesState>((set) => ({
@@ -52,6 +56,7 @@ export const useFilesStore = create<FilesState>((set) => ({
   currentFolderId: null,
   isLoading: false,
   searchQuery: "",
+  dataLoaded: false,
 
   // File actions
   setFiles: (files) => set({ files }),
@@ -145,7 +150,17 @@ export const useFilesStore = create<FilesState>((set) => ({
     })),
 
   // UI actions
-  setViewMode: (mode) => set({ viewMode: mode }),
+  setViewMode: (mode) => {
+    try {
+      localStorage.setItem("viewMode", mode);
+      if (mode === "grid") {
+        document.documentElement.setAttribute("data-view-mode", "grid");
+      } else {
+        document.documentElement.removeAttribute("data-view-mode");
+      }
+    } catch {}
+    set({ viewMode: mode });
+  },
   setSelectedFiles: (ids) => set({ selectedFiles: ids }),
   toggleFileSelection: (id) =>
     set((state) => ({
@@ -157,4 +172,5 @@ export const useFilesStore = create<FilesState>((set) => ({
   setCurrentFolderId: (id) => set({ currentFolderId: id }),
   setIsLoading: (loading) => set({ isLoading: loading }),
   setSearchQuery: (query) => set({ searchQuery: query }),
+  setDataLoaded: (loaded) => set({ dataLoaded: loaded }),
 }));

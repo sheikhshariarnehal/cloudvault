@@ -10,12 +10,20 @@ import { Sidebar } from "@/components/sidebar/sidebar";
 import { TopBar } from "@/components/top-bar/top-bar";
 import { UploadZone } from "@/components/upload/upload-zone";
 import { UploadProgress } from "@/components/upload/upload-progress";
-import { PreviewModal } from "@/components/preview/preview-modal";
+import dynamic from "next/dynamic";
 import { NewFolderModal } from "@/components/modals/new-folder-modal";
 import { RenameModal } from "@/components/modals/rename-modal";
 import type { DbFile, DbFolder } from "@/types/file.types";
 import { ShareModal } from "@/components/modals/share-modal";
+import { MobileUploadFab } from "@/components/upload/mobile-upload-fab";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+
+// Lazy-load PreviewModal — it bundles 8 preview sub-components that are only
+// needed when the user actually opens a file. Deferring saves ~60 KB on initial load.
+const PreviewModal = dynamic(
+  () => import("@/components/preview/preview-modal").then((m) => ({ default: m.PreviewModal })),
+  { ssr: false }
+);
 
 export default function DashboardLayout({
   children,
@@ -23,7 +31,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { user, guestSessionId, isLoading: authLoading } = useAuth();
-  const { setFiles, setFolders, setIsLoading, currentFolderId } = useFilesStore();
+  const { setFiles, setFolders, setIsLoading, setDataLoaded, currentFolderId } = useFilesStore();
   const { sidebarOpen, setSidebarOpen, isOnline, setIsOnline } = useUIStore();
 
 
@@ -83,11 +91,12 @@ export default function DashboardLayout({
         console.error("Failed to load data:", error);
       } finally {
         setIsLoading(false);
+        setDataLoaded(true);
       }
     };
 
     loadData();
-  }, [user?.id, guestSessionId, authLoading, setFiles, setFolders, setIsLoading]);
+  }, [user?.id, guestSessionId, authLoading, setFiles, setFolders, setIsLoading, setDataLoaded]);
 
   // Online/offline detection
   useEffect(() => {
@@ -141,14 +150,17 @@ export default function DashboardLayout({
 
           <TopBar />
 
-          <main className="flex-1 overflow-hidden px-1.5 pb-1.5 sm:px-2 sm:pb-2">
-            <div className="bg-white rounded-2xl h-full shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-              <div className="flex-1 overflow-y-auto w-full px-3 sm:px-4 lg:px-5 pb-3 sm:pb-4">
+          <main className="flex-1 overflow-hidden px-1 pb-1 sm:px-2 sm:pb-2">
+            <div className="bg-white rounded-xl sm:rounded-2xl h-full shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+              <div className="flex-1 overflow-y-auto w-full px-2.5 sm:px-4 lg:px-5 pb-20 sm:pb-4">
                 {children}
               </div>
             </div>
           </main>
         </div>
+
+        {/* Mobile FAB */}
+        <MobileUploadFab />
 
         {/* Modals */}
         <UploadProgress />
