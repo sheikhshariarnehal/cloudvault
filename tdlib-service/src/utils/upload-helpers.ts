@@ -326,6 +326,51 @@ export function buildDocumentFallbackParams(
 }
 
 /**
+ * Send a file to Telegram with automatic document fallback on media rejection.
+ * Combines ensureChatLoaded + invokeWithSlot + waitForMessageSent + extractFileInfo
+ * into a single call. Used by both upload.ts and chunked-upload.ts.
+ */
+export async function sendMessageWithFallback(
+  client: TDLibClient,
+  chatId: number,
+  localFilePath: string,
+  fileName: string,
+  mimeType: string,
+  fileSize: number,
+  session?: ProgressSession,
+): Promise<{ sentMessage: Record<string, unknown>; fileInfo: NonNullable<ReturnType<typeof extractFileInfo>> }> {
+  await ensureChatLoaded(client, chatId);
+
+  const sendParams = buildSendParams(chatId, localFilePath, fileName, mimeType);
+  const documentFallbackParams = buildDocumentFallbackParams(chatId, localFilePath, fileName);
+
+  let sentMessage: Record<string, unknown>;
+  try {
+    const pending = await invokeWithSlot(client, sendParams);
+    sentMessage = await waitForMessageSent(client, pending, fileSize, session);
+  } catch (sendErr) {
+    const sendErrMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+    if (isMediaRejection(sendErrMsg)) {
+      console.warn(`[Upload] Media rejected (${sendErrMsg}), retrying as document...`);
+      const pending = await invokeWithSlot(client, documentFallbackParams);
+      sentMessage = await waitForMessageSent(client, pending, fileSize, session);
+    } else {
+      throw sendErr;
+    }
+  }
+
+  const fileInfo = extractFileInfo(sentMessage);
+  if (!fileInfo) {
+    throw new Error("Failed to extract file info from Telegram response");
+  }
+  if (!fileInfo.remoteFileId || /^\d+$/.test(fileInfo.remoteFileId)) {
+    throw new Error("Telegram returned an invalid file ID. Please retry.");
+  }
+
+  return { sentMessage, fileInfo };
+}
+
+/**
  * Ensure the Telegram channel is loaded in TDLib's local chat DB.
  * TDLib returns "Chat not found" if the chat hasn't been resolved yet.
  * Throws a descriptive error on failure.

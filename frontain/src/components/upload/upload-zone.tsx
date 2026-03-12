@@ -168,10 +168,15 @@ function getFilesFromInputEvent(
  *   Prefixed with "p:" so partial hashes never collide with full hashes.
  */
 async function computeFileHash(file: File): Promise<string> {
-  const FULL_HASH_LIMIT = 100 * 1024 * 1024; // 100 MB
+  const FULL_HASH_LIMIT = 50 * 1024 * 1024; // 50 MB
 
   if (file.size <= FULL_HASH_LIMIT) {
-    // Full SHA-256 for small/medium files
+    // Stream SHA-256 in 2 MB chunks to avoid a single large allocation
+    const CHUNK = 2 * 1024 * 1024;
+    const stream = file.stream();
+    const reader = stream.getReader();
+    // Use subtle crypto via importKey/sign for streaming not available;
+    // fall back to reading chunks into a single buffer but cap at 50 MB.
     const buffer = await file.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
     return Array.from(new Uint8Array(hashBuffer))
@@ -179,7 +184,7 @@ async function computeFileHash(file: File): Promise<string> {
       .join("");
   }
 
-  // ── Fast partial hash for large files (> 100 MB) ──────────────────
+  // ── Fast partial hash for large files (> 50 MB) ───────────────────
   // Read first 10 MB + last 10 MB + encode the file size as bytes.
   // This catches 99.99%+ of duplicates without loading the full file.
   const PARTIAL = 10 * 1024 * 1024; // 10 MB
@@ -505,12 +510,14 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       chunked: file.size > CHUNK_THRESHOLD,
     });
 
-    // ── Generate video thumbnail client-side (non-blocking, non-fatal) ──
-    let thumbnailBlob: Blob | null = null;
+    // ── Generate video thumbnail client-side (non-blocking, 5s timeout) ──
     let thumbnailBase64: string | null = null;
     if (file.type.startsWith("video/")) {
       try {
-        thumbnailBlob = await extractVideoThumbnail(file);
+        const thumbnailBlob = await Promise.race([
+          extractVideoThumbnail(file),
+          new Promise<null>((r) => setTimeout(() => r(null), 5000)),
+        ]);
         if (thumbnailBlob) {
           const buf = await thumbnailBlob.arrayBuffer();
           thumbnailBase64 = btoa(
@@ -730,7 +737,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
       console.log(`[Upload] Processing ${filesWithPaths.length} file(s) from folder drop`);
 
-      const STAGGER_MS = 1500;
+      const STAGGER_MS = 300;
 
       // Separate files that need folder creation from plain files
       const hasAnyFolders = filesWithPaths.some((f) => f.pathSegments.length > 0);

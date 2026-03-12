@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateThumbnail } from "@/lib/telegram/thumbnail";
-import { uploadThumbnail, isR2Configured } from "@/lib/r2";
+import { resolveUploadThumbnail } from "@/lib/telegram/upload-thumbnail";
 
 const BACKEND_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
 const API_KEY = process.env.TDLIB_SERVICE_API_KEY || "";
@@ -90,38 +89,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate thumbnail for image/video files (sync with timeout, non-fatal)
-    if (
-      fileRecord.mime_type?.startsWith("image/") ||
-      fileRecord.mime_type?.startsWith("video/")
-    ) {
-      // 1. Try Telegram-based thumbnail (works when Telegram has processed the video)
-      let r2Url = await generateThumbnail(fileRecord.id, fileRecord.telegram_message_id, {
-        storageType: fileRecord.storage_type || "bot",
-        userId: userId,
-        chatId: fileRecord.telegram_chat_id,
-      });
-
-      // 2. Fallback: use client-generated thumbnail from the browser
-      if (!r2Url && clientThumbnail && isR2Configured()) {
-        try {
-          const buffer = Buffer.from(clientThumbnail, "base64");
-          if (buffer.length > 0) {
-            r2Url = await uploadThumbnail(fileRecord.id, buffer, "image/jpeg");
-            // Persist to Supabase
-            await supabase
-              .from("files")
-              .update({ thumbnail_url: r2Url })
-              .eq("id", fileRecord.id);
-            console.log(`[Upload] Client thumbnail saved to R2 for ${fileName}`);
-          }
-        } catch (thumbErr) {
-          console.error("[Upload] Client thumbnail R2 upload failed:", thumbErr);
-        }
-      }
-
-      if (r2Url) fileRecord.thumbnail_url = r2Url;
-    }
+    // Generate thumbnail for image/video files (non-fatal)
+    await resolveUploadThumbnail(supabase, fileRecord, {
+      storageType: telegramResult.storage_type || "bot",
+      userId,
+      clientThumbnail,
+      logLabel: fileName,
+    });
 
     return NextResponse.json({ file: fileRecord }, { status: 201 });
   } catch (error) {

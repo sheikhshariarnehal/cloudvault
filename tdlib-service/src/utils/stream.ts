@@ -66,12 +66,17 @@ export function streamFileToResponse(
 }
 
 /**
- * Read a file and return it as a base64 data URI
+ * Read a file and return it as a base64 data URI.
+ * Rejects files larger than 50 MB to prevent OOM.
  */
 export function fileToBase64DataUri(
   filePath: string,
   mimeType?: string
 ): string {
+  const stat = fs.statSync(filePath);
+  if (stat.size > 50 * 1024 * 1024) {
+    throw new Error(`File too large for base64 conversion (${Math.round(stat.size / 1024 / 1024)} MB)`);
+  }
   const buffer = fs.readFileSync(filePath);
   const type = mimeType || mime.lookup(filePath) || "application/octet-stream";
   return `data:${type};base64,${buffer.toString("base64")}`;

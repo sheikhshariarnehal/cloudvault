@@ -21,14 +21,7 @@ import { fileURLToPath } from "url";
 import { sessionManager } from "../session-manager.js";
 import { cleanupTempFile } from "../utils/temp-file.js";
 import {
-  invokeWithSlot,
-  isMediaRejection,
-  waitForMessageSent,
-  extractFileInfo,
-  getThumbnailDataUri,
-  buildSendParams,
-  buildDocumentFallbackParams,
-  ensureChatLoaded,
+  sendMessageWithFallback,
   parseFloodWait,
   type ProgressSession,
 } from "../utils/upload-helpers.js";
@@ -298,8 +291,14 @@ router.post("/complete", async (req: Request, res: Response) => {
 
   // Verify all chunks received
   if (session.receivedChunks.size !== session.totalChunks) {
+    // Return which chunks are missing so the client can retry only those
+    const missing: number[] = [];
+    for (let i = 0; i < session.totalChunks; i++) {
+      if (!session.receivedChunks.has(i)) missing.push(i);
+    }
     res.status(400).json({
       error: `Missing chunks: received ${session.receivedChunks.size} of ${session.totalChunks}`,
+      missing,
     });
     return;
   }
@@ -364,50 +363,10 @@ router.post("/complete", async (req: Request, res: Response) => {
     const mimeType = session.mimeType;
     const fileName = session.fileName;
 
-    const sendParams = buildSendParams(chatId, assembledPath, fileName, mimeType);
-    const documentFallbackParams = buildDocumentFallbackParams(chatId, assembledPath, fileName);
-
-    // Ensure chat is loaded
-    try {
-      await ensureChatLoaded(client, chatId);
-    } catch (chErr) {
-      cleanupTempFile(assembledPath);
-      sessions.delete(uploadId);
-      res.status(400).json({ error: (chErr as Error).message });
-      return;
-    }
-
-    // sendMessage with media rejection fallback
-    let sentMessage: Record<string, unknown>;
-    try {
-      const pending = await invokeWithSlot(client, sendParams);
-      sentMessage = await waitForMessageSent(client, pending, session.fileSize, session);
-    } catch (sendErr) {
-      const sendErrMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
-      if (isMediaRejection(sendErrMsg)) {
-        console.warn(`[ChunkedUpload] Media rejected (${sendErrMsg}), retrying as document...`);
-        const pending = await invokeWithSlot(client, documentFallbackParams);
-        sentMessage = await waitForMessageSent(client, pending, session.fileSize, session);
-      } else {
-        throw sendErr;
-      }
-    }
-
-    // Extract file info
-    const fileInfo = extractFileInfo(sentMessage);
-    if (!fileInfo) {
-      cleanupTempFile(assembledPath);
-      sessions.delete(uploadId);
-      res.status(500).json({ error: "Failed to extract file info from Telegram response" });
-      return;
-    }
-
-    if (!fileInfo.remoteFileId || /^\d+$/.test(fileInfo.remoteFileId)) {
-      cleanupTempFile(assembledPath);
-      sessions.delete(uploadId);
-      res.status(500).json({ error: "Telegram returned an invalid file ID. Please retry." });
-      return;
-    }
+    // Send to Telegram with automatic media→document fallback
+    const { sentMessage, fileInfo } = await sendMessageWithFallback(
+      client, chatId, assembledPath, fileName, mimeType, session.fileSize, session,
+    );
 
     // Send response immediately - don't wait for thumbnail
     res.status(201).json({

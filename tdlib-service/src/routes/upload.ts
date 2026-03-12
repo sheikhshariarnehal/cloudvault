@@ -6,14 +6,7 @@ import { fileURLToPath } from "url";
 import { sessionManager } from "../session-manager.js";
 import { cleanupTempFile } from "../utils/temp-file.js";
 import {
-  invokeWithSlot,
-  isMediaRejection,
-  waitForMessageSent,
-  extractFileInfo,
-  getThumbnailDataUri,
-  buildSendParams,
-  buildDocumentFallbackParams,
-  ensureChatLoaded,
+  sendMessageWithFallback,
   parseFloodWait,
 } from "../utils/upload-helpers.js";
 
@@ -87,49 +80,10 @@ router.post("/", upload.single("file"), async (req: Request, res: Response) => {
     }
     console.log(`[Upload] File received: ${fileName} (${fileStats.size} bytes) → ${localFilePath} [${storageType}]`);
 
-    // Build the appropriate send params based on MIME type
-    const sendParams = buildSendParams(chatId, localFilePath, fileName, mimeType);
-    const documentFallbackParams = buildDocumentFallbackParams(chatId, localFilePath, fileName);
-
-    // Ensure chat is loaded in TDLib's local chat DB
-    try {
-      await ensureChatLoaded(client, chatId);
-    } catch (chErr) {
-      cleanupTempFile(localFilePath);
-      res.status(400).json({ error: (chErr as Error).message });
-      return;
-    }
-
-    // ── Send with document fallback on media rejection ─────────────────
-    let sentMessage: Record<string, unknown>;
-    try {
-      const pending = await invokeWithSlot(client, sendParams);
-      sentMessage = await waitForMessageSent(client, pending, fileStats.size);
-    } catch (sendErr) {
-      const sendErrMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
-      if (isMediaRejection(sendErrMsg)) {
-        console.warn(`[Upload] Media rejected by Telegram (${sendErrMsg}), retrying as document...`);
-        const pending = await invokeWithSlot(client, documentFallbackParams);
-        sentMessage = await waitForMessageSent(client, pending, fileStats.size);
-      } else {
-        throw sendErr;
-      }
-    }
-
-    // Extract file info from the sent message
-    const fileInfo = extractFileInfo(sentMessage);
-
-    if (!fileInfo) {
-      res.status(500).json({ error: "Failed to extract file info from Telegram response" });
-      return;
-    }
-
-    // Safety net: reject numeric-only file IDs (TDLib internal IDs stored by mistake)
-    if (!fileInfo.remoteFileId || /^\d+$/.test(fileInfo.remoteFileId)) {
-      console.error("[Upload] Got invalid numeric-only file_id — aborting:", fileInfo.remoteFileId);
-      res.status(500).json({ error: "Telegram returned an invalid file ID. Please retry." });
-      return;
-    }
+    // Send to Telegram with automatic media→document fallback
+    const { sentMessage, fileInfo } = await sendMessageWithFallback(
+      client, chatId, localFilePath, fileName, mimeType, fileStats.size,
+    );
 
     // Send response immediately - don't wait for thumbnail
     res.status(201).json({
