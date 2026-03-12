@@ -22,6 +22,10 @@ export interface SignedTokenPayload {
   fn: string;
   /** File size in bytes */
   sz?: number;
+  /** Storage type: 'bot' or 'user' */
+  st?: string;
+  /** Supabase user ID (for user storage downloads) */
+  uid?: string;
   /** Expiry (seconds since epoch) */
   exp: number;
 }

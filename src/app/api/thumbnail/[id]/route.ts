@@ -43,7 +43,7 @@ export async function GET(
 
     const { data: file, error } = await supabase
       .from("files")
-      .select("thumbnail_url, telegram_message_id, mime_type")
+      .select("thumbnail_url, telegram_message_id, mime_type, storage_type, user_id, telegram_chat_id")
       .eq("id", id)
       .single();
 
@@ -58,7 +58,11 @@ export async function GET(
 
     // ── Need to fetch from TDLib backend (handles R2 upload server-side) ──
     if (file.telegram_message_id) {
-      const r2Url = await generateThumbnail(id, file.telegram_message_id);
+      const r2Url = await generateThumbnail(id, file.telegram_message_id, {
+        storageType: file.storage_type || "bot",
+        userId: file.user_id,
+        chatId: file.telegram_chat_id,
+      });
       if (r2Url) {
         return NextResponse.redirect(r2Url, 302);
       }

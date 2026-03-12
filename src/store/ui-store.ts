@@ -10,6 +10,7 @@ interface UIState {
   shareModalOpen: boolean;
   shareFileId: string | null;
   shareFolderId: string | null;
+  connectTelegramModalOpen: boolean;
   isOnline: boolean;
   openFilePicker: (() => void) | null;
   openFolderPicker: (() => void) | null;
@@ -25,6 +26,7 @@ interface UIState {
   setShareModalOpen: (open: boolean) => void;
   setShareFileId: (id: string | null) => void;
   setShareFolderId: (id: string | null) => void;
+  setConnectTelegramModalOpen: (open: boolean) => void;
   setIsOnline: (online: boolean) => void;
   setOpenFilePicker: (fn: (() => void) | null) => void;
   setOpenFolderPicker: (fn: (() => void) | null) => void;
@@ -41,6 +43,7 @@ export const useUIStore = create<UIState>((set) => ({
   shareModalOpen: false,
   shareFileId: null,
   shareFolderId: null,
+  connectTelegramModalOpen: false,
   isOnline: true,
   openFilePicker: null,
   openFolderPicker: null,
@@ -56,6 +59,7 @@ export const useUIStore = create<UIState>((set) => ({
   setShareModalOpen: (open) => set({ shareModalOpen: open }),
   setShareFileId: (id) => set({ shareFileId: id }),
   setShareFolderId: (id) => set({ shareFolderId: id }),
+  setConnectTelegramModalOpen: (open) => set({ connectTelegramModalOpen: open }),
   setIsOnline: (online) => set({ isOnline: online }),
   setOpenFilePicker: (fn) => set({ openFilePicker: fn }),
   setOpenFolderPicker: (fn) => set({ openFolderPicker: fn }),

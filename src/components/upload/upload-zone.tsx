@@ -250,6 +250,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
         fileSize: file.size,
         mimeType: file.type || "application/octet-stream",
         totalChunks,
+        userId: user?.id || null,
       }),
     });
 

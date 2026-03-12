@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
-import { Mail, Eye, EyeOff } from "lucide-react";
+import { Mail, Eye, EyeOff, Send, Cloud, Shield } from "lucide-react";
 import NextImage from "next/image";
 
 export default function SignUpPage() {
@@ -90,7 +90,7 @@ export default function SignUpPage() {
         <div className="text-center">
           <NextImage src="/logo.webp" alt="CloudVault" width={52} height={52} className="mx-auto mb-3" priority />
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create your account</h1>
-          <p className="text-sm text-gray-500 mt-1">Free forever. No credit card required.</p>
+          <p className="text-sm text-gray-500 mt-1">Store files in your own Telegram. Free &amp; unlimited.</p>
         </div>
 
         {/* Card */}
@@ -205,6 +205,28 @@ export default function SignUpPage() {
             Sign in
           </Link>
         </p>
+
+        {/* Feature highlights */}
+        <div className="grid grid-cols-3 gap-3 pt-2">
+          <div className="text-center space-y-1.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 bg-blue-50 rounded-lg">
+              <Send className="h-4 w-4 text-blue-600" />
+            </div>
+            <p className="text-[11px] text-gray-500 leading-tight">Telegram<br />Storage</p>
+          </div>
+          <div className="text-center space-y-1.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 bg-green-50 rounded-lg">
+              <Cloud className="h-4 w-4 text-green-600" />
+            </div>
+            <p className="text-[11px] text-gray-500 leading-tight">Unlimited<br />Space</p>
+          </div>
+          <div className="text-center space-y-1.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 bg-purple-50 rounded-lg">
+              <Shield className="h-4 w-4 text-purple-600" />
+            </div>
+            <p className="text-[11px] text-gray-500 leading-tight">End-to-End<br />Encrypted</p>
+          </div>
+        </div>
       </div>
     </div>
   );

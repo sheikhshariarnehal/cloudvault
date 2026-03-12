@@ -47,6 +47,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Determine storage type: authenticated users with connected Telegram use 'user' storage
+    const supabase = await createClient();
+    let storageType = "bot";
+    if (userId) {
+      const { data: profile } = await supabase
+        .from("users")
+        .select("telegram_connected")
+        .eq("id", userId)
+        .single();
+      if (profile?.telegram_connected) {
+        storageType = "user";
+      }
+    }
+
     // Stream the File directly to TDLib service — no ArrayBuffer conversion
     const telegramResult = await uploadToBackend(
       file,
@@ -56,11 +70,11 @@ export async function POST(request: NextRequest) {
         userId,
         guestSessionId,
         folderId,
+        storageType,
       }
     );
 
     // Insert file record into Supabase now that we have the Telegram IDs
-    const supabase = await createClient();
     const { data: fileRecord, error: dbError } = await supabase
       .from("files")
       .insert({
@@ -76,6 +90,8 @@ export async function POST(request: NextRequest) {
         tdlib_file_id: telegramResult.tdlib_file_id || null,
         thumbnail_url: telegramResult.thumbnail_data || null,
         file_hash: fileHash || null,
+        storage_type: telegramResult.storage_type || storageType,
+        telegram_chat_id: telegramResult.chat_id || null,
       })
       .select()
       .single();
@@ -94,7 +110,11 @@ export async function POST(request: NextRequest) {
       fileRecord.mime_type?.startsWith("video/")
     ) {
       // 1. Try Telegram-based thumbnail (works when Telegram has processed the video)
-      let r2Url = await generateThumbnail(fileRecord.id, fileRecord.telegram_message_id);
+      let r2Url = await generateThumbnail(fileRecord.id, fileRecord.telegram_message_id, {
+        storageType: fileRecord.storage_type || storageType,
+        userId: userId,
+        chatId: fileRecord.telegram_chat_id,
+      });
 
       // 2. Fallback: use client-generated thumbnail from the browser
       if (!r2Url && clientThumbnail && isR2Configured()) {

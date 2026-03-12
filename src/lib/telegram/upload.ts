@@ -21,6 +21,10 @@ export interface TDLibUploadResponse {
   thumbnail_data: string | null;
   /** File size in bytes as reported by Telegram */
   file_size: number;
+  /** The chat ID where the file was stored */
+  chat_id?: number;
+  /** Storage type: 'bot' or 'user' */
+  storage_type?: string;
 }
 
 /**
@@ -46,6 +50,7 @@ export async function uploadToBackend(
     guestSessionId?: string | null;
     folderId?: string | null;
     uploadId?: string;
+    storageType?: string;
   }
 ): Promise<TDLibUploadResponse> {
   const formData = new FormData();
@@ -53,6 +58,7 @@ export async function uploadToBackend(
   if (options?.userId) formData.append("user_id", options.userId);
   if (options?.guestSessionId) formData.append("guest_session_id", options.guestSessionId);
   if (options?.folderId) formData.append("folder_id", options.folderId);
+  if (options?.storageType) formData.append("storage_type", options.storageType);
 
   const headers: Record<string, string> = { ...getServiceHeaders() };
   if (options?.uploadId) headers["X-Upload-Id"] = options.uploadId;

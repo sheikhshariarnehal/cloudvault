@@ -30,7 +30,7 @@ export async function GET(
 
     const { data: file, error } = await supabase
       .from("files")
-      .select("id, telegram_file_id, telegram_message_id, mime_type, original_name, name, size_bytes")
+      .select("id, telegram_file_id, telegram_message_id, mime_type, original_name, name, size_bytes, storage_type, user_id")
       .eq("id", id)
       .single();
 
@@ -46,6 +46,8 @@ export async function GET(
         ct: file.mime_type || "application/octet-stream",
         fn: file.original_name || file.name,
         sz: file.size_bytes || undefined,
+        st: file.storage_type || "bot",
+        uid: file.storage_type === "user" ? (file.user_id || undefined) : undefined,
       },
       API_KEY,
     );

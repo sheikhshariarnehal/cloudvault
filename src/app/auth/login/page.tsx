@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
-import { Mail, Eye, EyeOff } from "lucide-react";
+import { Mail, Eye, EyeOff, Send, Cloud, Shield } from "lucide-react";
 import NextImage from "next/image";
 
 export default function LoginPage() {
@@ -183,6 +183,28 @@ export default function LoginPage() {
             Sign up free
           </Link>
         </p>
+
+        {/* Feature highlights */}
+        <div className="grid grid-cols-3 gap-3 pt-2">
+          <div className="text-center space-y-1.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 bg-blue-50 rounded-lg">
+              <Send className="h-4 w-4 text-blue-600" />
+            </div>
+            <p className="text-[11px] text-gray-500 leading-tight">Telegram<br />Storage</p>
+          </div>
+          <div className="text-center space-y-1.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 bg-green-50 rounded-lg">
+              <Cloud className="h-4 w-4 text-green-600" />
+            </div>
+            <p className="text-[11px] text-gray-500 leading-tight">Unlimited<br />Space</p>
+          </div>
+          <div className="text-center space-y-1.5">
+            <div className="inline-flex items-center justify-center w-9 h-9 bg-purple-50 rounded-lg">
+              <Shield className="h-4 w-4 text-purple-600" />
+            </div>
+            <p className="text-[11px] text-gray-500 leading-tight">End-to-End<br />Encrypted</p>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -16,7 +16,10 @@ interface AuthContextType {
   guestSessionId: string | null;
   isGuest: boolean;
   isLoading: boolean;
+  isTelegramConnected: boolean;
+  telegramPhone: string | null;
   signOut: () => Promise<void>;
+  refreshTelegramStatus: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -24,7 +27,10 @@ const AuthContext = createContext<AuthContextType>({
   guestSessionId: null,
   isGuest: false,
   isLoading: true,
+  isTelegramConnected: false,
+  telegramPhone: null,
   signOut: async () => {},
+  refreshTelegramStatus: () => {},
 });
 
 /**
@@ -65,7 +71,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [guestSessionId, setGuestSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTelegramConnected, setIsTelegramConnected] = useState(false);
+  const [telegramPhone, setTelegramPhone] = useState<string | null>(null);
   const supabase = createClient();
+
+  const fetchTelegramStatus = async () => {
+    try {
+      const res = await fetch("/api/telegram/status");
+      if (res.ok) {
+        const data = await res.json();
+        setIsTelegramConnected(!!data.connected);
+        setTelegramPhone(data.phone || null);
+      }
+    } catch {
+      // Non-fatal — status check failure doesn't block auth
+    }
+  };
+
+  const refreshTelegramStatus = () => {
+    fetchTelegramStatus();
+  };
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -91,6 +116,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (currentUser) {
           // Ensure the user has a public.users profile (fire-and-forget — don't block auth loading)
           ensureUserProfile(supabase, currentUser);
+          // Fetch Telegram connection status (fire-and-forget)
+          fetchTelegramStatus();
         } else {
           // Create guest session for unauthenticated users
           setGuestSessionId(getGuestSessionId());
@@ -116,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setGuestSessionId(null);
         // Ensure profile on any auth state change (fire-and-forget — don't block renders)
         ensureUserProfile(supabase, currentUser);
+        fetchTelegramStatus();
       } else {
         setGuestSessionId(getGuestSessionId());
       }
@@ -127,13 +155,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setIsTelegramConnected(false);
+    setTelegramPhone(null);
   };
 
   const isGuest = !user && !!guestSessionId;
 
   return (
     <AuthContext.Provider
-      value={{ user, guestSessionId, isGuest, isLoading, signOut }}
+      value={{ user, guestSessionId, isGuest, isLoading, isTelegramConnected, telegramPhone, signOut, refreshTelegramStatus }}
     >
       {children}
     </AuthContext.Provider>

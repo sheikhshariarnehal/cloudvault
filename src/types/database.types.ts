@@ -19,6 +19,10 @@ export interface Database {
           storage_limit_bytes: number;
           is_premium: boolean;
           guest_session_id: string | null;
+          telegram_phone: string | null;
+          telegram_user_id: number | null;
+          telegram_connected: boolean;
+          telegram_connected_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -31,6 +35,10 @@ export interface Database {
           storage_limit_bytes?: number;
           is_premium?: boolean;
           guest_session_id?: string | null;
+          telegram_phone?: string | null;
+          telegram_user_id?: number | null;
+          telegram_connected?: boolean;
+          telegram_connected_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -43,6 +51,10 @@ export interface Database {
           storage_limit_bytes?: number;
           is_premium?: boolean;
           guest_session_id?: string | null;
+          telegram_phone?: string | null;
+          telegram_user_id?: number | null;
+          telegram_connected?: boolean;
+          telegram_connected_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -63,6 +75,8 @@ export interface Database {
           tdlib_file_id: number | null;
           thumbnail_url: string | null;
           file_hash: string | null;
+          storage_type: string;
+          telegram_chat_id: number | null;
           is_starred: boolean;
           is_trashed: boolean;
           trashed_at: string | null;
@@ -83,6 +97,8 @@ export interface Database {
           tdlib_file_id?: number | null;
           thumbnail_url?: string | null;
           file_hash?: string | null;
+          storage_type?: string;
+          telegram_chat_id?: number | null;
           is_starred?: boolean;
           is_trashed?: boolean;
           trashed_at?: string | null;
@@ -103,6 +119,8 @@ export interface Database {
           tdlib_file_id?: number | null;
           thumbnail_url?: string | null;
           file_hash?: string | null;
+          storage_type?: string;
+          telegram_chat_id?: number | null;
           is_starred?: boolean;
           is_trashed?: boolean;
           trashed_at?: string | null;

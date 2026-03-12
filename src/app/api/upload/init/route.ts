@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 const BACKEND_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
 const API_KEY = process.env.TDLIB_SERVICE_API_KEY || "";
@@ -12,11 +13,27 @@ export const dynamic = "force-dynamic";
  * POST /api/upload/init
  * Initialize a chunked upload session.
  * Proxies to TDLib service: POST /api/chunked-upload/init
+ * Injects storageType/userId based on user's Telegram connection.
  * Returns direct chunkEndpoint URL so browser can skip Vercel proxy.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+
+    // Determine storage type from user's Telegram connection status
+    let storageType = "bot";
+    const userId = body.userId || null;
+    if (userId) {
+      const supabase = await createClient();
+      const { data: profile } = await supabase
+        .from("users")
+        .select("telegram_connected")
+        .eq("id", userId)
+        .single();
+      if (profile?.telegram_connected) {
+        storageType = "user";
+      }
+    }
 
     const response = await fetch(`${BACKEND_URL}/api/chunked-upload/init`, {
       method: "POST",
@@ -24,7 +41,7 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         "X-API-Key": API_KEY,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, storageType, userId }),
     });
 
     const data = await response.json();

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Send, X } from "lucide-react";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useRealtimeFiles } from "@/lib/realtime/use-realtime-files";
 import { useFilesStore } from "@/store/files-store";
@@ -15,6 +16,7 @@ import { NewFolderModal } from "@/components/modals/new-folder-modal";
 import { RenameModal } from "@/components/modals/rename-modal";
 import type { DbFile, DbFolder } from "@/types/file.types";
 import { ShareModal } from "@/components/modals/share-modal";
+import { ConnectTelegramModal } from "@/components/modals/connect-telegram-modal";
 import { MobileUploadFab } from "@/components/upload/mobile-upload-fab";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
@@ -30,7 +32,12 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, guestSessionId, isLoading: authLoading } = useAuth();
+  const { user, guestSessionId, isLoading: authLoading, isTelegramConnected } = useAuth();
+  const isGuest = !user && !!guestSessionId;
+  const [telegramBannerDismissed, setTelegramBannerDismissed] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("telegram-banner-dismissed") === "true";
+  });
   const { setFiles, setFolders, setIsLoading, setDataLoaded, currentFolderId } = useFilesStore();
   const { sidebarOpen, setSidebarOpen, isOnline, setIsOnline } = useUIStore();
 
@@ -148,6 +155,36 @@ export default function DashboardLayout({
             </div>
           )}
 
+          {/* Telegram Connect Banner */}
+          {user && !isGuest && !isTelegramConnected && !telegramBannerDismissed && (
+            <div className="bg-blue-50 border-b border-blue-100 px-4 py-2.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Send className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                <p className="text-sm text-blue-800 truncate">
+                  Connect your Telegram for <span className="font-medium">unlimited personal storage</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => useUIStore.getState().setConnectTelegramModalOpen(true)}
+                  className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-md transition-colors"
+                >
+                  Connect
+                </button>
+                <button
+                  onClick={() => {
+                    setTelegramBannerDismissed(true);
+                    localStorage.setItem("telegram-banner-dismissed", "true");
+                  }}
+                  className="text-blue-400 hover:text-blue-600 transition-colors"
+                  aria-label="Dismiss"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
           <TopBar />
 
           <main className="flex-1 overflow-hidden px-1 pb-1 sm:px-2 sm:pb-2">
@@ -168,6 +205,7 @@ export default function DashboardLayout({
         <NewFolderModal />
         <RenameModal />
         <ShareModal />
+        <ConnectTelegramModal />
       </div>
     </UploadZone>
   );

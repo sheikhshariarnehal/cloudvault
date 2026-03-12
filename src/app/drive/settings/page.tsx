@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useAuth } from "@/app/providers/auth-provider";
+import { useUIStore } from "@/store/ui-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,10 +10,12 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Shield, Bell } from "lucide-react";
+import { User, Shield, Bell, Phone, Loader2 } from "lucide-react";
 
 export default function SettingsPage() {
-  const { user, isGuest } = useAuth();
+  const { user, isGuest, isTelegramConnected, telegramPhone, refreshTelegramStatus } = useAuth();
+  const { setConnectTelegramModalOpen } = useUIStore();
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   const displayName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || "Guest";
   const avatarUrl = user?.user_metadata?.avatar_url;
@@ -74,6 +78,68 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Telegram Connection Section */}
+      {!isGuest && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Phone className="h-5 w-5" />
+              Telegram Storage
+            </CardTitle>
+            <CardDescription>
+              Connect your Telegram account to store files in your own Saved Messages
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isTelegramConnected ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="default" className="bg-green-600">Connected</Badge>
+                  {telegramPhone && (
+                    <span className="text-sm text-muted-foreground">{telegramPhone}</span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Your uploads are stored in your Telegram Saved Messages.
+                </p>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={isDisconnecting}
+                  onClick={async () => {
+                    setIsDisconnecting(true);
+                    try {
+                      await fetch("/api/telegram/disconnect", { method: "POST" });
+                      refreshTelegramStatus();
+                    } catch {
+                      // ignore
+                    } finally {
+                      setIsDisconnecting(false);
+                    }
+                  }}
+                >
+                  {isDisconnecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Disconnect Telegram
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Link your Telegram account to get unlimited personal cloud storage.
+                  Files are stored securely in your own Telegram Saved Messages.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => setConnectTelegramModalOpen(true)}
+                >
+                  Connect Telegram
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Security Section */}
       <Card>
