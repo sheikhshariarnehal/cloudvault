@@ -5,6 +5,7 @@ const BACKEND_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
 const API_KEY = process.env.TDLIB_SERVICE_API_KEY || "";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * POST /api/telegram/verify-code
