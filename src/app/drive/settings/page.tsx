@@ -52,7 +52,7 @@ export default function SettingsPage() {
     security:      true,
   });
 
-  const { user, isGuest, isTelegramConnected, telegramPhone, refreshTelegramStatus } = useAuth();
+  const { user, isGuest, isTelegramConnected, isTelegramStatusLoading, telegramPhone, refreshTelegramStatus } = useAuth();
   const { setConnectTelegramModalOpen } = useUIStore();
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
@@ -172,7 +172,14 @@ export default function SettingsPage() {
                         Connect your Telegram account to store files in your own Saved Messages.
                       </p>
                     </div>
-                    {isTelegramConnected ? (
+                    {isTelegramStatusLoading ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">Checking connection status...</span>
+                        </div>
+                      </div>
+                    ) : isTelegramConnected ? (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
                           <Badge className="bg-green-600">Connected</Badge>

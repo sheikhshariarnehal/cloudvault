@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState, useCallback } from "react";
+import { memo, useState, useCallback } from "react";
 import Link from "next/link";
 import { ChevronRight, Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -8,11 +8,11 @@ import type { DbFolder } from "@/types/file.types";
 
 interface FolderTreeProps {
   folders: DbFolder[];
-  allFolders: DbFolder[];
+  childrenByParent: Map<string, DbFolder[]>;
   level?: number;
 }
 
-export const FolderTree = memo(function FolderTree({ folders, allFolders, level = 0 }: FolderTreeProps) {
+export const FolderTree = memo(function FolderTree({ folders, childrenByParent, level = 0 }: FolderTreeProps) {
   if (folders.length === 0) {
     return (
       <p className="text-xs text-muted-foreground px-2 py-1">No folders yet</p>
@@ -25,7 +25,7 @@ export const FolderTree = memo(function FolderTree({ folders, allFolders, level 
         <FolderTreeItem
           key={folder.id}
           folder={folder}
-          allFolders={allFolders}
+          childrenByParent={childrenByParent}
           level={level}
         />
       ))}
@@ -35,21 +35,17 @@ export const FolderTree = memo(function FolderTree({ folders, allFolders, level 
 
 const FolderTreeItem = memo(function FolderTreeItem({
   folder,
-  allFolders,
+  childrenByParent,
   level,
 }: {
   folder: DbFolder;
-  allFolders: DbFolder[];
+  childrenByParent: Map<string, DbFolder[]>;
   level: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const toggleExpanded = useCallback(() => setExpanded((v) => !v), []);
 
-  // Memoize the children lookup so it doesn't re-filter on every parent render.
-  const children = useMemo(
-    () => allFolders.filter((f) => f.parent_id === folder.id),
-    [allFolders, folder.id]
-  );
+  const children = childrenByParent.get(folder.id) || [];
   const hasChildren = children.length > 0;
 
   return (
@@ -89,7 +85,7 @@ const FolderTreeItem = memo(function FolderTreeItem({
       {expanded && hasChildren && (
         <FolderTree
           folders={children}
-          allFolders={allFolders}
+          childrenByParent={childrenByParent}
           level={level + 1}
         />
       )}

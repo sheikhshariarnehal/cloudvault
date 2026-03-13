@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import NextImage from "next/image";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
-import { StorageMeter } from "@/components/storage/storage-meter";
 import { FolderTree } from "@/components/sidebar/folder-tree";
 import { NavItem } from "@/components/sidebar/nav-item";
 import { Button } from "@/components/ui/button";
@@ -43,9 +43,15 @@ const navItems: Array<{ href: string; label: string; icon: LucideIcon; badge?: s
   { href: "/drive/settings", label: "Settings", icon: Settings },
 ];
 
+const StorageMeter = dynamic(
+  () => import("@/components/storage/storage-meter").then((m) => ({ default: m.StorageMeter })),
+  { ssr: false }
+);
+
 export function Sidebar() {
+  const [secondaryReady, setSecondaryReady] = useState(false);
   const pathname = usePathname();
-  const { user, isGuest } = useAuth();
+  const { user, isGuest, isLoading } = useAuth();
   // Use granular selectors so Sidebar only re-renders when these specific values change.
   const folders = useFilesStore((s) => s.folders);
   const openFilePicker = useUIStore((s) => s.openFilePicker);
@@ -56,12 +62,30 @@ export function Sidebar() {
 
   // Memoize the root-level folder list to avoid a new array reference on every render.
   const rootFolders = useMemo(() => folders.filter((f) => !f.parent_id), [folders]);
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, typeof folders>();
+    for (const folder of folders) {
+      if (!folder.parent_id) continue;
+      const list = map.get(folder.parent_id);
+      if (list) {
+        list.push(folder);
+      } else {
+        map.set(folder.parent_id, [folder]);
+      }
+    }
+    return map;
+  }, [folders]);
 
   const handleFolderUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) uploadFiles?.(files);
     e.target.value = "";
   }, [uploadFiles]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSecondaryReady(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   return (
     <div className="flex flex-col h-full w-full bg-transparent">
@@ -162,17 +186,21 @@ export function Sidebar() {
 
         {/* Folder Tree */}
         <div className="px-1 mt-4">
-          <FolderTree folders={rootFolders} allFolders={folders} />
+          {secondaryReady ? (
+            <FolderTree folders={rootFolders} childrenByParent={childrenByParent} />
+          ) : (
+            <p className="text-xs text-muted-foreground px-2 py-1">Loading folders...</p>
+          )}
         </div>
       </nav>
 
       {/* Storage Meter */}
       <div className="px-4 pb-3">
-        <StorageMeter />
+        {secondaryReady ? <StorageMeter /> : null}
       </div>
 
       {/* Upgrade / Sign Up Button */}
-      {(isGuest || !user) && (
+      {!isLoading && (isGuest || !user) && (
         <div className="px-4 pb-4">
           <Link href="/auth/signup">
             <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all h-10 text-sm font-medium rounded-full">

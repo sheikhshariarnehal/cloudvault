@@ -10,7 +10,8 @@ import { Menu, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export function TopBar() {
-  const { toggleSidebar, openFilePicker } = useUIStore();
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const openFilePicker = useUIStore((s) => s.openFilePicker);
   const { isGuest, user, isLoading } = useAuth();
   const router = useRouter();
 

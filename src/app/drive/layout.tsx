@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Send, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useRealtimeFiles } from "@/lib/realtime/use-realtime-files";
 import { useFilesStore } from "@/store/files-store";
@@ -19,6 +19,7 @@ import { ShareModal } from "@/components/modals/share-modal";
 import { ConnectTelegramModal } from "@/components/modals/connect-telegram-modal";
 import { MobileUploadFab } from "@/components/upload/mobile-upload-fab";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import Telegram from "@/components/ui/Telegram";
 
 // Lazy-load PreviewModal — it bundles 8 preview sub-components that are only
 // needed when the user actually opens a file. Deferring saves ~60 KB on initial load.
@@ -32,14 +33,19 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, guestSessionId, isLoading: authLoading, isTelegramConnected } = useAuth();
+  const { user, guestSessionId, isLoading: authLoading, isTelegramConnected, isTelegramStatusLoading } = useAuth();
   const isGuest = !user && !!guestSessionId;
+  const [isDesktop, setIsDesktop] = useState(false);
   const [telegramBannerDismissed, setTelegramBannerDismissed] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("telegram-banner-dismissed") === "true";
   });
   const { setFiles, setFolders, setIsLoading, setDataLoaded, currentFolderId } = useFilesStore();
-  const { sidebarOpen, setSidebarOpen, isOnline, setIsOnline } = useUIStore();
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
+  const isOnline = useUIStore((s) => s.isOnline);
+  const setIsOnline = useUIStore((s) => s.setIsOnline);
+  const previewFileId = useUIStore((s) => s.previewFileId);
 
 
   // Set up realtime subscriptions
@@ -120,6 +126,14 @@ export default function DashboardLayout({
     };
   }, [setIsOnline]);
 
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
   // Lock body scroll when mobile sidebar is open
   useEffect(() => {
     if (sidebarOpen) {
@@ -133,18 +147,23 @@ export default function DashboardLayout({
   return (
     <UploadZone folderId={currentFolderId}>
       <div className="flex h-dvh bg-background text-foreground overflow-hidden">
-        {/* Desktop Sidebar — fixed, full height */}
-        <aside className="hidden lg:flex w-[240px] flex-shrink-0">
-          <Sidebar />
-        </aside>
-
-        {/* Mobile / Tablet Sidebar */}
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="p-0 w-[240px] lg:hidden">
-            <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+        {isDesktop ? (
+          <aside className="w-[240px] flex-shrink-0">
             <Sidebar />
-          </SheetContent>
-        </Sheet>
+          </aside>
+        ) : (
+          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+            <SheetContent
+              side="left"
+              className="p-0 w-[240px]"
+              showCloseButton={false}
+              onOpenAutoFocus={(event) => event.preventDefault()}
+            >
+              <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+              {sidebarOpen ? <Sidebar /> : null}
+            </SheetContent>
+          </Sheet>
+        )}
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0">
@@ -156,31 +175,35 @@ export default function DashboardLayout({
           )}
 
           {/* Telegram Connect Banner */}
-          {user && !isGuest && !isTelegramConnected && !telegramBannerDismissed && (
-            <div className="bg-muted border-b border-border px-4 py-2.5 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Send className="h-4 w-4 text-foreground flex-shrink-0" />
-                <p className="text-sm text-foreground truncate">
-                  Connect your Telegram for <span className="font-medium">unlimited personal storage</span>
-                </p>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button
-                  onClick={() => useUIStore.getState().setConnectTelegramModalOpen(true)}
-                  className="text-xs font-medium text-primary-foreground bg-primary hover:bg-primary/90 px-3 py-1 rounded-md transition-colors"
-                >
-                  Connect
-                </button>
-                <button
-                  onClick={() => {
-                    setTelegramBannerDismissed(true);
-                    localStorage.setItem("telegram-banner-dismissed", "true");
-                  }}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Dismiss"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+          {user && !isGuest && !isTelegramStatusLoading && !isTelegramConnected && !telegramBannerDismissed && (
+            <div className="px-3 pt-3 sm:px-4">
+              <div className="flex flex-col gap-3 rounded-2xl border border-[#1a73e8] bg-[#d3e3fd] px-4 py-3 shadow-[0_1px_2px_rgba(26,115,232,0.08)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5 sm:py-3.5">
+                <div className="flex min-w-0 items-start gap-3 sm:items-center">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center">
+                    <Telegram className="h-6 w-6" />
+                  </div>
+                  <p className="min-w-0 text-sm leading-6 text-[#202124] sm:text-[15px]">
+                    Connect your Telegram for <span className="font-semibold">unlimited personal storage</span>
+                  </p>
+                </div>
+                <div className="flex items-center justify-end gap-2.5 sm:flex-shrink-0">
+                  <button
+                    onClick={() => useUIStore.getState().setConnectTelegramModalOpen(true)}
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-4 text-sm font-medium text-[#3c4043] shadow-none transition-all hover:bg-[#f8f9fa] hover:border-[#dadce0]"
+                  >
+                    Connect
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTelegramBannerDismissed(true);
+                      localStorage.setItem("telegram-banner-dismissed", "true");
+                    }}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#5f6368] transition-colors hover:bg-white/50 hover:text-[#202124]"
+                    aria-label="Dismiss"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -204,7 +227,7 @@ export default function DashboardLayout({
 
         {/* Modals */}
         <UploadProgress />
-        <PreviewModal />
+        {previewFileId ? <PreviewModal /> : null}
         <NewFolderModal />
         <RenameModal />
         <ShareModal />
