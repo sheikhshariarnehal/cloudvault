@@ -66,16 +66,20 @@ export function Sidebar() {
   return (
     <div className="flex flex-col h-full w-full bg-transparent">
       {/* Brand */}
-      <div className="flex items-center gap-2 px-4 h-14 shrink-0">
+      <div className="flex items-center gap-2.5 px-4 h-14 shrink-0">
         <NextImage
           src="/logo.webp"
           alt="NDrive"
-          width={30}
-          height={30}
+          width={34}
+          height={34}
           className="flex-shrink-0"
           priority
         />
-        <span className="text-[34px] leading-none font-normal tracking-tight text-[#3c4043]">Drive</span>
+        <span className="text-[30px] leading-none tracking-tight text-[#3c4043]" aria-label="NDrive">
+          <span className="font-bold">N</span>
+          <span className="font-normal">D</span>
+          <span className="font-bold">rive</span>
+        </span>
       </div>
 
       {/* + New Button */}
@@ -93,7 +97,7 @@ export function Sidebar() {
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
-              className="w-fit h-12 px-6 rounded-2xl shadow-[0_1px_2px_rgba(60,64,67,0.3),0_1px_3px_1px_rgba(60,64,67,0.15)] border border-[#dadce0] bg-white hover:bg-[#f8f9fa] text-[#202124] font-medium text-sm gap-2.5 transition-all"
+              className="w-fit h-12 px-6 rounded-2xl border border-[#dadce0] bg-white hover:bg-[#f8f9fa] text-[#202124] font-medium text-sm gap-2.5 transition-all"
             >
               <Plus className="h-5 w-5" />
               <span>New</span>

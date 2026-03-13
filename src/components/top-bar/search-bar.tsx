@@ -57,7 +57,7 @@ export function SearchBar() {
       <Input
         ref={inputRef}
         type="text"
-        placeholder="Search in Drive"
+        placeholder="Search in NDrive"
         value={localQuery}
         onChange={(e) => handleSearch(e.target.value)}
         className="w-full h-11 pl-11 pr-10 rounded-full border border-transparent bg-[#e9eef6] hover:bg-[#e3e9f3] focus-visible:bg-white focus-visible:border-[#d2d6dc] focus-visible:ring-0 focus-visible:shadow-[0_1px_3px_rgba(60,64,67,0.3),0_1px_2px_rgba(60,64,67,0.15)] text-[#202124] text-sm placeholder:text-[#5f6368] transition-all duration-150"

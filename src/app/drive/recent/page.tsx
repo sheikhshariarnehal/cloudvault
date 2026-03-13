@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { useAuth } from "@/app/providers/auth-provider";
+import { createClient } from "@/lib/supabase/client";
 import { useFilesStore } from "@/store/files-store";
 import { FileList } from "@/components/file-list/file-list";
 import { FileCard } from "@/components/file-grid/file-card";
@@ -7,17 +10,79 @@ import { Clock } from "lucide-react";
 import { useEffectiveViewMode } from "@/lib/utils/use-view-mode";
 import { GridViewSkeleton } from "@/components/skeletons/grid-view-skeleton";
 import { ListViewSkeleton } from "@/components/skeletons/list-view-skeleton";
+import type { DbFile } from "@/types/file.types";
 
 export default function RecentPage() {
-  const { files, dataLoaded } = useFilesStore();
+  const { user, guestSessionId } = useAuth();
+  const { files, dataLoaded, mergeFiles } = useFilesStore();
   const viewMode = useEffectiveViewMode();
+
+  useEffect(() => {
+    // The layout preloads a capped set. On the Recent page, fetch remaining
+    // pages so older files are also available.
+    if (!dataLoaded) return;
+
+    const userId = user?.id;
+    const filterColumn = userId ? "user_id" : "guest_session_id";
+    const filterValue = userId || guestSessionId;
+    if (!filterValue) return;
+
+    const FILE_COLUMNS =
+      "id,user_id,guest_session_id,folder_id,name,original_name," +
+      "mime_type,size_bytes,telegram_file_id,telegram_message_id," +
+      "file_hash,tdlib_file_id,is_starred,is_trashed,trashed_at," +
+      "created_at,updated_at,thumbnail_url";
+
+    const PAGE_SIZE = 1000;
+    const supabase = createClient();
+    let cancelled = false;
+
+    const loadOlderPages = async () => {
+      // Start after the first page loaded in layout.
+      let from = PAGE_SIZE;
+
+      while (!cancelled) {
+        const to = from + PAGE_SIZE - 1;
+        const { data, error } = await supabase
+          .from("files")
+          .select(FILE_COLUMNS)
+          .eq(filterColumn, filterValue)
+          .eq("is_trashed", false)
+          .order("created_at", { ascending: false })
+          .range(from, to);
+
+        if (error) {
+          console.error("Failed to load older recent files:", error);
+          return;
+        }
+
+        const page = (data ?? []) as unknown as DbFile[];
+        if (page.length === 0) {
+          return;
+        }
+
+        mergeFiles(page);
+
+        if (page.length < PAGE_SIZE) {
+          return;
+        }
+
+        from += PAGE_SIZE;
+      }
+    };
+
+    loadOlderPages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, guestSessionId, dataLoaded, mergeFiles]);
 
   const recentFiles = [...files]
     .sort(
       (a, b) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-    )
-    .slice(0, 50);
+    );
 
   if (!dataLoaded) {
     return (
