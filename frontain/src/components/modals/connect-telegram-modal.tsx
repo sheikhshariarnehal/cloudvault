@@ -18,10 +18,19 @@ import { Loader2, Phone, KeyRound, Lock, CheckCircle2, AlertCircle } from "lucid
 
 type Step = "phone" | "code" | "password" | "success" | "error";
 
+const COUNTRY_OPTIONS = [
+  { code: "+880", label: "Bangladesh" },
+  { code: "+1", label: "United States" },
+  { code: "+44", label: "United Kingdom" },
+  { code: "+91", label: "India" },
+  { code: "+971", label: "UAE" },
+];
+
 export function ConnectTelegramModal() {
   const { connectTelegramModalOpen, setConnectTelegramModalOpen } = useUIStore();
   const { refreshTelegramStatus } = useAuth();
   const [step, setStep] = useState<Step>("phone");
+  const [countryCode, setCountryCode] = useState("+880");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
@@ -30,6 +39,7 @@ export function ConnectTelegramModal() {
 
   const reset = useCallback(() => {
     setStep("phone");
+    setCountryCode("+880");
     setPhone("");
     setCode("");
     setPassword("");
@@ -49,11 +59,17 @@ export function ConnectTelegramModal() {
     setIsLoading(true);
     setError("");
 
+    const rawPhone = phone.trim();
+    const digitsOnly = rawPhone.replace(/\D/g, "");
+    const normalizedPhone = rawPhone.startsWith("+")
+      ? `+${digitsOnly}`
+      : `${countryCode}${digitsOnly.replace(/^0+/, "")}`;
+
     try {
       const res = await fetch("/api/telegram/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phone.trim() }),
+        body: JSON.stringify({ phone: normalizedPhone }),
       });
 
       const data = await res.json();
@@ -139,7 +155,7 @@ export function ConnectTelegramModal() {
 
   return (
     <Dialog open={connectTelegramModalOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={step === "phone" ? "sm:max-w-2xl" : "sm:max-w-md"}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {step === "success" ? (
@@ -147,10 +163,10 @@ export function ConnectTelegramModal() {
             ) : (
               <Phone className="h-5 w-5" />
             )}
-            {step === "success" ? "Telegram Connected" : "Connect Telegram"}
+            {step === "success" ? "Telegram Connected" : step === "phone" ? "Verify phone number" : "Connect Telegram"}
           </DialogTitle>
           <DialogDescription>
-            {step === "phone" && "Enter your phone number to link your Telegram account. Files will be stored in your Saved Messages."}
+            {step === "phone" && "We use phone verification to keep your account secure. Enter your number to receive a one-time Telegram code."}
             {step === "code" && "Enter the code sent to your Telegram app."}
             {step === "password" && "Your account has Two-Factor Authentication enabled. Enter your password."}
             {step === "success" && "Your Telegram account is now linked. All new uploads will be stored in your Saved Messages."}
@@ -166,20 +182,43 @@ export function ConnectTelegramModal() {
           )}
 
           {step === "phone" && (
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="+1234567890"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, handleSendCode)}
-                disabled={isLoading}
-                autoFocus
-              />
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country</Label>
+                  <select
+                    id="country"
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    disabled={isLoading}
+                    className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    {COUNTRY_OPTIONS.map((option) => (
+                      <option key={option.code} value={option.code}>
+                        {option.code} ({option.label})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="1712345678"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, handleSendCode)}
+                    disabled={isLoading}
+                    autoFocus
+                    className="h-11"
+                  />
+                </div>
+              </div>
+
               <p className="text-xs text-muted-foreground">
-                Include country code (e.g. +1 for US)
+                Bangladesh (+880) is selected by default. You can still paste a full international number starting with +.
               </p>
             </div>
           )}
@@ -239,9 +278,13 @@ export function ConnectTelegramModal() {
 
         <DialogFooter>
           {step === "phone" && (
-            <Button onClick={handleSendCode} disabled={!phone.trim() || isLoading}>
+            <Button
+              onClick={handleSendCode}
+              disabled={!phone.trim() || isLoading}
+              className="w-full bg-[#032b2b] text-white hover:bg-[#043737]"
+            >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Send Code
+              Continue
             </Button>
           )}
           {step === "code" && (
