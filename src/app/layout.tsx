@@ -35,15 +35,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <link rel="preconnect" href="https://zcigqsiovqqldlsnwiqd.supabase.co" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://pub-99b846451dcc4c879db177b7e8b60c2f.r2.dev" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var v=localStorage.getItem('viewMode');var m=window.matchMedia('(max-width: 767px)').matches;var mode=m?'grid':(v==='grid'?'grid':'list');document.documentElement.setAttribute('data-view-mode',mode)}catch(e){}`,
+            __html: `try{var v=localStorage.getItem('viewMode');if(v==='grid')document.documentElement.setAttribute('data-view-mode','grid')}catch(e){}`,
           }}
         />
         {/* Skeleton toggle CSS — inlined so it's available before any stylesheet loads */}
-        <style dangerouslySetInnerHTML={{ __html: `.skeleton-grid{display:none}.skeleton-list{display:block}html[data-view-mode="grid"] .skeleton-grid{display:block}html[data-view-mode="grid"] .skeleton-list{display:none}html[data-view-mode="list"] .skeleton-grid{display:none}html[data-view-mode="list"] .skeleton-list{display:block}@media (max-width:767px){html .skeleton-grid{display:block!important}html .skeleton-list{display:none!important}}` }} />
+        <style dangerouslySetInnerHTML={{ __html: `.skeleton-grid{display:none}.skeleton-list{display:block}html[data-view-mode="grid"] .skeleton-grid{display:block}html[data-view-mode="grid"] .skeleton-list{display:none}` }} />
         <AuthProvider>
           <TooltipProvider>
             {children}

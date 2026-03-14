@@ -52,7 +52,7 @@ export default function SettingsPage() {
     security:      true,
   });
 
-  const { user, isGuest, isTelegramConnected, isTelegramStatusLoading, telegramPhone, refreshTelegramStatus } = useAuth();
+  const { user, isGuest, isTelegramConnected, telegramPhone, refreshTelegramStatus } = useAuth();
   const { setConnectTelegramModalOpen } = useUIStore();
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
@@ -60,7 +60,7 @@ export default function SettingsPage() {
   const avatarUrl   = user?.user_metadata?.avatar_url;
 
   return (
-    <div className="mx-auto w-full max-w-[1280px] pt-3 sm:pt-4 xl:max-w-[1400px]">
+    <div className="pt-3 sm:pt-4">
       {/* Page header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Settings</h1>
@@ -69,15 +69,15 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="flex flex-col gap-4 sm:gap-8 lg:flex-row lg:items-start">
+      <div className="flex gap-8">
         {/* Left sidebar nav */}
-        <nav className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:sticky lg:top-20 lg:w-52 lg:shrink-0 lg:grid-cols-1">
+        <nav className="flex w-44 shrink-0 flex-col gap-1">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
               className={cn(
-                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors text-left lg:gap-3",
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors text-left",
                 activeTab === id
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
@@ -90,12 +90,12 @@ export default function SettingsPage() {
         </nav>
 
         {/* Right content panel */}
-        <div className="min-w-0 flex-1 xl:max-w-5xl">
+        <div className="flex-1 min-w-0">
 
           {/* Profile */}
           {activeTab === "profile" && (
-            <div className="space-y-6 rounded-lg border p-4 sm:space-y-8 sm:p-6">
-              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+            <div className="rounded-lg border p-6 space-y-8">
+              <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16">
                   <AvatarImage src={avatarUrl} />
                   <AvatarFallback className="bg-muted">
@@ -107,40 +107,38 @@ export default function SettingsPage() {
                 </Button>
               </div>
 
-              <div className="grid gap-6 xl:grid-cols-2 xl:gap-8">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Username</Label>
-                  <Input
-                    defaultValue={isGuest ? "" : displayName}
-                    disabled={isGuest}
-                    placeholder={isGuest ? "Guest" : "Your username"}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    This is your public display name. It can be your real name or a pseudonym.
-                    You can only change this once every 30 days.
-                  </p>
-                </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Username</Label>
+                <Input
+                  defaultValue={isGuest ? "" : displayName}
+                  disabled={isGuest}
+                  placeholder={isGuest ? "Guest" : "Your username"}
+                />
+                <p className="text-sm text-muted-foreground">
+                  This is your public display name. It can be your real name or a pseudonym.
+                  You can only change this once every 30 days.
+                </p>
+              </div>
 
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Email</Label>
-                  {isGuest ? (
-                    <Input value="" disabled placeholder="No email - guest account" />
-                  ) : (
-                    <Select defaultValue={user?.email ?? undefined}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a verified email to display" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {user?.email && (
-                          <SelectItem value={user.email}>{user.email}</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    You can manage verified email addresses in your email settings.
-                  </p>
-                </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Email</Label>
+                {isGuest ? (
+                  <Input value="" disabled placeholder="No email - guest account" />
+                ) : (
+                  <Select defaultValue={user?.email ?? undefined}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a verified email to display" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {user?.email && (
+                        <SelectItem value={user.email}>{user.email}</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  You can manage verified email addresses in your email settings.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -161,7 +159,7 @@ export default function SettingsPage() {
 
           {/* Account */}
           {activeTab === "account" && (
-            <div className="space-y-6 rounded-lg border p-4 sm:space-y-8 sm:p-6">
+            <div className="rounded-lg border p-6 space-y-8">
               {!isGuest && (
                 <>
                   <div className="space-y-4">
@@ -174,14 +172,7 @@ export default function SettingsPage() {
                         Connect your Telegram account to store files in your own Saved Messages.
                       </p>
                     </div>
-                    {isTelegramStatusLoading ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Checking connection status...</span>
-                        </div>
-                      </div>
-                    ) : isTelegramConnected ? (
+                    {isTelegramConnected ? (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
                           <Badge className="bg-green-600">Connected</Badge>
@@ -251,7 +242,7 @@ export default function SettingsPage() {
 
           {/* Billing */}
           {activeTab === "billing" && (
-            <div className="rounded-lg border p-4 sm:p-6">
+            <div className="rounded-lg border p-6">
               <h3 className="text-sm font-semibold">Billing</h3>
               <p className="text-sm text-muted-foreground mt-1">Billing settings coming soon.</p>
             </div>
@@ -259,7 +250,7 @@ export default function SettingsPage() {
 
           {/* Appearance */}
           {activeTab === "appearance" && (
-            <div className="space-y-6 rounded-lg border p-4 sm:space-y-8 sm:p-6">
+            <div className="rounded-lg border p-6 space-y-8">
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold">Font</h3>
                 <Select>
@@ -284,7 +275,7 @@ export default function SettingsPage() {
                     Select the theme for the dashboard.
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-3 sm:gap-4">
+                <div className="flex gap-4">
                   <button
                     onClick={() => setTheme("light")}
                     className={cn(
@@ -294,7 +285,7 @@ export default function SettingsPage() {
                         : "border-muted hover:border-muted-foreground/50"
                     )}
                   >
-                    <div className="w-[7.5rem] rounded-md bg-[#f1f5f9] p-2 space-y-1.5 sm:w-36">
+                    <div className="w-36 rounded-md bg-[#f1f5f9] p-2 space-y-1.5">
                       <div className="space-y-1">
                         <div className="h-2 w-4/5 rounded bg-[#cbd5e1]" />
                         <div className="h-2 w-3/5 rounded bg-[#cbd5e1]" />
@@ -320,7 +311,7 @@ export default function SettingsPage() {
                         : "border-muted hover:border-muted-foreground/50"
                     )}
                   >
-                    <div className="w-[7.5rem] rounded-md bg-[#1e293b] p-2 space-y-1.5 sm:w-36">
+                    <div className="w-36 rounded-md bg-[#1e293b] p-2 space-y-1.5">
                       <div className="space-y-1">
                         <div className="h-2 w-4/5 rounded bg-[#475569]" />
                         <div className="h-2 w-3/5 rounded bg-[#475569]" />
@@ -347,7 +338,7 @@ export default function SettingsPage() {
 
           {/* Notifications */}
           {activeTab === "notifications" && (
-            <div className="space-y-6 rounded-lg border p-4 sm:space-y-8 sm:p-6">
+            <div className="rounded-lg border p-6 space-y-8">
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold">Notify me about...</h3>
                 <div className="space-y-3">
@@ -401,14 +392,13 @@ export default function SettingsPage() {
                 ).map(({ key, label, description }) => (
                   <div
                     key={key}
-                    className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 xl:items-center"
+                    className="flex items-start justify-between gap-4 rounded-lg border p-4"
                   >
                     <div>
                       <p className="text-sm font-medium">{label}</p>
                       <p className="text-sm text-muted-foreground">{description}</p>
                     </div>
                     <Switch
-                      className="self-start sm:self-auto"
                       checked={emailPrefs[key]}
                       onCheckedChange={(checked) =>
                         setEmailPrefs((prev) => ({ ...prev, [key]: checked }))
@@ -422,7 +412,7 @@ export default function SettingsPage() {
 
           {/* Display */}
           {activeTab === "display" && (
-            <div className="rounded-lg border p-4 sm:p-6">
+            <div className="rounded-lg border p-6">
               <h3 className="text-sm font-semibold">Display</h3>
               <p className="text-sm text-muted-foreground mt-1">Display settings coming soon.</p>
             </div>

@@ -7,6 +7,7 @@ import { useUIStore } from "@/store/ui-store";
 import { validateFile } from "@/types/file.types";
 import { v4 as uuidv4 } from "uuid";
 import { extractVideoThumbnail } from "@/lib/utils/video-thumbnail";
+import { extractImageThumbnail } from "@/lib/utils/image-thumbnail";
 import { Upload, FolderUp, CloudUpload } from "lucide-react";
 
 // ─── Folder / Directory Handling Utilities ──────────────────────────────────
@@ -510,12 +511,16 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       chunked: file.size > CHUNK_THRESHOLD,
     });
 
-    // ── Generate video thumbnail client-side (non-blocking, 5s timeout) ──
+    // ── Generate thumbnail client-side for videos and images (non-blocking, 5s timeout) ──
     let thumbnailBase64: string | null = null;
-    if (file.type.startsWith("video/")) {
+    if (file.type.startsWith("video/") || file.type.startsWith("image/")) {
       try {
+        const thumbnailPromise = file.type.startsWith("video/")
+          ? extractVideoThumbnail(file)
+          : extractImageThumbnail(file);
+
         const thumbnailBlob = await Promise.race([
-          extractVideoThumbnail(file),
+          thumbnailPromise,
           new Promise<null>((r) => setTimeout(() => r(null), 5000)),
         ]);
         if (thumbnailBlob) {
