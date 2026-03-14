@@ -202,7 +202,7 @@ export function PreviewModal() {
             <>
               {isImage && <ImagePreview src={fileUrl} alt={file.name} fallbackSrc={file.thumbnail_url} />}
               {category === "pdf" && (
-                <div className="w-full h-full">
+                <div className="absolute inset-0 w-full h-full">
                   <PdfPreview src={fileUrl} />
                 </div>
               )}
@@ -222,37 +222,37 @@ export function PreviewModal() {
               )}
               {/* Office documents (Word, Excel) — NOT PowerPoint */}
               {isOfficeFile(file.mime_type, file.name) && !isPptxFile(file.mime_type, file.name) && (
-                <div className="w-full h-full">
+                <div className="absolute inset-0 w-full h-full">
                   <OfficePreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
                 </div>
               )}
               {/* PowerPoint presentations (.pptx) */}
               {isPptxFile(file.mime_type, file.name) && (
-                <div className="w-full h-full">
+                <div className="absolute inset-0 w-full h-full">
                   <PptxPreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
                 </div>
               )}
               {/* Legacy PowerPoint (.ppt) — show friendly download prompt */}
               {isLegacyPptFile(file.mime_type, file.name) && (
-                <div className="w-full h-full">
+                <div className="absolute inset-0 w-full h-full">
                   <PptxPreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
                 </div>
               )}
               {/* CSV files */}
               {isCsvFile(file.mime_type, file.name) && (
-                <div className="w-full h-full">
+                <div className="absolute inset-0 w-full h-full">
                   <CsvPreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
                 </div>
               )}
               {/* JSON files */}
               {isJsonFile(file.mime_type, file.name) && (
-                <div className="w-full h-full">
+                <div className="absolute inset-0 w-full h-full">
                   <JsonPreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
                 </div>
               )}
               {/* Text / code files (.md, .sql, .html, .css, .js, .py, .txt, etc.) */}
               {isTextFile(file.mime_type, file.name) && (
-                <div className="w-full h-full">
+                <div className="absolute inset-0 w-full h-full">
                   <TextPreview src={fileUrl} fileName={file.name} onDownload={handleDownload} />
                 </div>
               )}

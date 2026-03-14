@@ -281,13 +281,13 @@ function SharePreviewModal({
           )}
           {/* PowerPoint presentations (.pptx) */}
           {isPptxFile(file.mime_type, file.name) && (
-            <div className="w-full h-full">
+            <div className="absolute inset-0 w-full h-full">
               <PptxPreview src={getFileUrl(file.id, file.name)} fileName={file.name} />
             </div>
           )}
           {/* Legacy PowerPoint (.ppt) */}
           {isLegacyPptFile(file.mime_type, file.name) && (
-            <div className="w-full h-full">
+            <div className="absolute inset-0 w-full h-full">
               <PptxPreview src={getFileUrl(file.id, file.name)} fileName={file.name} />
             </div>
           )}
@@ -476,7 +476,7 @@ export default function SharePage() {
           </div>
         </header>
 
-        <main className="flex-1 flex items-center justify-center overflow-hidden">
+        <main className="flex-1 flex items-center justify-center overflow-hidden relative">
           {category === "image" && (
             <div className="w-full h-full">
               <ImagePreview src={previewUrl} alt={file.name} />
@@ -511,13 +511,13 @@ export default function SharePage() {
           )}
           {/* PowerPoint presentations (.pptx) */}
           {isPptxFile(file.mime_type, file.name) && (
-            <div className="w-full h-full">
+            <div className="absolute inset-0 w-full h-full">
               <PptxPreview src={getFileUrl(file.id, file.name)} fileName={file.name} />
             </div>
           )}
           {/* Legacy PowerPoint (.ppt) */}
           {isLegacyPptFile(file.mime_type, file.name) && (
-            <div className="w-full h-full">
+            <div className="absolute inset-0 w-full h-full">
               <PptxPreview src={getFileUrl(file.id, file.name)} fileName={file.name} />
             </div>
           )}
