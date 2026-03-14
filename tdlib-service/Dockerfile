@@ -14,6 +14,7 @@ RUN npm install
 
 COPY tsconfig.json ./
 COPY src/ ./src/
+COPY public/ ./public/
 
 RUN npm run build
 
@@ -32,6 +33,7 @@ COPY package.json package-lock.json* ./
 RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
 
 # Create persistent directories for TDLib database and file cache
 RUN mkdir -p /data/tdlib-db /data/tdlib-files
