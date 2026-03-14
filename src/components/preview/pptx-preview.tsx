@@ -89,8 +89,8 @@ function IframeViewer({
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  // Office Online: wdAr=2 enables 16:9 widescreen, action=embedview for full embed
-  const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}&wdAr=2`;
+  // Office Online: action=embedview for full embed without black bars
+  const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}&action=embedview&wdbipreview=true`;
   const googleUrl = `https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`;
   const viewerUrl = mode === "office" ? officeUrl : googleUrl;
 
@@ -134,6 +134,16 @@ function IframeViewer({
     timeoutRef.current = setTimeout(() => { setLoading(false); setFailed(true); }, 30_000);
   }, [viewerUrl]);
 
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      if (iframeRef.current) {
+        iframeRef.current.requestFullscreen?.().catch(console.error);
+      }
+    } else {
+      document.exitFullscreen?.();
+    }
+  };
+
   const handleMouseMove = useCallback(() => {
     setShowSwitcher(true);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
@@ -167,6 +177,13 @@ function IframeViewer({
             {v === "office" ? "Office" : "Google"}
           </button>
         ))}
+        <button
+          onClick={toggleFullScreen}
+          className="px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all text-white/50 hover:text-white hover:bg-white/10 ml-1 border-l border-white/20 pl-3"
+          title="Full Screen"
+        >
+          Fullscreen
+        </button>
       </div>
 
       {/* Loading */}
