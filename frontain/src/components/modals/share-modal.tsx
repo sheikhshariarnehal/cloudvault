@@ -107,7 +107,7 @@ export function ShareModal() {
   };
 
   return (
-    <Dialog open={shareModalOpen} onOpenChange={handleClose}>
+    <Dialog open={shareModalOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden gap-0">
         {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4">

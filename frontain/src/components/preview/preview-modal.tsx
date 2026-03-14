@@ -26,7 +26,7 @@ import { getFileUrl } from "@/lib/utils";
 
 export function PreviewModal() {
   const { files } = useFilesStore();
-  const { previewFileId, setPreviewFileId, setShareModalOpen, setShareFileId } =
+  const { previewFileId, setPreviewFileId, shareModalOpen, setShareModalOpen, setShareFileId } =
     useUIStore();
   const [fileUrl, setFileUrl] = useState<string | null>(null);
 
@@ -54,7 +54,7 @@ export function PreviewModal() {
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (!previewFileId) return;
+      if (!previewFileId || shareModalOpen) return;
 
       if (e.key === "Escape") {
         setPreviewFileId(null);
@@ -68,7 +68,7 @@ export function PreviewModal() {
         setPreviewFileId(imageFiles[currentImageIndex + 1].id);
       }
     },
-    [previewFileId, isImage, currentImageIndex, imageFiles, setPreviewFileId]
+    [previewFileId, isImage, currentImageIndex, imageFiles, setPreviewFileId, shareModalOpen]
   );
 
   useEffect(() => {
