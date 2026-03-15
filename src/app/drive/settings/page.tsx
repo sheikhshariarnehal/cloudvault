@@ -69,15 +69,15 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="flex gap-8">
+      <div className="flex flex-col gap-4 md:flex-row md:gap-8">
         {/* Left sidebar nav */}
-        <nav className="flex w-44 shrink-0 flex-col gap-1">
+        <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:w-44 md:shrink-0 md:flex-col md:overflow-visible md:px-0 md:pb-0">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors text-left",
+                "flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors text-left whitespace-nowrap md:w-full md:gap-3",
                 activeTab === id
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
@@ -94,8 +94,8 @@ export default function SettingsPage() {
 
           {/* Profile */}
           {activeTab === "profile" && (
-            <div className="rounded-lg border p-6 space-y-8">
-              <div className="flex items-center gap-4">
+            <div className="space-y-8 rounded-lg border p-4 sm:p-6">
+              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
                 <Avatar className="h-16 w-16">
                   <AvatarImage src={avatarUrl} />
                   <AvatarFallback className="bg-muted">
@@ -159,7 +159,7 @@ export default function SettingsPage() {
 
           {/* Account */}
           {activeTab === "account" && (
-            <div className="rounded-lg border p-6 space-y-8">
+            <div className="space-y-8 rounded-lg border p-4 sm:p-6">
               {!isGuest && (
                 <>
                   <div className="space-y-4">
@@ -242,7 +242,7 @@ export default function SettingsPage() {
 
           {/* Billing */}
           {activeTab === "billing" && (
-            <div className="rounded-lg border p-6">
+            <div className="rounded-lg border p-4 sm:p-6">
               <h3 className="text-sm font-semibold">Billing</h3>
               <p className="text-sm text-muted-foreground mt-1">Billing settings coming soon.</p>
             </div>
@@ -250,7 +250,7 @@ export default function SettingsPage() {
 
           {/* Appearance */}
           {activeTab === "appearance" && (
-            <div className="rounded-lg border p-6 space-y-8">
+            <div className="space-y-8 rounded-lg border p-4 sm:p-6">
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold">Font</h3>
                 <Select>
@@ -275,7 +275,7 @@ export default function SettingsPage() {
                     Select the theme for the dashboard.
                   </p>
                 </div>
-                <div className="flex gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row">
                   <button
                     onClick={() => setTheme("light")}
                     className={cn(
@@ -338,7 +338,7 @@ export default function SettingsPage() {
 
           {/* Notifications */}
           {activeTab === "notifications" && (
-            <div className="rounded-lg border p-6 space-y-8">
+            <div className="space-y-8 rounded-lg border p-4 sm:p-6">
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold">Notify me about...</h3>
                 <div className="space-y-3">
@@ -392,7 +392,7 @@ export default function SettingsPage() {
                 ).map(({ key, label, description }) => (
                   <div
                     key={key}
-                    className="flex items-start justify-between gap-4 rounded-lg border p-4"
+                    className="flex flex-col items-start gap-3 rounded-lg border p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
                   >
                     <div>
                       <p className="text-sm font-medium">{label}</p>
@@ -412,7 +412,7 @@ export default function SettingsPage() {
 
           {/* Display */}
           {activeTab === "display" && (
-            <div className="rounded-lg border p-6">
+            <div className="rounded-lg border p-4 sm:p-6">
               <h3 className="text-sm font-semibold">Display</h3>
               <p className="text-sm text-muted-foreground mt-1">Display settings coming soon.</p>
             </div>
