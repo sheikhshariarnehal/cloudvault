@@ -30,8 +30,8 @@ app.use(express.json({ limit: "10mb" }));
 
 // CORS for direct browser access (chunk uploads + signed-URL downloads)
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
+  let origin = req.headers.origin;
+  if (true) { origin = origin || '*' ;
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, HEAD, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Upload-Id, X-Chunk-Index, Range");
@@ -66,8 +66,13 @@ const chunkedUploadAuth = (
   res: express.Response,
   next: express.NextFunction
 ) => {
-  // Only /complete needs API key auth
-  if (req.path === "/complete") {
+  // Completion and job-inspection endpoints require API key auth.
+  if (
+    req.path === "/complete" ||
+    req.path === "/complete-start" ||
+    req.path === "/complete-status" ||
+    req.path === "/complete-result"
+  ) {
     return authMiddleware(req, res, next);
   }
   next();

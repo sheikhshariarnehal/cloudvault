@@ -60,7 +60,21 @@ interface UploadSession {
   flushLock: Promise<void>;
 }
 
+type CompleteJobState = "assembling" | "uploading" | "success" | "failed";
+
+interface CompleteJob {
+  jobId: string;
+  uploadId: string;
+  state: CompleteJobState;
+  error: string | null;
+  result: Record<string, unknown> | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
 const sessions = new Map<string, UploadSession>();
+const completeJobs = new Map<string, CompleteJob>();
+const uploadToJobId = new Map<string, string>();
 
 // Clean up stale sessions every 15 minutes
 const sessionCleanupTimer = setInterval(() => {
@@ -75,6 +89,157 @@ const sessionCleanupTimer = setInterval(() => {
   }
 }, 15 * 60 * 1000);
 sessionCleanupTimer.unref(); // allow clean shutdown
+
+const completeJobCleanupTimer = setInterval(() => {
+  const now = Date.now();
+  const ttlMs = 60 * 60 * 1000;
+  for (const [jobId, job] of completeJobs) {
+    if (now - job.updatedAt > ttlMs) {
+      completeJobs.delete(jobId);
+      if (uploadToJobId.get(job.uploadId) === jobId) {
+        uploadToJobId.delete(job.uploadId);
+      }
+    }
+  }
+}, 15 * 60 * 1000);
+completeJobCleanupTimer.unref();
+
+function generateJobId(): string {
+  return `${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
+}
+
+async function appendChunkToAssembled(session: UploadSession, chunkPath: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const readStream = fs.createReadStream(chunkPath);
+    let writtenBytes = 0;
+
+    const fail = (err: Error) => {
+      readStream.destroy();
+      reject(err);
+    };
+
+    readStream.on("error", fail);
+
+    readStream.on("data", (chunk) => {
+      const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      writtenBytes += data.length;
+      const canContinue = session.writeStream.write(data);
+      if (!canContinue) {
+        readStream.pause();
+        session.writeStream.once("drain", () => readStream.resume());
+      }
+    });
+
+    readStream.on("end", () => {
+      session.assembledBytes += writtenBytes;
+      try { fs.unlinkSync(chunkPath); } catch { /* ignore */ }
+      resolve();
+    });
+  });
+}
+
+async function flushContiguousChunks(session: UploadSession): Promise<void> {
+  while (session.receivedChunks.has(session.nextFlushIndex)) {
+    const flushPath = path.join(session.dir, String(session.nextFlushIndex));
+    if (fs.existsSync(flushPath)) {
+      await appendChunkToAssembled(session, flushPath);
+    }
+    session.nextFlushIndex++;
+  }
+}
+
+function getMissingChunks(session: UploadSession): number[] {
+  const missing: number[] = [];
+  for (let i = 0; i < session.totalChunks; i++) {
+    if (!session.receivedChunks.has(i)) missing.push(i);
+  }
+  return missing;
+}
+
+async function closeWriteStream(session: UploadSession): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    session.writeStream.end((err: Error | undefined) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+async function performCompleteUpload(session: UploadSession, uploadId: string): Promise<Record<string, unknown>> {
+  await session.flushLock;
+
+  try {
+    await flushContiguousChunks(session);
+  } catch (flushErr) {
+    console.error(`[ChunkedUpload] Final flush error:`, flushErr);
+    throw flushErr;
+  }
+
+  await closeWriteStream(session);
+  cleanupSessionDir(session.dir);
+
+  const assembledPath = session.assembledPath;
+  const stats = fs.statSync(assembledPath);
+  console.log(`[ChunkedUpload] Assembled file: ${stats.size} bytes (expected ${session.fileSize})`);
+
+  if (stats.size === 0) {
+    cleanupTempFile(assembledPath);
+    sessions.delete(uploadId);
+    throw new Error("Assembled file is empty");
+  }
+
+  const { client, chatId, actualStorageType, sessionExpired } = await sessionManager.resolveClientAndChat(
+    session.storageType,
+    session.userId || undefined,
+  );
+
+  const { sentMessage, fileInfo } = await sendMessageWithFallback(
+    client,
+    chatId,
+    assembledPath,
+    session.fileName,
+    session.mimeType,
+    session.fileSize,
+    session,
+  );
+
+  return {
+    file_id: fileInfo.remoteFileId,
+    tdlib_file_id: fileInfo.tdlibFileId,
+    message_id: sentMessage.id,
+    thumbnail_data: null,
+    file_size: fileInfo.size,
+    chat_id: chatId,
+    storage_type: actualStorageType,
+    session_expired: sessionExpired || false,
+  };
+}
+
+function startCompleteJob(jobId: string, uploadId: string, session: UploadSession): void {
+  const job = completeJobs.get(jobId);
+  if (!job) return;
+
+  void (async () => {
+    try {
+      job.state = "uploading";
+      job.updatedAt = Date.now();
+      const result = await performCompleteUpload(session, uploadId);
+      job.state = "success";
+      job.result = result;
+      job.updatedAt = Date.now();
+      cleanupTempFile(session.assembledPath);
+      sessions.delete(uploadId);
+    } catch (err) {
+      cleanupTempFile(session.assembledPath);
+      sessions.delete(uploadId);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      job.state = "failed";
+      job.error = errMsg;
+      job.updatedAt = Date.now();
+      console.error("[ChunkedUpload] Async complete error:", err);
+    }
+  })();
+}
 
 function cleanupSessionDir(dir: string) {
   try {
@@ -210,24 +375,7 @@ router.post("/chunk", chunkUpload.single("chunk"), async (req: Request, res: Res
   // Multiple concurrent chunk handlers call this, but only one write runs
   // at a time thanks to the promise chain. Uses persistent WriteStream.
   const doFlush = async () => {
-    while (session.receivedChunks.has(session.nextFlushIndex)) {
-      const flushPath = path.join(session.dir, String(session.nextFlushIndex));
-      if (fs.existsSync(flushPath)) {
-        const chunkData = await fs.promises.readFile(flushPath);
-        // Write to persistent stream — no open/close overhead
-        await new Promise<void>((resolve, reject) => {
-          session.writeStream.write(chunkData, (err) => {
-            if (err) reject(err);
-            else {
-              session.assembledBytes += chunkData.length;
-              try { fs.unlinkSync(flushPath); } catch { /* ignore */ }
-              resolve();
-            }
-          });
-        });
-      }
-      session.nextFlushIndex++;
-    }
+    await flushContiguousChunks(session);
   };
 
   // Chain onto the lock — each flush waits for the previous one to finish
@@ -273,6 +421,124 @@ router.get("/status", (req: Request, res: Response) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POST /api/chunked-upload/complete-start
+// Starts Telegram upload in background and returns a jobId immediately.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/complete-start", (req: Request, res: Response) => {
+  const { uploadId } = req.body;
+
+  if (!uploadId) {
+    res.status(400).json({ error: "Missing uploadId" });
+    return;
+  }
+
+  const session = sessions.get(uploadId);
+  if (!session) {
+    res.status(404).json({ error: "Upload session not found or expired" });
+    return;
+  }
+
+  const existingJobId = uploadToJobId.get(uploadId);
+  if (existingJobId) {
+    const job = completeJobs.get(existingJobId);
+    if (job) {
+      res.status(200).json({ jobId: existingJobId, state: job.state });
+      return;
+    }
+  }
+
+  const missing = getMissingChunks(session);
+  if (missing.length > 0) {
+    res.status(400).json({
+      error: `Missing chunks: received ${session.receivedChunks.size} of ${session.totalChunks}`,
+      missing,
+    });
+    return;
+  }
+
+  const jobId = generateJobId();
+  const job: CompleteJob = {
+    jobId,
+    uploadId,
+    state: "assembling",
+    error: null,
+    result: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  completeJobs.set(jobId, job);
+  uploadToJobId.set(uploadId, jobId);
+  startCompleteJob(jobId, uploadId, session);
+
+  res.status(202).json({ jobId, state: job.state });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/chunked-upload/complete-status?jobId=xxx
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/complete-status", (req: Request, res: Response) => {
+  const jobId = req.query.jobId as string;
+  if (!jobId) {
+    res.status(400).json({ error: "Missing jobId" });
+    return;
+  }
+
+  const job = completeJobs.get(jobId);
+  if (!job) {
+    res.status(404).json({ error: "Complete job not found or expired" });
+    return;
+  }
+
+  const session = sessions.get(job.uploadId);
+  res.status(200).json({
+    jobId,
+    uploadId: job.uploadId,
+    state: job.state,
+    telegramProgress: session?.telegramProgress ?? (job.state === "success" ? 1 : 0),
+    error: job.error,
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/chunked-upload/complete-result?jobId=xxx
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/complete-result", (req: Request, res: Response) => {
+  const jobId = req.query.jobId as string;
+  if (!jobId) {
+    res.status(400).json({ error: "Missing jobId" });
+    return;
+  }
+
+  const job = completeJobs.get(jobId);
+  if (!job) {
+    res.status(404).json({ error: "Complete job not found or expired" });
+    return;
+  }
+
+  if (job.state === "failed") {
+    const waitSec = parseFloodWait(job.error || "");
+    if (waitSec !== null) {
+      res
+        .status(429)
+        .set("Retry-After", String(waitSec))
+        .json({ error: `Rate limited by Telegram. Retry after ${waitSec} seconds.`, retry_after: waitSec });
+      return;
+    }
+
+    res.status(500).json({ error: `Chunked upload failed: ${job.error || "Unknown error"}` });
+    return;
+  }
+
+  if (job.state !== "success" || !job.result) {
+    res.status(202).json({ jobId, state: job.state });
+    return;
+  }
+
+  res.status(200).json(job.result);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/chunked-upload/complete
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/complete", async (req: Request, res: Response) => {
@@ -289,13 +555,8 @@ router.post("/complete", async (req: Request, res: Response) => {
     return;
   }
 
-  // Verify all chunks received
-  if (session.receivedChunks.size !== session.totalChunks) {
-    // Return which chunks are missing so the client can retry only those
-    const missing: number[] = [];
-    for (let i = 0; i < session.totalChunks; i++) {
-      if (!session.receivedChunks.has(i)) missing.push(i);
-    }
+  const missing = getMissingChunks(session);
+  if (missing.length > 0) {
     res.status(400).json({
       error: `Missing chunks: received ${session.receivedChunks.size} of ${session.totalChunks}`,
       missing,
@@ -303,88 +564,16 @@ router.post("/complete", async (req: Request, res: Response) => {
     return;
   }
 
-  // Wait for any in-progress flush from chunk handlers to finish
-  await session.flushLock;
-
-  // Flush any remaining buffered chunks (shouldn't be many)
   try {
-    while (session.nextFlushIndex < session.totalChunks) {
-      const flushPath = path.join(session.dir, String(session.nextFlushIndex));
-      if (fs.existsSync(flushPath)) {
-        const chunkData = await fs.promises.readFile(flushPath);
-        await new Promise<void>((resolve, reject) => {
-          session.writeStream.write(chunkData, (err) => {
-            if (err) reject(err);
-            else {
-              session.assembledBytes += chunkData.length;
-              try { fs.unlinkSync(flushPath); } catch { /* ignore */ }
-              resolve();
-            }
-          });
-        });
-      }
-      session.nextFlushIndex++;
-    }
-  } catch (flushErr) {
-    console.error(`[ChunkedUpload] Final flush error:`, flushErr);
-  }
+    const result = await performCompleteUpload(session, uploadId);
 
-  // Close the persistent write stream and wait for it to finish
-  await new Promise<void>((resolve, reject) => {
-    session.writeStream.end((err: Error | undefined) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
-
-  // Clean up chunk directory (should be empty now)
-  cleanupSessionDir(session.dir);
-
-  const assembledPath = session.assembledPath;
-
-  try {
-    // Verify assembled size
-    const stats = fs.statSync(assembledPath);
-    console.log(`[ChunkedUpload] Assembled file: ${stats.size} bytes (expected ${session.fileSize})`);
-
-    if (stats.size === 0) {
-      cleanupTempFile(assembledPath);
-      sessions.delete(uploadId);
-      res.status(400).json({ error: "Assembled file is empty" });
-      return;
-    }
-
-    // ── Upload to Telegram (using shared helpers) ────────────────────────
-    const { client, chatId, actualStorageType, sessionExpired } = await sessionManager.resolveClientAndChat(
-      session.storageType,
-      session.userId || undefined,
-    );
-
-    const mimeType = session.mimeType;
-    const fileName = session.fileName;
-
-    // Send to Telegram with automatic media→document fallback
-    const { sentMessage, fileInfo } = await sendMessageWithFallback(
-      client, chatId, assembledPath, fileName, mimeType, session.fileSize, session,
-    );
-
-    // Send response immediately - don't wait for thumbnail
-    res.status(201).json({
-      file_id: fileInfo.remoteFileId,
-      tdlib_file_id: fileInfo.tdlibFileId,
-      message_id: sentMessage.id,
-      thumbnail_data: null, // Will be fetched by frontend if needed
-      file_size: fileInfo.size,
-      chat_id: chatId,
-      storage_type: actualStorageType,
-      session_expired: sessionExpired || false,
-    });
+    res.status(201).json(result);
 
     // Cleanup in background (don't block response)
-    cleanupTempFile(assembledPath);
+    cleanupTempFile(session.assembledPath);
     sessions.delete(uploadId);
   } catch (err) {
-    cleanupTempFile(assembledPath);
+    cleanupTempFile(session.assembledPath);
     sessions.delete(uploadId);
     console.error("[ChunkedUpload] Error:", err);
 
