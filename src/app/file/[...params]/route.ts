@@ -4,6 +4,7 @@ import { decodeFileToken } from "@/lib/utils";
 import { createSignedToken, buildDirectUrl } from "@/lib/signed-url";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 const BACKEND_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
 const PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_TDLIB_CHUNK_URL || BACKEND_URL;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { ImagePreview } from "@/components/preview/image-preview";
 import { VideoPreview } from "@/components/preview/video-preview";
@@ -10,6 +10,10 @@ import { CsvPreview } from "@/components/preview/csv-preview";
 import { TextPreview } from "@/components/preview/text-preview";
 import { JsonPreview } from "@/components/preview/json-preview";
 import { PptxPreview } from "@/components/preview/pptx-preview";
+import {
+  DownloadSpeedometer,
+  type DownloadState,
+} from "@/components/share/download-speedometer";
 import { getFileCategory, formatFileSize, isOfficeFile, isCsvFile, isPptxFile, isJsonFile, isTextFile, isPreviewableFile, isLegacyPptFile } from "@/types/file.types";
 import { getFileUrl } from "@/lib/utils";
 import {
@@ -155,12 +159,14 @@ function SharePreviewModal({
   files,
   onClose,
   onNavigate,
+  onDownload,
 }: {
   file: SharedFile;
   token: string;
   files: SharedFile[];
   onClose: () => void;
   onNavigate: (fileId: string) => void;
+  onDownload: (url: string, fileName: string, fallbackSize?: number) => void;
 }) {
   const category = getFileCategory(file.mime_type);
   const previewUrl = `/api/share/${token}?previewFileId=${file.id}`;
@@ -219,13 +225,13 @@ function SharePreviewModal({
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <a
-            href={downloadUrl}
+          <button
+            onClick={() => onDownload(downloadUrl, file.name, file.size_bytes)}
             className="p-2.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
             title="Download"
           >
             <Download className="h-5 w-5" />
-          </a>
+          </button>
         </div>
       </div>
 
@@ -347,6 +353,141 @@ export default function SharePage() {
     null
   );
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
+  const [downloadState, setDownloadState] = useState<DownloadState | null>(null);
+  const downloadAbortRef = useRef<AbortController | null>(null);
+
+  const startDownloadWithFeedback = useCallback(async (url: string, fileName: string, fallbackSize = 0) => {
+    const pickerWindow = window as Window & {
+      showSaveFilePicker?: (options?: {
+        suggestedName?: string;
+      }) => Promise<{
+        createWritable: () => Promise<{
+          write: (chunk: Uint8Array) => Promise<void>;
+          close: () => Promise<void>;
+        }>;
+      }>;
+    };
+
+    // If File System Access API is not available, fallback to plain download.
+    if (!pickerWindow.showSaveFilePicker) {
+      setDownloadState({
+        phase: "starting",
+        fileName,
+        receivedBytes: 0,
+        totalBytes: fallbackSize,
+        speedBps: 0,
+        errorMessage: "Realtime progress is not supported in this browser.",
+      });
+
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+
+      window.setTimeout(() => setDownloadState(null), 5000);
+      return;
+    }
+
+    try {
+      setDownloadState({
+        phase: "starting",
+        fileName,
+        receivedBytes: 0,
+        totalBytes: fallbackSize,
+        speedBps: 0,
+      });
+
+      const abortController = new AbortController();
+      downloadAbortRef.current = abortController;
+
+      const fileHandle = await pickerWindow.showSaveFilePicker({ suggestedName: fileName });
+      const writable = await fileHandle.createWritable();
+
+      const response = await fetch(url, { signal: abortController.signal });
+      if (!response.ok || !response.body) {
+        throw new Error(`Download failed with status ${response.status}`);
+      }
+
+      const headerLength = Number(response.headers.get("content-length") || 0);
+      const totalBytes = headerLength > 0 ? headerLength : fallbackSize;
+      const reader = response.body.getReader();
+
+      let receivedBytes = 0;
+      let lastStamp = performance.now();
+      let lastBytes = 0;
+
+      setDownloadState({
+        phase: "downloading",
+        fileName,
+        receivedBytes,
+        totalBytes,
+        speedBps: 0,
+      });
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+
+        await writable.write(value);
+        receivedBytes += value.byteLength;
+
+        const now = performance.now();
+        const dtSec = (now - lastStamp) / 1000;
+        let speedBps = 0;
+        if (dtSec >= 0.2) {
+          speedBps = (receivedBytes - lastBytes) / dtSec;
+          lastStamp = now;
+          lastBytes = receivedBytes;
+        }
+
+        setDownloadState((prev) => ({
+          phase: "downloading",
+          fileName,
+          receivedBytes,
+          totalBytes,
+          speedBps: speedBps > 0 ? speedBps : prev?.speedBps || 0,
+        }));
+      }
+
+      await writable.close();
+      downloadAbortRef.current = null;
+
+      setDownloadState((prev) => ({
+        phase: "completed",
+        fileName,
+        receivedBytes,
+        totalBytes,
+        speedBps: prev?.speedBps || 0,
+      }));
+
+      window.setTimeout(() => setDownloadState(null), 3500);
+    } catch (error) {
+      downloadAbortRef.current = null;
+      const aborted = error instanceof DOMException && error.name === "AbortError";
+      setDownloadState({
+        phase: "error",
+        fileName,
+        receivedBytes: 0,
+        totalBytes: fallbackSize,
+        speedBps: 0,
+        errorMessage: aborted
+          ? "Download canceled."
+          : error instanceof Error
+          ? error.message
+          : "Download failed",
+      });
+    }
+  }, []);
+
+  const cancelDownload = useCallback(() => {
+    if (downloadAbortRef.current) {
+      downloadAbortRef.current.abort();
+      downloadAbortRef.current = null;
+    }
+  }, []);
 
   const fetchShareData = useCallback(
     async (subfolderId?: string | null) => {
@@ -466,13 +607,13 @@ export default function SharePage() {
                 </p>
               </div>
             </div>
-            <a
-              href={downloadUrl}
+            <button
+              onClick={() => startDownloadWithFeedback(downloadUrl, file.name, file.size_bytes)}
               className="p-2.5 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
               title="Download"
             >
               <Download className="h-5 w-5" />
-            </a>
+            </button>
           </div>
         </header>
 
@@ -550,13 +691,13 @@ export default function SharePage() {
               <p className="text-sm text-white/50 mb-6">
                 {formatFileSize(file.size_bytes)} &middot; Preview not available
               </p>
-              <a
-                href={downloadUrl}
+              <button
+                onClick={() => startDownloadWithFeedback(downloadUrl, file.name, file.size_bytes)}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-[#8ab4f8] text-[#202124] rounded-full font-medium hover:bg-[#aecbfa] transition-colors"
               >
                 <Download className="h-4 w-4" />
                 Download File
-              </a>
+              </button>
             </div>
           )}
         </main>
@@ -598,6 +739,7 @@ export default function SharePage() {
           files={files}
           onClose={() => setPreviewFileId(null)}
           onNavigate={(id) => setPreviewFileId(id)}
+          onDownload={startDownloadWithFeedback}
         />
       )}
 
@@ -768,13 +910,13 @@ export default function SharePage() {
                           <Eye className="h-4 w-4" />
                         </button>
                       )}
-                      <a
-                        href={downloadUrl}
+                      <button
+                        onClick={() => startDownloadWithFeedback(downloadUrl, file.name, file.size_bytes)}
                         className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-colors opacity-0 group-hover:opacity-100"
                         title="Download"
                       >
                         <Download className="h-4 w-4" />
-                      </a>
+                      </button>
                     </div>
                   </div>
                 );
@@ -791,6 +933,8 @@ export default function SharePage() {
           )}
         </div>
       </main>
+
+      <DownloadSpeedometer state={downloadState} onCancel={cancelDownload} />
     </div>
   );
 }

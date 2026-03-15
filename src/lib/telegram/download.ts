@@ -27,7 +27,11 @@ export async function downloadFromTelegram(
   fileId: string,
   mimeType: string,
   messageId?: number | null,
-  options?: { rangeHeader?: string },
+  options?: {
+    rangeHeader?: string;
+    storageType?: string;
+    userId?: string | null;
+  },
 ): Promise<{
   stream: ReadableStream;
   contentType: string;
@@ -38,6 +42,12 @@ export async function downloadFromTelegram(
   const params = new URLSearchParams();
   if (messageId) {
     params.set("message_id", String(messageId));
+  }
+  if (options?.storageType) {
+    params.set("storage_type", options.storageType);
+  }
+  if (options?.userId) {
+    params.set("user_id", options.userId);
   }
   const qs = params.toString();
   const url = `${BACKEND_URL}/api/download/${encodeURIComponent(fileId)}${qs ? `?${qs}` : ""}`;

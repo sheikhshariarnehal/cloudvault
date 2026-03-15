@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createSignedToken, buildDirectUrl } from "@/lib/signed-url";
 
+export const maxDuration = 300;
+
 const BACKEND_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
 const PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_TDLIB_CHUNK_URL || BACKEND_URL;
 const API_KEY = process.env.TDLIB_SERVICE_API_KEY || "";

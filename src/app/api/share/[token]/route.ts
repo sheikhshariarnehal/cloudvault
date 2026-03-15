@@ -2,12 +2,47 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { downloadFromTelegram, TelegramDownloadError } from "@/lib/telegram/download";
 
+// Shared folder/file downloads can take time on first fetch before cache warm-up.
+export const maxDuration = 300;
+
 function getServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
+}
+
+function createTelegramStreamResponse(
+  result: {
+    stream: ReadableStream;
+    contentType: string;
+    contentLength?: number;
+    contentRange?: string;
+    status: number;
+  },
+  fileName: string,
+  disposition: "inline" | "attachment",
+  cacheControl: string,
+) {
+  const headers: Record<string, string> = {
+    "Content-Type": result.contentType || "application/octet-stream",
+    "Content-Disposition": `${disposition}; filename="${encodeURIComponent(fileName)}"`,
+    "Cache-Control": cacheControl,
+    "Accept-Ranges": "bytes",
+  };
+
+  if (result.contentLength !== undefined) {
+    headers["Content-Length"] = String(result.contentLength);
+  }
+  if (result.contentRange) {
+    headers["Content-Range"] = result.contentRange;
+  }
+
+  return new NextResponse(result.stream, {
+    status: result.status,
+    headers,
+  });
 }
 
 // Recursively get all files in a folder and its subfolders
@@ -147,19 +182,22 @@ export async function GET(
           .update({ download_count: shareLink.download_count + 1 })
           .eq("id", shareLink.id);
 
-        const { stream } = await downloadFromTelegram(
+        const telegramResult = await downloadFromTelegram(
           file.telegram_file_id,
           file.mime_type || "application/octet-stream",
           file.telegram_message_id,
+          {
+            storageType: file.storage_type,
+            userId: file.user_id,
+          },
         );
 
-        return new NextResponse(stream, {
-          headers: {
-            "Content-Type": file.mime_type || "application/octet-stream",
-            "Content-Disposition": `attachment; filename="${encodeURIComponent(file.original_name)}"`,
-            "Cache-Control": "private, max-age=3600",
-          },
-        });
+        return createTelegramStreamResponse(
+          telegramResult,
+          file.original_name,
+          "attachment",
+          "private, max-age=3600",
+        );
       }
 
       if (previewFileId) {
@@ -182,19 +220,23 @@ export async function GET(
           return NextResponse.json({ error: "File not found" }, { status: 404 });
         }
 
-        const { stream } = await downloadFromTelegram(
+        const telegramResult = await downloadFromTelegram(
           file.telegram_file_id,
           file.mime_type || "application/octet-stream",
           file.telegram_message_id,
+          {
+            rangeHeader: request.headers.get("range") || undefined,
+            storageType: file.storage_type,
+            userId: file.user_id,
+          },
         );
 
-        return new NextResponse(stream, {
-          headers: {
-            "Content-Type": file.mime_type || "application/octet-stream",
-            "Content-Disposition": `inline; filename="${encodeURIComponent(file.original_name)}"`,
-            "Cache-Control": "no-cache",
-          },
-        });
+        return createTelegramStreamResponse(
+          telegramResult,
+          file.original_name,
+          "inline",
+          "no-cache",
+        );
       }
 
       // Get the target folder info (for subfolder navigation)
@@ -275,38 +317,45 @@ export async function GET(
         .eq("id", shareLink.id);
 
       // Download from Telegram via TDLib service using the remote file_id
-      const { stream } = await downloadFromTelegram(
+      const telegramResult = await downloadFromTelegram(
         file.telegram_file_id,
         file.mime_type || "application/octet-stream",
         file.telegram_message_id,
+        {
+          storageType: file.storage_type,
+          userId: file.user_id,
+        },
       );
 
-      return new NextResponse(stream, {
-        headers: {
-          "Content-Type": file.mime_type || "application/octet-stream",
-          "Content-Disposition": `attachment; filename="${encodeURIComponent(file.original_name)}"`,
-          "Cache-Control": "private, max-age=3600",
-        },
-      });
+      return createTelegramStreamResponse(
+        telegramResult,
+        file.original_name,
+        "attachment",
+        "private, max-age=3600",
+      );
     }
 
     // Check if this is a preview/stream request (for images, videos, PDFs)
     const isPreview = request.nextUrl.searchParams.get("preview") === "true";
 
     if (isPreview) {
-      const { stream } = await downloadFromTelegram(
+      const telegramResult = await downloadFromTelegram(
         file.telegram_file_id,
         file.mime_type || "application/octet-stream",
         file.telegram_message_id,
+        {
+          rangeHeader: request.headers.get("range") || undefined,
+          storageType: file.storage_type,
+          userId: file.user_id,
+        },
       );
 
-      return new NextResponse(stream, {
-        headers: {
-          "Content-Type": file.mime_type || "application/octet-stream",
-          "Content-Disposition": `inline; filename="${encodeURIComponent(file.original_name)}"`,
-          "Cache-Control": "no-cache",
-        },
-      });
+      return createTelegramStreamResponse(
+        telegramResult,
+        file.original_name,
+        "inline",
+        "no-cache",
+      );
     }
 
     // Return file metadata (for the share page to render)
