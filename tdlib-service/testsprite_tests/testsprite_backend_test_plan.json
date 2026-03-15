@@ -1,0 +1,47 @@
+[
+  {
+    "id": "TC001",
+    "title": "get health service status",
+    "description": "Test the GET /health endpoint to verify it returns the correct service and TDLib health details including status, tdlib_ready flag, active_sessions, max_sessions, uptime, and timestamp under normal, degraded, and error conditions."
+  },
+  {
+    "id": "TC002",
+    "title": "post single file upload",
+    "description": "Test the POST /api/upload/ endpoint for single file upload with valid authorization and multipart/form-data, ensuring it returns 200 with file metadata including remoteFileId. Also test error cases for missing authorization and file size exceeding limits."
+  },
+  {
+    "id": "TC003",
+    "title": "chunked upload lifecycle",
+    "description": "Test the chunked upload lifecycle endpoints including initializing a session, uploading chunks, polling status, starting async completion, checking completion status, fetching completion result, and single-call completion. Verify correct responses and error handling for invalid uploadId and authorization."
+  },
+  {
+    "id": "TC004",
+    "title": "file download and repair",
+    "description": "Test the file download endpoints including GET /api/download/:remoteFileId with range support and authorization, GET /api/dl/:remoteFileId with signed URL validation, GET /api/download/status/:remoteFileId for cache status, and POST /api/download/repair for repair flow. Verify happy paths and error scenarios like invalid signatures and non-existent files."
+  },
+  {
+    "id": "TC005",
+    "title": "thumbnail delete and telegram session utilities",
+    "description": "Test thumbnail retrieval and creation endpoints, message deletion and cleanup, and Telegram auth lifecycle endpoints including send-code, verify-code, verify-password, status, and disconnect. Verify correct responses for happy and error paths."
+  },
+  {
+    "id": "TC006",
+    "title": "admin and diagnostics endpoints",
+    "description": "Test admin endpoints for storage stats, targeted and full cleanup, cache clearing, TDLib optimizeStorage, runtime metrics, and logs retrieval. Verify authorization enforcement and error handling for cleanup failures."
+  },
+  {
+    "id": "TC007",
+    "title": "guest mode file operations",
+    "description": "Test guest mode APIs including file upload with guest_session_id header, listing files by guest_session_id, and error handling for guest share link creation and missing guest/session tokens."
+  },
+  {
+    "id": "TC008",
+    "title": "realtime sync notifications",
+    "description": "Test real-time sync functionality by subscribing to Supabase Realtime channels, receiving insert events, handling connection drops and reconnect attempts, and fallback to file list retrieval."
+  },
+  {
+    "id": "TC009",
+    "title": "folder management and file preview",
+    "description": "Test folder creation, moving files between folders, and file preview endpoints including thumbnail and partial download with preview flag. Verify happy paths and error handling for unsupported preview types and non-existent folders."
+  }
+]
