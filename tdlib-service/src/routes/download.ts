@@ -66,7 +66,7 @@ const CACHE_SWEEP_INTERVAL_MS = 5 * 60 * 1000; // sweep every 5 minutes
 const MB = 1024 * 1024;
 const TDLIB_DOWNLOAD_PRIORITY = parseInt(process.env.TDLIB_DOWNLOAD_PRIORITY || "32", 10);
 const PROGRESSIVE_THRESHOLD_BYTES =
-  parseInt(process.env.DOWNLOAD_PROGRESSIVE_THRESHOLD_MB || "64", 10) * MB;
+  parseInt(process.env.DOWNLOAD_PROGRESSIVE_THRESHOLD_MB || "5", 10) * MB;
 const ENABLE_PROGRESSIVE_FOR_LARGE =
   process.env.DOWNLOAD_PROGRESSIVE_FOR_LARGE !== "false";
 
