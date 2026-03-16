@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useUIStore } from "@/store/ui-store";
@@ -234,7 +235,9 @@ export default function SettingsPage() {
                     Sign up for an account to access security settings.
                   </p>
                 ) : (
-                  <Button variant="outline" size="sm">Change Password</Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/auth/reset-password?mode=change">Change Password</Link>
+                  </Button>
                 )}
               </div>
             </div>

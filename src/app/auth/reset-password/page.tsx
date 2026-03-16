@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Lock, Eye, EyeOff, CheckCircle, ArrowLeft } from "lucide-react";
 import NextImage from "next/image";
 
 export default function ResetPasswordPage() {
@@ -18,7 +19,9 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+  const isChangePasswordFlow = searchParams.get("mode") === "change";
 
   useEffect(() => {
     // Listen for the PASSWORD_RECOVERY event from the URL hash
@@ -62,7 +65,9 @@ export default function ResetPasswordPage() {
       });
       if (error) throw error;
       setSuccess(true);
-      setTimeout(() => router.push("/drive"), 2000);
+      setTimeout(() => {
+        router.push(isChangePasswordFlow ? "/drive/settings" : "/drive");
+      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reset password");
     } finally {
@@ -78,7 +83,9 @@ export default function ResetPasswordPage() {
             <CheckCircle className="h-7 w-7 text-green-600" />
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Password updated!</h2>
-          <p className="text-sm text-gray-500">Redirecting to your drive...</p>
+          <p className="text-sm text-gray-500">
+            Redirecting to {isChangePasswordFlow ? "settings" : "your drive"}...
+          </p>
         </div>
       </div>
     );
@@ -89,7 +96,9 @@ export default function ResetPasswordPage() {
       <div className="min-h-dvh bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col justify-center py-8 px-4 sm:px-6">
         <div className="w-full max-w-sm mx-auto text-center space-y-4">
           <NextImage src="/logo.webp" alt="CloudVault" width={52} height={52} className="mx-auto" priority />
-          <p className="text-sm text-gray-500">Verifying your reset link...</p>
+          <p className="text-sm text-gray-500">
+            {isChangePasswordFlow ? "Checking your session..." : "Verifying your reset link..."}
+          </p>
         </div>
       </div>
     );
@@ -102,8 +111,14 @@ export default function ResetPasswordPage() {
         {/* Logo */}
         <div className="text-center">
           <NextImage src="/logo.webp" alt="CloudVault" width={52} height={52} className="mx-auto mb-3" priority />
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">New password</h1>
-          <p className="text-sm text-gray-500 mt-1">Choose a strong password</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+            {isChangePasswordFlow ? "Change password" : "New password"}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {isChangePasswordFlow
+              ? "Set a new password for your account"
+              : "Choose a strong password"}
+          </p>
         </div>
 
         {/* Card */}
@@ -182,8 +197,18 @@ export default function ResetPasswordPage() {
               disabled={isLoading}
             >
               <Lock className="h-4 w-4 mr-2" />
-              {isLoading ? "Updating..." : "Update Password"}
+              {isLoading ? "Updating..." : isChangePasswordFlow ? "Change Password" : "Update Password"}
             </Button>
+
+            {isChangePasswordFlow && (
+              <Link
+                href="/drive/settings"
+                className="flex items-center justify-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back to Settings
+              </Link>
+            )}
           </form>
         </div>
       </div>
