@@ -45,7 +45,7 @@ export default function DashboardLayout({
     if (typeof window === "undefined") return true;
     return localStorage.getItem("telegram-banner-dismissed") === "true";
   });
-  const { setFiles, setFolders, setIsLoading, setDataLoaded, currentFolderId } = useFilesStore();
+  const { setFiles, mergeFiles, setFolders, setIsLoading, setDataLoaded, currentFolderId } = useFilesStore();
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
   const isOnline = useUIStore((s) => s.isOnline);
@@ -61,6 +61,8 @@ export default function DashboardLayout({
     // Wait for auth to finish resolving before querying.
     // This prevents: (a) querying with wrong identity, (b) double-firing.
     if (authLoading) return;
+
+    let cancelled = false;
 
     const loadData = async () => {
       setIsLoading(true);
@@ -87,6 +89,9 @@ export default function DashboardLayout({
           "id,user_id,guest_session_id,parent_id,name,color," +
           "is_trashed,trashed_at,created_at,updated_at";
 
+        const INITIAL_FILES_PAGE_SIZE = 200;
+        const FILES_BACKGROUND_PAGE_SIZE = 1000;
+
         const [filesRes, foldersRes] = await Promise.all([
           supabase
             .from("files")
@@ -94,7 +99,7 @@ export default function DashboardLayout({
             .eq(filterColumn, filterValue)
             .eq("is_trashed", false)
             .order("created_at", { ascending: false })
-            .limit(200),
+            .limit(INITIAL_FILES_PAGE_SIZE),
           supabase
             .from("folders")
             .select(FOLDER_COLUMNS)
@@ -103,18 +108,59 @@ export default function DashboardLayout({
             .order("name", { ascending: true }),
         ]);
 
+        if (cancelled) return;
+
         if (filesRes.data) setFiles(filesRes.data as unknown as DbFile[]);
         if (foldersRes.data) setFolders(foldersRes.data as unknown as DbFolder[]);
+
+        // Keep hydrating older pages in the background so sidebar storage metrics
+        // are computed from the full dataset across all drive routes.
+        const loadRemainingFiles = async () => {
+          let from = INITIAL_FILES_PAGE_SIZE;
+
+          while (!cancelled) {
+            const to = from + FILES_BACKGROUND_PAGE_SIZE - 1;
+            const { data, error } = await supabase
+              .from("files")
+              .select(FILE_COLUMNS)
+              .eq(filterColumn, filterValue)
+              .eq("is_trashed", false)
+              .order("created_at", { ascending: false })
+              .range(from, to);
+
+            if (error) {
+              console.error("Failed to load remaining files:", error);
+              return;
+            }
+
+            const page = (data ?? []) as unknown as DbFile[];
+            if (page.length === 0) return;
+
+            mergeFiles(page);
+
+            if (page.length < FILES_BACKGROUND_PAGE_SIZE) return;
+
+            from += FILES_BACKGROUND_PAGE_SIZE;
+          }
+        };
+
+        void loadRemainingFiles();
       } catch (error) {
         console.error("Failed to load data:", error);
       } finally {
-        setIsLoading(false);
-        setDataLoaded(true);
+        if (!cancelled) {
+          setIsLoading(false);
+          setDataLoaded(true);
+        }
       }
     };
 
     loadData();
-  }, [user?.id, guestSessionId, authLoading, setFiles, setFolders, setIsLoading, setDataLoaded]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, guestSessionId, authLoading, setFiles, mergeFiles, setFolders, setIsLoading, setDataLoaded]);
 
   // Online/offline detection
   useEffect(() => {
