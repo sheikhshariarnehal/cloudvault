@@ -32,13 +32,18 @@ export async function POST(
     const supabase = getServiceClient();
     const { data: file, error } = await supabase
       .from("files")
-      .select("telegram_file_id, size_bytes")
+      .select("telegram_file_id, size_bytes, storage_type, user_id")
       .eq("id", id)
       .single();
 
     if (error || !file?.telegram_file_id) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
+
+    // Skip prefetch for user-stored files when the user ID is unavailable
+    // (the bot TDLib client cannot access files from a user's personal session)
+    const storageType: string = (file as Record<string, unknown>).storage_type as string ?? "bot";
+    const userId: string | undefined = (file as Record<string, unknown>).user_id as string | undefined;
 
     // Fire to backend — don't await the full download, just initiate
     const res = await fetch(`${BACKEND_URL}/api/download/prefetch`, {
@@ -50,6 +55,8 @@ export async function POST(
       body: JSON.stringify({
         remoteFileId: file.telegram_file_id,
         sizeHint: file.size_bytes,
+        storageType,
+        userId,
       }),
     });
 

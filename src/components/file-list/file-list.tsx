@@ -251,6 +251,8 @@ const COL = {
   actions: "w-14",
 } as const;
 
+const MIN_PREFETCH_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
 // ─── Folder Row ──────────────────────────────────────────────────────
 function FolderRow({ folder, isSelected, onToggle }: { folder: DbFolder; isSelected: boolean; onToggle: (id: string) => void }) {
   const handleRowClick = (e: React.MouseEvent) => {
@@ -643,12 +645,25 @@ export function FileList({ files, folders = [], topRightSlot, stickyOffset = 0, 
   // Prefetch on hover — debounced 400ms, only for files > 5 MB, max 2 in-flight
   const prefetchInFlight = useRef(new Set<string>());
   const prefetchTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  // Prevents re-prefetching the same file within 60s (success or failure)
+  const prefetchCooldown = useRef(new Set<string>());
+  const prefetchCooldownTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  // Clear all pending timers on unmount
+  useEffect(() => {
+    return () => {
+      for (const timer of prefetchTimers.current.values()) clearTimeout(timer);
+      for (const timer of prefetchCooldownTimers.current.values()) clearTimeout(timer);
+      prefetchTimers.current.clear();
+      prefetchCooldownTimers.current.clear();
+    };
+  }, []);
 
   const handlePrefetch = useCallback((fileId: string) => {
-    const MIN_PREFETCH_SIZE = 5 * 1024 * 1024;
     const file = sortedFiles.find((f) => f.id === fileId);
-    if (!file || (file.size_bytes ?? 0) < MIN_PREFETCH_SIZE) return;
+    if (!file || (file.size_bytes ?? 0) < MIN_PREFETCH_SIZE_BYTES) return;
     if (prefetchInFlight.current.has(fileId)) return;
+    if (prefetchCooldown.current.has(fileId)) return; // recently attempted
     if (prefetchInFlight.current.size >= 2) return;
 
     // Debounce: only fire after 400ms hover
@@ -658,7 +673,16 @@ export function FileList({ files, folders = [], topRightSlot, stickyOffset = 0, 
       if (prefetchInFlight.current.size >= 2) return;
       prefetchInFlight.current.add(fileId);
       fetch(`/api/prefetch/${fileId}`, { method: "POST" })
-        .finally(() => prefetchInFlight.current.delete(fileId));
+        .finally(() => {
+          prefetchInFlight.current.delete(fileId);
+          // Cooldown: don't re-prefetch this file for 60 seconds
+          prefetchCooldown.current.add(fileId);
+          const cooldownTimer = setTimeout(() => {
+            prefetchCooldown.current.delete(fileId);
+            prefetchCooldownTimers.current.delete(fileId);
+          }, 60_000);
+          prefetchCooldownTimers.current.set(fileId, cooldownTimer);
+        });
     }, 400);
     prefetchTimers.current.set(fileId, timer);
   }, [sortedFiles]);

@@ -4,6 +4,13 @@ import { CheckCircle2, CloudOff, Download, Loader2, X, Cloud, XCircle } from "lu
 import { formatFileSize } from "@/types/file.types";
 import type { DownloadItem } from "@/store/download-store";
 
+// Indeterminate slide animation used in starting / fetching phase progress bars
+const SLIDE_CSS = `@keyframes slide {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(250%); }
+  100% { transform: translateX(250%); }
+}`;
+
 export type DownloadPhase = "idle" | "starting" | "fetching" | "downloading" | "completed" | "error";
 
 export interface DownloadState {
@@ -66,6 +73,7 @@ function SingleDownloadRow({
 
   return (
     <div className={compact ? "py-2 border-b border-white/5 last:border-b-0" : ""}>
+      <style>{SLIDE_CSS}</style>
       {/* Header row */}
       <div className="flex items-center gap-2 mb-1.5">
         {state.phase === "idle" && (
@@ -200,13 +208,6 @@ export function DownloadSpeedometer({
     return (
       <div className="fixed bottom-5 right-5 z-[120] bg-[#2b2c2f] text-white border border-white/10 rounded-xl px-4 py-3 shadow-2xl w-[min(92vw,400px)]">
         <SingleDownloadRow state={state} onCancel={onCancel} />
-        <style>{`
-          @keyframes slide {
-            0%   { transform: translateX(-100%); }
-            50%  { transform: translateX(250%); }
-            100% { transform: translateX(250%); }
-          }
-        `}</style>
       </div>
     );
   }
@@ -252,14 +253,6 @@ export function DownloadSpeedometer({
           />
         ))}
       </div>
-
-      <style>{`
-        @keyframes slide {
-          0%   { transform: translateX(-100%); }
-          50%  { transform: translateX(250%); }
-          100% { transform: translateX(250%); }
-        }
-      `}</style>
     </div>
   );
 }
