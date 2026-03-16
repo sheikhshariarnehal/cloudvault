@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createSignedToken, buildDirectUrl } from "@/lib/signed-url";
 import { decodeFileToken } from "@/lib/utils";
 
@@ -7,6 +7,19 @@ export const dynamic = "force-dynamic";
 
 const BACKEND_URL = process.env.TDLIB_SERVICE_URL || "http://localhost:3001";
 const API_KEY = process.env.TDLIB_SERVICE_API_KEY || "";
+
+/**
+ * Service-role Supabase client — bypasses RLS so guest users
+ * and all session types can retrieve file records for signed URLs.
+ * This matches the same model used by /file/[...params]/route.ts.
+ */
+function getServiceClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+}
 
 /**
  * The public BACKEND_URL that the browser can reach.
@@ -38,24 +51,28 @@ export async function GET(
       return NextResponse.json({ error: "File ID required" }, { status: 400 });
     }
 
-    // Decode if it's a base64url token (from /file/ routes), otherwise treat as UUID
-    let fileId: string;
-    try {
-      fileId = decodeFileToken(id);
-    } catch {
-      fileId = id; // already a raw UUID
-    }
+    // If the id is already a raw UUID, use it directly.
+    // decodeFileToken silently corrupts UUIDs (replaces '-' with '+'),
+    // so we must guard against applying it to an already-decoded value.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const fileId = UUID_RE.test(id) ? id : decodeFileToken(id);
 
-    const supabase = await createClient();
+    const supabase = getServiceClient();
 
     // Fetch file record
     const { data: file, error } = await supabase
       .from("files")
-      .select("id, telegram_file_id, telegram_message_id, mime_type, original_name, name, size_bytes")
+      .select("id, telegram_file_id, telegram_message_id, mime_type, original_name, name, size_bytes, storage_type, user_id")
       .eq("id", fileId)
       .single();
 
     if (error || !file) {
+      console.error("[signed-url] Supabase lookup failed:", {
+        fileId,
+        error: error?.message || error,
+        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      });
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 
@@ -67,6 +84,8 @@ export async function GET(
         ct: file.mime_type || "application/octet-stream",
         fn: file.original_name || file.name,
         sz: file.size_bytes || undefined,
+        st: file.storage_type || "bot",
+        uid: file.storage_type === "user" ? (file.user_id || undefined) : undefined,
       },
       API_KEY,
     );

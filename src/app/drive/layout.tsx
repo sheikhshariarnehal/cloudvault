@@ -20,6 +20,8 @@ import { ConnectTelegramModal } from "@/components/modals/connect-telegram-modal
 import { MobileUploadFab } from "@/components/upload/mobile-upload-fab";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import Telegram from "@/components/ui/Telegram";
+import { DownloadSpeedometer } from "@/components/share/download-speedometer";
+import { useDownloadStore } from "@/store/download-store";
 
 // Lazy-load PreviewModal — it bundles 8 preview sub-components that are only
 // needed when the user actually opens a file. Deferring saves ~60 KB on initial load.
@@ -35,6 +37,7 @@ export default function DashboardLayout({
 }) {
   const { user, guestSessionId, isLoading: authLoading, isTelegramConnected, isTelegramStatusLoading } = useAuth();
   const isGuest = !user && !!guestSessionId;
+  const { downloadState, cancelDownload } = useDownloadStore();
   const [telegramBannerDismissed, setTelegramBannerDismissed] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("telegram-banner-dismissed") === "true";
@@ -223,6 +226,9 @@ export default function DashboardLayout({
         <RenameModal />
         <ShareModal />
         <ConnectTelegramModal />
+
+        {/* Global download progress speedometer */}
+        <DownloadSpeedometer state={downloadState} onCancel={cancelDownload} />
       </div>
     </UploadZone>
   );

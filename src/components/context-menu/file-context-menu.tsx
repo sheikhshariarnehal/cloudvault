@@ -21,7 +21,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { DbFile } from "@/types/file.types";
-import { getFileUrl } from "@/lib/utils";
+import { useDownloadStore } from "@/store/download-store";
 
 interface FileContextMenuProps {
   file: DbFile;
@@ -30,11 +30,12 @@ interface FileContextMenuProps {
 export function FileContextMenu({ file }: FileContextMenuProps) {
   const { updateFile, removeFile } = useFilesStore();
   const { setPreviewFileId, setRenameTarget, setRenameModalOpen, setShareFileId, setShareModalOpen } = useUIStore();
+  const { startDownload } = useDownloadStore();
 
   const handlePreview = () => setPreviewFileId(file.id);
 
   const handleDownload = () => {
-    window.open(getFileUrl(file.id, file.name, true), "_blank");
+    startDownload(file.id, file.original_name || file.name, file.size_bytes ?? 0);
   };
 
   const handleRename = () => {

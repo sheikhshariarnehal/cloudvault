@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
+import { useDownloadStore } from "@/store/download-store";
 import { FileContextMenu } from "@/components/context-menu/file-context-menu";
 import { FolderContextMenu } from "@/components/context-menu/folder-context-menu";
 import {
@@ -578,6 +579,7 @@ export function FileList({ files, folders = [], topRightSlot, stickyOffset = 0, 
     setShareFileId,
     setShareModalOpen,
   } = useUIStore();
+  const { startDownload } = useDownloadStore();
 
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -632,8 +634,8 @@ export function FileList({ files, folders = [], topRightSlot, stickyOffset = 0, 
   );
 
   const handleDownloadFile = useCallback((file: DbFile) => {
-    window.open(getFileUrl(file.id, file.name, true), "_blank");
-  }, []);
+    startDownload(file.id, file.original_name || file.name, file.size_bytes ?? 0);
+  }, [startDownload]);
 
   const handleShareFile = useCallback(
     (file: DbFile) => {
