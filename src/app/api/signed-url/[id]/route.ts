@@ -100,8 +100,13 @@ export async function GET(
 
     const isDownload = request.nextUrl.searchParams.get("download") === "true";
 
+    // Build the status-polling URL for the frontend to track backend progress
+    const statusUrl = `${PUBLIC_BACKEND_URL}/api/dl/status/${encodeURIComponent(file.telegram_file_id)}?sig=${encodeURIComponent(token)}`;
+
     return NextResponse.json({
       url: isDownload ? `${directUrl}&inline=false` : directUrl,
+      statusUrl,
+      telegramFileId: file.telegram_file_id,
       expiresIn: 900, // 15 minutes
     });
   } catch (error) {

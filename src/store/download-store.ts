@@ -1,9 +1,24 @@
 import { create } from "zustand";
 import type { DownloadState } from "@/components/share/download-speedometer";
 
+interface SignedUrlResponse {
+  url: string;
+  statusUrl: string;
+  telegramFileId: string;
+  expiresIn: number;
+}
+
+interface BackendStatus {
+  is_downloading: boolean;
+  is_complete: boolean;
+  downloaded_size: number;
+  size: number;
+}
+
 interface DownloadStore {
   downloadState: DownloadState | null;
   _abortController: AbortController | null;
+  _pollTimer: ReturnType<typeof setInterval> | null;
   startDownload: (fileId: string, fileName: string, fileSize?: number) => Promise<void>;
   cancelDownload: () => void;
 }
@@ -11,13 +26,14 @@ interface DownloadStore {
 export const useDownloadStore = create<DownloadStore>((set, get) => ({
   downloadState: null,
   _abortController: null,
+  _pollTimer: null,
 
   cancelDownload: () => {
     const ctrl = get()._abortController;
-    if (ctrl) {
-      ctrl.abort();
-      set({ _abortController: null });
-    }
+    const poll = get()._pollTimer;
+    if (ctrl) ctrl.abort();
+    if (poll) clearInterval(poll);
+    set({ _abortController: null, _pollTimer: null, downloadState: null });
   },
 
   startDownload: async (fileId: string, fileName: string, fileSize = 0) => {
@@ -34,6 +50,9 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
       },
     });
 
+    const abortController = new AbortController();
+    set({ _abortController: abortController });
+
     try {
       // ── Step 1: Open OS Save dialog (must be first async op to retain user gesture) ──
       let fileHandle: FileSystemFileHandle | null = null;
@@ -45,9 +64,8 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
               }) => Promise<FileSystemFileHandle>;
             }).showSaveFilePicker({ suggestedName: fileName });
         } catch (err) {
-          // User cancelled the picker — clean up
           if (err instanceof DOMException && err.name === "AbortError") {
-            set({ downloadState: null });
+            set({ downloadState: null, _abortController: null });
             return;
           }
           throw err;
@@ -59,7 +77,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
       if (!sigRes.ok) {
         throw new Error(`Could not generate download link (${sigRes.status})`);
       }
-      const { url } = (await sigRes.json()) as { url: string };
+      const { url, statusUrl } = (await sigRes.json()) as SignedUrlResponse;
 
       // ── Step 3: Fallback — no File System Access API ──
       if (!fileHandle) {
@@ -69,19 +87,69 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        window.setTimeout(() => set({ downloadState: null }), 5000);
+        window.setTimeout(() => set({ downloadState: null, _abortController: null }), 5000);
         return;
       }
 
-      // ── Step 4: Stream the file with real-time progress ──
+      // ── Step 4: Start the file fetch (backend begins Telegram download) ──
       const writable = await fileHandle.createWritable();
-      const abortController = new AbortController();
-      set({ _abortController: abortController });
 
+      // ── Step 4a: Poll backend for Telegram download progress ──
+      // When the backend is fetching from Telegram, no bytes flow to us yet.
+      // Poll the status endpoint so we can show real progress instead of a blind spinner.
+      let pollStopped = false;
+      let backendSpeedBps = 0;
+      let backendLastBytes = 0;
+      let backendLastStamp = performance.now();
+
+      const pollTimer = setInterval(async () => {
+        if (pollStopped || abortController.signal.aborted) {
+          clearInterval(pollTimer);
+          return;
+        }
+        try {
+          const res = await fetch(statusUrl, { signal: abortController.signal });
+          if (!res.ok) return;
+          const status = (await res.json()) as BackendStatus;
+
+          // Calculate backend download speed
+          const now = performance.now();
+          const dtSec = (now - backendLastStamp) / 1000;
+          if (dtSec >= 0.4 && status.downloaded_size > backendLastBytes) {
+            backendSpeedBps = (status.downloaded_size - backendLastBytes) / dtSec;
+            backendLastStamp = now;
+            backendLastBytes = status.downloaded_size;
+          }
+
+          const total = status.size || fileSize;
+
+          if (!pollStopped) {
+            set({
+              downloadState: {
+                phase: "fetching",
+                fileName,
+                receivedBytes: status.downloaded_size,
+                totalBytes: total,
+                speedBps: backendSpeedBps,
+              },
+            });
+          }
+        } catch {
+          // Ignore poll errors (e.g. abort, network glitch)
+        }
+      }, 800);
+      set({ _pollTimer: pollTimer });
+
+      // ── Step 4b: Fetch the file — this blocks until backend starts streaming ──
       const response = await fetch(url, { signal: abortController.signal });
       if (!response.ok || !response.body) {
         throw new Error(`Download failed with status ${response.status}`);
       }
+
+      // Backend started sending bytes → stop polling
+      pollStopped = true;
+      clearInterval(pollTimer);
+      set({ _pollTimer: null });
 
       const headerLength = Number(
         response.headers.get("content-length") || 0,
@@ -98,6 +166,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
         },
       });
 
+      // ── Step 5: Stream to disk with progress ──
       const reader = response.body.getReader();
       let receivedBytes = 0;
       let lastStamp = performance.now();
@@ -134,6 +203,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
       await writable.close();
       set({
         _abortController: null,
+        _pollTimer: null,
         downloadState: {
           phase: "completed",
           fileName,
@@ -144,9 +214,12 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
       });
       window.setTimeout(() => set({ downloadState: null }), 3500);
     } catch (err) {
-      set({ _abortController: null });
+      const poll = get()._pollTimer;
+      if (poll) clearInterval(poll);
+      set({ _abortController: null, _pollTimer: null });
       const aborted =
         err instanceof DOMException && err.name === "AbortError";
+      if (aborted && !get().downloadState) return; // Already cleared by cancelDownload
       set({
         downloadState: {
           phase: "error",
