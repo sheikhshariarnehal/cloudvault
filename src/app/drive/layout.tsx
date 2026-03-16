@@ -37,7 +37,10 @@ export default function DashboardLayout({
 }) {
   const { user, guestSessionId, isLoading: authLoading, isTelegramConnected, isTelegramStatusLoading } = useAuth();
   const isGuest = !user && !!guestSessionId;
-  const { downloadState, cancelDownload } = useDownloadStore();
+  const downloads = useDownloadStore((s) => s.downloads);
+  const cancelDownload = useDownloadStore((s) => s.cancelDownload);
+  const cancelAll = useDownloadStore((s) => s.cancelAll);
+  const retryDownload = useDownloadStore((s) => s.retryDownload);
   const [telegramBannerDismissed, setTelegramBannerDismissed] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("telegram-banner-dismissed") === "true";
@@ -228,7 +231,12 @@ export default function DashboardLayout({
         <ConnectTelegramModal />
 
         {/* Global download progress speedometer */}
-        <DownloadSpeedometer state={downloadState} onCancel={cancelDownload} />
+        <DownloadSpeedometer
+          downloads={downloads}
+          onCancelItem={cancelDownload}
+          onCancelAll={cancelAll}
+          onRetry={retryDownload}
+        />
       </div>
     </UploadZone>
   );

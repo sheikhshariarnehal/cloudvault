@@ -353,6 +353,7 @@ interface RowProps {
   handleDownload: (file: DbFile) => void;
   handleRename: (file: DbFile) => void;
   handleStar: (file: DbFile) => void;
+  onPrefetch?: (fileId: string) => void;
 }
 
 function FileRow({
@@ -366,6 +367,7 @@ function FileRow({
   handleDownload,
   handleRename,
   handleStar,
+  onPrefetch,
 }: {
   ariaAttributes?: Record<string, unknown>;
   index: number;
@@ -405,6 +407,7 @@ function FileRow({
         ${isSelected ? "bg-accent/80 hover:bg-accent" : "hover:bg-accent/40"}
       `}
       onClick={handleRowClick}
+      onMouseEnter={() => onPrefetch?.(file.id)}
       role="row"
       aria-selected={isSelected}
     >
@@ -637,6 +640,29 @@ export function FileList({ files, folders = [], topRightSlot, stickyOffset = 0, 
     startDownload(file.id, file.original_name || file.name, file.size_bytes ?? 0);
   }, [startDownload]);
 
+  // Prefetch on hover — debounced 400ms, only for files > 5 MB, max 2 in-flight
+  const prefetchInFlight = useRef(new Set<string>());
+  const prefetchTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  const handlePrefetch = useCallback((fileId: string) => {
+    const MIN_PREFETCH_SIZE = 5 * 1024 * 1024;
+    const file = sortedFiles.find((f) => f.id === fileId);
+    if (!file || (file.size_bytes ?? 0) < MIN_PREFETCH_SIZE) return;
+    if (prefetchInFlight.current.has(fileId)) return;
+    if (prefetchInFlight.current.size >= 2) return;
+
+    // Debounce: only fire after 400ms hover
+    if (prefetchTimers.current.has(fileId)) return;
+    const timer = setTimeout(() => {
+      prefetchTimers.current.delete(fileId);
+      if (prefetchInFlight.current.size >= 2) return;
+      prefetchInFlight.current.add(fileId);
+      fetch(`/api/prefetch/${fileId}`, { method: "POST" })
+        .finally(() => prefetchInFlight.current.delete(fileId));
+    }, 400);
+    prefetchTimers.current.set(fileId, timer);
+  }, [sortedFiles]);
+
   const handleShareFile = useCallback(
     (file: DbFile) => {
       setShareFileId(file.id);
@@ -741,6 +767,7 @@ export function FileList({ files, folders = [], topRightSlot, stickyOffset = 0, 
       handleDownload: handleDownloadFile,
       handleRename: handleRenameFile,
       handleStar: handleStarFile,
+      onPrefetch: handlePrefetch,
     }),
     [
       sortedFiles,
@@ -751,6 +778,7 @@ export function FileList({ files, folders = [], topRightSlot, stickyOffset = 0, 
       handleDownloadFile,
       handleRenameFile,
       handleStarFile,
+      handlePrefetch,
     ]
   );
 
