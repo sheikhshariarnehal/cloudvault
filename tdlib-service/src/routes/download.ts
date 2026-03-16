@@ -1100,9 +1100,11 @@ router.post(
 router.post(
   "/prefetch",
   async (req: Request, res: Response) => {
-    const { remoteFileId, sizeHint } = req.body as {
+    const { remoteFileId, sizeHint, storageType: bodyStorageType, userId: bodyUserId } = req.body as {
       remoteFileId: string;
       sizeHint?: number;
+      storageType?: string;
+      userId?: string;
     };
 
     if (!remoteFileId) {
@@ -1118,14 +1120,16 @@ router.post(
     }
 
     try {
-      const { client } = await sessionManager.resolveClientAndChat("bot");
+      const storageType = bodyStorageType || "bot";
+      const userId = bodyUserId;
+      const { client } = await sessionManager.resolveClientAndChat(storageType, userId);
 
       const remoteFile = await client.invoke({
         _: "getRemoteFile",
         remote_file_id: remoteFileId,
       });
       const tdlibFileId = remoteFile.id as number;
-      if (!tdlibFileId) {
+      if (!tdlibFileId || tdlibFileId === 0) {
         res.status(404).json({ error: "File not found" });
         return;
       }
