@@ -22,7 +22,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import {
   FolderOpen,
-  Image,
+  History,
   Star,
   Users,
   Trash2,
@@ -36,7 +36,7 @@ import {
 
 const navItems: Array<{ href: string; label: string; icon: LucideIcon; badge?: string }> = [
   { href: "/drive", label: "My Drive", icon: FolderOpen },
-  { href: "/drive/recent", label: "Recent", icon: Image },
+  { href: "/drive/recent", label: "Recent", icon: History },
   { href: "/drive/starred", label: "Starred", icon: Star },
   { href: "/drive/shared", label: "Shared with me", icon: Users },
   { href: "/drive/trash", label: "Bin", icon: Trash2 },
