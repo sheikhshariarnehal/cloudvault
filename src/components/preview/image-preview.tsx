@@ -24,9 +24,6 @@ export function ImagePreview({ src, alt, fallbackSrc }: ImagePreviewProps) {
   const [retryKey, setRetryKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // True while full image is still loading AND we have a thumbnail to show
-  const showThumbnailPlaceholder = !isLoaded && !hasError && !!fallbackSrc;
-
   const handleZoomIn = useCallback(() => {
     setZoom((prev) => Math.min(prev + ZOOM_STEP, MAX_ZOOM));
   }, []);
@@ -123,24 +120,20 @@ export function ImagePreview({ src, alt, fallbackSrc }: ImagePreviewProps) {
             alt=""
             aria-hidden
             className={`absolute max-w-full max-h-full object-contain pointer-events-none select-none
-              transition-opacity duration-500 blur-sm scale-105
-              ${isLoaded || hasError ? "opacity-0" : "opacity-60"}`}
+              transition-opacity duration-700 blur-xl
+              ${isLoaded || hasError ? "opacity-0" : "opacity-40"}`}
+            style={{
+              transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+              transition: isDragging ? "opacity 0.5s ease" : "transform 0.2s ease, opacity 0.7s ease",
+            }}
             draggable={false}
           />
         )}
 
-        {/* Loading spinner — only shown when no thumbnail exists */}
-        {!isLoaded && !hasError && !fallbackSrc && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-10 h-10 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          </div>
-        )}
-
-        {/* Subtle spinner overlay when thumbnail IS showing (user knows something is loading) */}
-        {showThumbnailPlaceholder && (
-          <div className="absolute bottom-20 right-6 flex items-center gap-2 bg-black/40 rounded-full px-3 py-1.5">
-            <div className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />
-            <span className="text-[11px] text-white/60">Loading full image…</span>
+        {/* Loading spinner — always shown in the center when not loaded */}
+        {!isLoaded && !hasError && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <div className="w-12 h-12 border-4 border-white/20 border-t-white/90 rounded-full animate-spin shadow-lg" />
           </div>
         )}
 
@@ -166,12 +159,14 @@ export function ImagePreview({ src, alt, fallbackSrc }: ImagePreviewProps) {
           key={retryKey}
           src={usingFallback && fallbackSrc ? fallbackSrc : src}
           alt={alt}
-          className={`max-w-full max-h-full object-contain transition-opacity duration-500 ${
+          className={`max-w-full max-h-full object-contain transition-opacity duration-700 ${
             isLoaded && !hasError ? "opacity-100" : "opacity-0"
           }`}
           style={{
             transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-            transition: isDragging ? "none" : "transform 0.2s ease",
+            transition: isDragging 
+              ? "opacity 0.2s ease" 
+              : "transform 0.2s ease, opacity 0.7s ease",
           }}
           onLoad={() => { setIsLoaded(true); setHasError(false); }}
           onError={() => {
