@@ -1,24 +1,10 @@
 "use client"
 
-<<<<<<< Updated upstream
-import * as React from "react"
-import { Tooltip as TooltipPrimitive } from "radix-ui"
-=======
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
->>>>>>> Stashed changes
 
 import { cn } from "@/lib/utils"
 
 function TooltipProvider({
-<<<<<<< Updated upstream
-  delayDuration = 0,
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
-  return (
-    <TooltipPrimitive.Provider
-      data-slot="tooltip-provider"
-      delayDuration={delayDuration}
-=======
   delay = 0,
   ...props
 }: TooltipPrimitive.Provider.Props) {
@@ -26,55 +12,21 @@ function TooltipProvider({
     <TooltipPrimitive.Provider
       data-slot="tooltip-provider"
       delay={delay}
->>>>>>> Stashed changes
       {...props}
     />
   )
 }
 
-<<<<<<< Updated upstream
-function Tooltip({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
-}
-
-function TooltipTrigger({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" suppressHydrationWarning {...props} />
-=======
 function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
   return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
 }
 
 function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
->>>>>>> Stashed changes
 }
 
 function TooltipContent({
   className,
-<<<<<<< Updated upstream
-  sideOffset = 0,
-  children,
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
-  return (
-    <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Content
-        data-slot="tooltip-content"
-        sideOffset={sideOffset}
-        className={cn(
-          "bg-foreground text-background animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-md px-3 py-1.5 text-xs text-balance",
-          className
-        )}
-        {...props}
-      >
-        {children}
-        <TooltipPrimitive.Arrow className="bg-foreground fill-foreground z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
-      </TooltipPrimitive.Content>
-=======
   side = "top",
   sideOffset = 4,
   align = "center",
@@ -107,7 +59,6 @@ function TooltipContent({
           <TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%-2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground data-[side=bottom]:top-1 data-[side=inline-end]:top-1/2! data-[side=inline-end]:-left-1 data-[side=inline-end]:-translate-y-1/2 data-[side=inline-start]:top-1/2! data-[side=inline-start]:-right-1 data-[side=inline-start]:-translate-y-1/2 data-[side=left]:top-1/2! data-[side=left]:-right-1 data-[side=left]:-translate-y-1/2 data-[side=right]:top-1/2! data-[side=right]:-left-1 data-[side=right]:-translate-y-1/2 data-[side=top]:-bottom-2.5" />
         </TooltipPrimitive.Popup>
       </TooltipPrimitive.Positioner>
->>>>>>> Stashed changes
     </TooltipPrimitive.Portal>
   )
 }

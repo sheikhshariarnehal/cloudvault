@@ -5,6 +5,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/app/providers/auth-provider";
 import { Search, Bell } from "lucide-react";
 import {
   Breadcrumb,
@@ -18,6 +19,22 @@ import React from "react";
 
 export function AppHeader() {
   const pathname = usePathname();
+  const { user } = useAuth();
+
+  const displayName =
+    user?.user_metadata?.display_name ||
+    user?.user_metadata?.full_name ||
+    user?.email?.split("@")[0] ||
+    "Admin";
+
+  const avatarUrl = user?.user_metadata?.avatar_url;
+  const initials = displayName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word: string) => word[0])
+    .join("")
+    .toUpperCase();
 
   // Create breadcrumb segments
   const pathSegments = pathname.split("/").filter(Boolean);
@@ -94,8 +111,8 @@ export function AppHeader() {
           </Badge>
           
           <Avatar className="h-8 w-8 cursor-pointer ring-1 ring-border/50 transition-all hover:ring-primary/50">
-            <AvatarImage src="https://github.com/shadcn.png" alt="Admin" />
-            <AvatarFallback className="bg-primary/5 text-primary text-xs">AD</AvatarFallback>
+            <AvatarImage src={avatarUrl} alt={displayName} />
+            <AvatarFallback className="bg-primary/5 text-primary text-xs">{initials}</AvatarFallback>
           </Avatar>
         </div>
       </div>

@@ -1,10 +1,4 @@
-<<<<<<< Updated upstream
-import { redirect } from "next/navigation";
-
-export default function Home() {
-  redirect("/drive");
-=======
-﻿import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, HardDrive, Files, Share2, UserPlus, Upload, Activity, UserCircle2 } from "lucide-react";
 import OverviewChart from "@/components/dashboard/overview-chart";
 import OverviewUploadVolumeChart from "@/components/dashboard/overview-upload-volume-chart";
@@ -207,5 +201,4 @@ export default async function Dashboard() {
       </div>
     </div>
   );
->>>>>>> Stashed changes
 }

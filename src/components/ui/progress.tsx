@@ -1,35 +1,11 @@
-"use client"
+﻿"use client"
 
-<<<<<<< Updated upstream
-import * as React from "react"
-import { Progress as ProgressPrimitive } from "radix-ui"
-=======
 import { Progress as ProgressPrimitive } from "@base-ui/react/progress"
->>>>>>> Stashed changes
 
 import { cn } from "@/lib/utils"
 
 function Progress({
   className,
-<<<<<<< Updated upstream
-  value,
-  ...props
-}: React.ComponentProps<typeof ProgressPrimitive.Root>) {
-  return (
-    <ProgressPrimitive.Root
-      data-slot="progress"
-      className={cn(
-        "bg-primary/20 relative h-2 w-full overflow-hidden rounded-full",
-        className
-      )}
-      {...props}
-    >
-      <ProgressPrimitive.Indicator
-        data-slot="progress-indicator"
-        className="bg-primary h-full w-full flex-1 transition-all"
-        style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
-      />
-=======
   children,
   value,
   ...props
@@ -45,14 +21,10 @@ function Progress({
       <ProgressTrack>
         <ProgressIndicator />
       </ProgressTrack>
->>>>>>> Stashed changes
     </ProgressPrimitive.Root>
   )
 }
 
-<<<<<<< Updated upstream
-export { Progress }
-=======
 function ProgressTrack({ className, ...props }: ProgressPrimitive.Track.Props) {
   return (
     <ProgressPrimitive.Track
@@ -109,4 +81,3 @@ export {
   ProgressLabel,
   ProgressValue,
 }
->>>>>>> Stashed changes
