@@ -6,12 +6,11 @@ import { NotificationPopover } from "@/components/top-bar/notification-popover";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/store/ui-store";
 import { useAuth } from "@/app/providers/auth-provider";
-import { Menu, Upload } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export function TopBar() {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-  const openFilePicker = useUIStore((s) => s.openFilePicker);
   const { isGuest, user, isLoading } = useAuth();
   const router = useRouter();
 
@@ -37,20 +36,6 @@ export function TopBar() {
 
       {/* Right actions */}
       <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-        {/* Upload action (desktop/tablet only) */}
-        {isAuthenticated && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden sm:inline-flex h-9 px-4 rounded-full border-[#dadce0] bg-white text-[#3c4043] hover:bg-[#f8f9fa] hover:border-[#dadce0] shadow-none"
-            onClick={() => openFilePicker?.()}
-            aria-label="Upload file"
-          >
-            <Upload className="h-4 w-4" />
-            Upload
-          </Button>
-        )}
-
         {/* Notifications */}
         {isAuthenticated && <NotificationPopover />}
 

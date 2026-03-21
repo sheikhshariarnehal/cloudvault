@@ -218,7 +218,7 @@ export default function DashboardLayout({
     <UploadZone folderId={currentFolderId}>
       <div className="flex h-dvh bg-background text-foreground overflow-hidden">
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:flex w-[240px] flex-shrink-0">
+        <aside className="hidden lg:flex w-[256px] xl:w-[280px] flex-shrink-0">
           <Sidebar />
         </aside>
 
@@ -226,7 +226,7 @@ export default function DashboardLayout({
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetContent
             side="left"
-            className="p-0 w-[240px] lg:hidden"
+            className="p-0 w-[256px] lg:hidden"
             showCloseButton={false}
             onOpenAutoFocus={(event) => event.preventDefault()}
           >
