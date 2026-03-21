@@ -1,4 +1,5 @@
 "use client";
+import { NewDropdownMenu } from "@/components/context-menu/global-context-menu";
 
 import Link from "next/link";
 import NextImage from "next/image";
@@ -18,6 +19,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -33,6 +37,12 @@ import {
   Upload,
   FolderUp,
   ImageIcon,
+  FileText,
+  Table,
+  Presentation,
+  PlaySquare,
+  ListTodo,
+  ChevronRight
 } from "lucide-react";
 
 const navItems: Array<{ href: string; label: string; icon: LucideIcon; badge?: string }> = [
@@ -163,47 +173,7 @@ export function Sidebar() {
                   <span>New</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="w-[360px] p-0 rounded-[12px] border border-[#dadce0] bg-white text-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.3),0_1px_3px_1px_rgba(60,64,67,0.15)] overflow-hidden"
-              >
-                <DropdownMenuItem
-                  className="h-14 px-4 rounded-none flex items-center justify-between cursor-pointer focus:bg-[#f1f3f4]"
-                  onClick={() => setNewFolderModalOpen(true)}
-                >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <FolderPlus className="h-5 w-5 text-[#5f6368] flex-shrink-0" />
-                    <span className="text-base leading-none">New folder</span>
-                  </div>
-                  <span className="text-sm text-[#5f6368]">Alt+C then F</span>
-                </DropdownMenuItem>
-
-                <DropdownMenuSeparator className="my-0 bg-[#e0e3e7]" />
-
-                <DropdownMenuItem
-                  className="h-14 px-4 rounded-none flex items-center justify-between cursor-pointer focus:bg-[#f1f3f4]"
-                  onClick={() => openFilePicker?.()}
-                >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <Upload className="h-5 w-5 text-[#5f6368] flex-shrink-0" />
-                    <span className="text-base leading-none">File upload</span>
-                  </div>
-                  <span className="text-sm text-[#5f6368]">Alt+C then U</span>
-                </DropdownMenuItem>
-
-                <DropdownMenuSeparator className="my-0 bg-[#e0e3e7]" />
-
-                <DropdownMenuItem
-                  className="h-14 px-4 rounded-none flex items-center justify-between cursor-pointer focus:bg-[#f1f3f4]"
-                  onClick={() => openFolderPicker?.() || folderInputRef.current?.click()}
-                >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <FolderUp className="h-5 w-5 text-[#5f6368] flex-shrink-0" />
-                    <span className="text-base leading-none">Folder upload</span>
-                  </div>
-                  <span className="text-sm text-[#5f6368]">Alt+C then I</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
+              <NewDropdownMenu folderInputRef={folderInputRef} />
             </DropdownMenu>
           </div>
 

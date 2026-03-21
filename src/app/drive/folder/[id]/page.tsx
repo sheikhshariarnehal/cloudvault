@@ -10,18 +10,12 @@ import { FileCard } from "@/components/file-grid/file-card";
 import { FolderGrid } from "@/components/file-grid/folder-grid";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ChevronRight, FolderOpen, Upload, Plus, FolderPlus, FolderUp, LayoutGrid, List } from "lucide-react";
+import { ChevronDown, ChevronRight, FolderOpen, Upload, LayoutGrid, List, Info } from "lucide-react";
 import Link from "next/link";
 import type { BreadcrumbItem, DbFile } from "@/types/file.types";
 import { useEffectiveViewMode } from "@/lib/utils/use-view-mode";
@@ -36,7 +30,7 @@ export default function FolderPage({
   const { id } = use(params);
   const { user, guestSessionId } = useAuth();
   const { files, folders, viewMode, setViewMode, setCurrentFolderId, mergeFiles, dataLoaded } = useFilesStore();
-  const { openFilePicker, openFolderPicker, setNewFolderModalOpen } = useUIStore();
+  const { openFilePicker } = useUIStore();
   const effectiveViewMode = useEffectiveViewMode();
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
 
@@ -107,93 +101,80 @@ export default function FolderPage({
 
   return (
     <div className="pt-2 sm:pt-4 space-y-4 sm:space-y-6">
-      {/* Breadcrumbs */}
-      <nav className="flex items-center gap-1 text-xs sm:text-sm flex-wrap">
-        {breadcrumbs.map((crumb, index) => (
-          <div key={crumb.id ?? "root"} className="flex items-center gap-1">
-            {index > 0 && (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            )}
-            {index === breadcrumbs.length - 1 ? (
-              <span className="font-medium">{crumb.name}</span>
-            ) : (
-              <Link
-                href={
-                  crumb.id
-                    ? `/drive/folder/${crumb.id}`
-                    : "/drive"
-                }
-                className="text-muted-foreground hover:text-foreground"
-              >
-                {crumb.name}
-              </Link>
-            )}
-          </div>
-        ))}
-      </nav>
-
-      {/* Action Toolbar */}
-      <div className="flex items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 sm:h-10 text-xs sm:text-sm font-medium shadow-sm hover:shadow">
-              <Plus className="h-4 w-4 mr-2" />
-              Create
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => setNewFolderModalOpen(true)}>
-              <FolderPlus className="h-4 w-4 mr-2" />
-              New Folder
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => openFilePicker?.()}>
-              <Upload className="h-4 w-4 mr-2" />
-              Upload File
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => openFolderPicker?.()}>
-              <FolderUp className="h-4 w-4 mr-2" />
-              Upload Folder
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 sm:h-10 text-xs sm:text-sm font-medium shadow-sm hover:shadow"
-          onClick={() => openFilePicker?.()}
-        >
-          <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-          <span className="hidden xs:inline">Upload</span>
-        </Button>
+      {/* Breadcrumbs + view controls */}
+      <div className="flex items-center h-11 sm:h-14 sticky top-0 z-20 bg-surface-white -mx-2.5 px-2.5 sm:-mx-4 sm:px-4 lg:-mx-5 lg:px-5">
+        <nav className="flex items-center gap-1 text-[17px] sm:text-[22px] font-normal text-[#202124] min-w-0 flex-1 overflow-x-auto whitespace-nowrap scrollbar-none">
+          {breadcrumbs.map((crumb, index) => (
+            <div key={crumb.id ?? "root"} className="flex items-center gap-1 flex-shrink-0">
+              {index > 0 && (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+              {index === breadcrumbs.length - 1 ? (
+                <span className="inline-flex items-center gap-1.5 font-medium text-[17px] sm:text-[22px]">
+                  {crumb.name}
+                  <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-[#5f6368]" />
+                </span>
+              ) : (
+                <Link
+                  href={
+                    crumb.id
+                      ? `/drive/folder/${crumb.id}`
+                      : "/drive"
+                  }
+                  className="text-muted-foreground hover:text-foreground text-[17px] sm:text-[22px]"
+                >
+                  {crumb.name}
+                </Link>
+              )}
+            </div>
+          ))}
+        </nav>
 
         <TooltipProvider>
-          <div className="hidden sm:flex items-center border rounded-lg overflow-hidden shadow-sm bg-white ml-auto">
+          <div className="hidden sm:flex items-center gap-2 flex-shrink-0 ml-3">
+            <div className="flex items-center gap-0.5 p-0.5 rounded-full border border-[#9aa0a6] bg-[#f8f9fa]">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-8 w-8 rounded-full ${
+                      viewMode === "list"
+                        ? "bg-[#e8f0fe] text-[#174ea6] hover:bg-[#d2e3fc]"
+                        : "text-[#5f6368] hover:bg-[#f1f3f4]"
+                    }`}
+                    onClick={() => setViewMode("list")}
+                  >
+                    <List className="h-[18px] w-[18px]" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>List view</p></TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-8 w-8 rounded-full ${
+                      viewMode === "grid"
+                        ? "bg-[#e8f0fe] text-[#174ea6] hover:bg-[#d2e3fc]"
+                        : "text-[#5f6368] hover:bg-[#f1f3f4]"
+                    }`}
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <LayoutGrid className="h-[18px] w-[18px]" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Grid view</p></TooltipContent>
+              </Tooltip>
+            </div>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === "grid" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-10 w-10 rounded-none"
-                  onClick={() => setViewMode("grid")}
-                >
-                  <LayoutGrid className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-[#5f6368] hover:bg-[#f1f3f4]">
+                  <Info className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent><p>Grid view</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === "list" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-10 w-10 rounded-none"
-                  onClick={() => setViewMode("list")}
-                >
-                  <List className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent><p>List view</p></TooltipContent>
+              <TooltipContent><p>View details</p></TooltipContent>
             </Tooltip>
           </div>
         </TooltipProvider>

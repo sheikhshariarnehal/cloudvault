@@ -50,6 +50,8 @@ const MediaPreviewModal = dynamic(
   { ssr: false }
 );
 
+import { GlobalContextMenu } from "@/components/context-menu/global-context-menu";
+
 export default function DashboardLayout({
   children,
 }: {
@@ -284,7 +286,9 @@ export default function DashboardLayout({
               className={`bg-surface-white text-card-foreground h-full border border-transparent flex flex-col overflow-hidden ${isPhotosPage ? "rounded-none" : "rounded-[calc(var(--radius)+0.5rem)] sm:rounded-[calc(var(--radius)+0.75rem)]"}`}
             >
               <div className={`flex-1 overflow-y-auto w-full pb-20 sm:pb-4 ${isPhotosPage ? "px-0 sm:px-0 lg:px-0" : "px-2.5 sm:px-4 lg:px-5"}`}>
-                {children}
+                <GlobalContextMenu>
+                  {children}
+                </GlobalContextMenu>
               </div>
             </div>
           </main>
