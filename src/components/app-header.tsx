@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/app/providers/auth-provider";
 import { Search, Bell } from "lucide-react";
 import {
@@ -15,7 +14,29 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { ThemeToggle } from "@/components/dashboard/theme-toggle";
+import { CommandPalette, useCommandPalette } from "@/components/dashboard/command-palette";
 import React from "react";
+
+function HeaderSearchButton() {
+  const { open, setOpen } = useCommandPalette();
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="hidden md:flex items-center gap-2 h-9 px-3 bg-muted/30 border border-border/50 rounded-lg hover:bg-muted/50 transition-colors"
+      >
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">Search...</span>
+        <kbd className="pointer-events-none flex items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+          <span className="text-xs">⌘</span>K
+        </kbd>
+      </button>
+      <CommandPalette open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
 
 export function AppHeader() {
   const pathname = usePathname();
@@ -36,7 +57,6 @@ export function AppHeader() {
     .join("")
     .toUpperCase();
 
-  // Create breadcrumb segments
   const pathSegments = pathname.split("/").filter(Boolean);
 
   return (
@@ -45,7 +65,6 @@ export function AppHeader() {
         <SidebarTrigger className="-ml-1 text-muted-foreground transition-colors hover:text-foreground sm:-ml-2" />
         <div className="hidden sm:flex h-4 w-px bg-border mx-1" />
         
-        {/* Dynamic Breadcrumbs */}
         <Breadcrumb className="hidden sm:flex">
           <BreadcrumbList className="text-sm">
             <BreadcrumbItem>
@@ -86,21 +105,11 @@ export function AppHeader() {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
-        {/* Global Search */}
-        <div className="relative hidden md:flex items-center">
-          <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search resources..." 
-            className="h-9 w-[220px] pl-9 bg-muted/30 border-border/50 shadow-none focus-visible:bg-transparent lg:w-[280px] xl:w-[340px]" 
-          />
-          <div className="absolute right-2.5 flex items-center gap-1">
-            <kbd className="inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-              <span className="text-xs">⌘</span>K
-            </kbd>
-          </div>
-        </div>
+        <HeaderSearchButton />
 
         <div className="flex items-center gap-2 border-l border-border pl-3 sm:gap-3 sm:pl-4">
+          <ThemeToggle />
+          
           <button 
             aria-label="Notifications"
             className="relative w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
