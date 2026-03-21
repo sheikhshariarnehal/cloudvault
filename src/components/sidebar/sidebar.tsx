@@ -167,9 +167,9 @@ export function Sidebar() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-fit h-12 px-6 rounded-2xl border border-[#dadce0] bg-white hover:bg-[#f8f9fa] text-[#202124] font-medium text-sm gap-2.5 transition-all"
+                  className="w-fit h-14 px-6 rounded-2xl border border-transparent bg-white shadow-[0_1px_3px_rgb(0_0_0/0.1),0_1px_2px_rgb(0_0_0/0.06)] hover:bg-[#f8f9fa] hover:shadow-[0_1px_3px_rgb(0_0_0/0.15),0_1px_2px_rgb(0_0_0/0.1)] text-[#202124] font-medium text-sm gap-3 transition-all"
                 >
-                  <Plus className="h-5 w-5" />
+                  <Plus className="h-6 w-6 stroke-[2]" />
                   <span>New</span>
                 </Button>
               </DropdownMenuTrigger>

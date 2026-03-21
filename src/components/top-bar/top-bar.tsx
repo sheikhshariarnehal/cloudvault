@@ -22,7 +22,7 @@ export function TopBar() {
       <Button
         variant="ghost"
         size="icon"
-        className="flex-shrink-0 lg:hidden h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full"
+        className="flex-shrink-0 md:hidden h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full"
         onClick={toggleSidebar}
         aria-label="Toggle sidebar"
       >

@@ -31,9 +31,9 @@ export const NavItem = memo(function NavItem({ href, label, icon: Icon, isActive
       )}
     >
       <Icon className={cn("h-5 w-5 flex-shrink-0", isActive ? "text-[#001d35]" : "text-[#5f6368]")} />
-      <span className="flex-1">{label}</span>
+      <span className="flex-1 truncate">{label}</span>
       {badge && (
-        <span className="text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full leading-none">
+        <span className="text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full leading-none shrink-0">
           {badge}
         </span>
       )}
