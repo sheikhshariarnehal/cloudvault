@@ -2,12 +2,39 @@
 import NextImage from "next/image";
 import { ShaderAnimation } from "@/components/ui/shader-lines";
 import { ShieldCheck, Zap, HardDrive } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export function AuthBranding() {
+  const [showShader, setShowShader] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
+    if (!isDesktop) return;
+
+    let timeoutId: number | null = null;
+    const idle = (window as Window & { requestIdleCallback?: (cb: IdleRequestCallback) => number }).requestIdleCallback;
+
+    if (idle) {
+      const idleId = idle(() => setShowShader(true));
+      return () => {
+        window.cancelIdleCallback?.(idleId);
+      };
+    }
+
+    timeoutId = window.setTimeout(() => setShowShader(true), 250);
+    return () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
   return (
     <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center bg-[#09090b] text-white relative overflow-hidden text-center selection:bg-blue-500/30">
       {/* WebGL Shader Animation */}
-      <ShaderAnimation />
+      {showShader ? <ShaderAnimation /> : null}
 
       {/* Modern Vignette Overlay */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#09090b_100%)] pointer-events-none z-0"></div>

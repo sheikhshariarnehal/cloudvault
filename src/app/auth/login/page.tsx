@@ -121,6 +121,7 @@ export default function LoginPage() {
                     <Label htmlFor="password" className="text-[13px] font-semibold text-zinc-200">Password</Label>
                     <Link
                       href="/auth/forgot-password"
+                      prefetch={false}
                       className="text-[12px] font-medium text-zinc-500 hover:text-zinc-300 transition-colors"
                     >
                       Forgot password?
@@ -170,7 +171,7 @@ export default function LoginPage() {
 
             <p className="text-center text-[13px] text-zinc-400 mt-4">
               Don't have an account?{" "}
-              <Link href="/auth/signup" className="text-white font-medium hover:underline">
+              <Link href="/auth/signup" prefetch={false} className="text-white font-medium hover:underline">
                 Sign up
               </Link>
             </p>
