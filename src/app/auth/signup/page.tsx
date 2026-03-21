@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
-import { Mail, Eye, EyeOff, Send, Shield } from "lucide-react";
+import ShaderBackground from "@/components/auth/shader-background";
+import { Mail, Eye, EyeOff, Send, Shield, Cloud } from "lucide-react";
 import NextImage from "next/image";
 
 export default function SignUpPage() {
@@ -85,88 +86,58 @@ export default function SignUpPage() {
   return (
     <div className="min-h-dvh flex bg-background sm:bg-muted/40 text-foreground">
       {/* Left Column - Branding (Hidden on mobile) */}
-<div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-10 xl:p-14 bg-[#09090b] text-white relative overflow-hidden border-r border-white/5">
-        {/* Animated SVG & Abstract Background */}
-        <div className="absolute inset-0 z-0 pointer-events-none select-none">
-          {/* Subtle moving grid */}
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wMSkiLz48L3N2Zz4=')] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_40%,#000_10%,transparent_100%)]" />
-          
-          {/* Animated Orbs */}
-          <div className="absolute -top-[20%] -right-[10%] w-[500px] h-[500px] rounded-full bg-blue-600/20 blur-[120px] mix-blend-screen animate-[spin_20s_linear_infinite_reverse] origin-bottom-left" />
-          <div className="absolute -bottom-[20%] -left-[10%] w-[600px] h-[600px] rounded-full bg-indigo-600/20 blur-[130px] mix-blend-screen animate-[spin_25s_linear_infinite] origin-top-right" />
-
-          {/* Floating Geometric Lines SVG */}
-          <svg className="absolute inset-0 w-full h-full opacity-40" xmlns="http://www.w3.org/2000/svg">
-            <style>{`
-              @keyframes line-dash { to { stroke-dashoffset: -1000; } }
-              @keyframes float-up { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
-              @keyframes float-down { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(20px); } }
-              .animated-line { stroke-dasharray: 20 15; animation: line-dash 30s linear infinite; }
-              .floating-group { animation: float-up 10s ease-in-out infinite; }
-              .floating-group-delayed { animation: float-down 14s ease-in-out infinite; }
-            `}</style>
-            <g className="floating-group" stroke="rgba(255,255,255,0.1)" strokeWidth="1" fill="none">
-              <path className="animated-line" d="M -100 200 C 300 100, 600 400, 1000 150" />
-              <path className="animated-line" d="M -100 250 C 400 150, 500 500, 1100 200" stroke="rgba(99,102,241,0.2)" />
-              <circle cx="300" cy="180" r="3" fill="rgba(99,102,241,0.5)" />
-              <circle cx="700" cy="320" r="4" fill="rgba(59,130,246,0.5)" />
-            </g>
-            <g className="floating-group-delayed" stroke="rgba(255,255,255,0.07)" strokeWidth="1" fill="none">
-              <path className="animated-line" d="M -100 800 C 400 900, 700 600, 1200 850" />
-              <path className="animated-line" d="M -100 750 C 300 850, 800 550, 1100 750" stroke="rgba(59,130,246,0.2)" />
-              <circle cx="450" cy="780" r="3" fill="rgba(59,130,246,0.5)" />
-              <circle cx="850" cy="680" r="4" fill="rgba(99,102,241,0.5)" />
-            </g>
-            <g stroke="rgba(255,255,255,0.05)" strokeWidth="0.5">
-              <line x1="300" y1="180" x2="450" y2="780" className="floating-group" />
-              <line x1="700" y1="320" x2="850" y2="680" className="floating-group-delayed" />
-            </g>
-          </svg>
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-10 xl:p-16 bg-zinc-950 text-white relative overflow-hidden border-r border-white/5">
+        {/* Professional Minimal Background */}
+        <div className="absolute inset-0 z-0 pointer-events-none select-none opacity-80">
+          <ShaderBackground />
         </div>
 
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 shadow-xl shadow-black/50">
-            <NextImage src="/logo.webp" alt="NDrive" width={28} height={28} className="drop-shadow-md" />
+          <div className="w-12 h-12 bg-white/5 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/10 shadow-lg">
+            <NextImage src="/logo.webp" alt="NDrive" width={28} height={28} className="drop-shadow-sm" />
           </div>
           <div>
-            <span className="text-3xl font-bold tracking-tight block bg-gradient-to-br from-white to-white/70 bg-clip-text text-transparent">
+            <span className="text-2xl font-bold tracking-tight text-white">
               NDrive
             </span>
           </div>
         </div>
 
-        <div className="relative z-10 flex-1 flex flex-col justify-center max-w-lg">
-          <h2 className="text-5xl font-bold leading-[1.1] tracking-tight bg-gradient-to-br from-white to-white/60 bg-clip-text text-transparent mb-6">
-            Create your account today.
+        <div className="relative z-10 flex-1 flex flex-col justify-center max-w-xl">
+          <h2 className="text-4xl xl:text-5xl font-semibold leading-[1.15] tracking-tight text-white mb-6">
+            Create your zero-limit cloud workspace.
           </h2>
-          <p className="text-gray-400 text-lg leading-relaxed font-light mb-10">
-            Store unlimited files for free. Secure, fast, and easy to use. Powered by MTProto backend and React frontend.
+          <p className="text-zinc-400 text-lg leading-relaxed font-normal mb-12 max-w-md">
+            Join the next generation of file storage. Store unlimited files for free, secured natively by MTProto architecture.
           </p>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-3 group cursor-default">
-              <div className="w-12 h-12 rounded-xl bg-white/5 flex flex-col items-center justify-center border border-white/10 transition-all duration-300 group-hover:bg-blue-500/10 group-hover:border-blue-500/30 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.15)]">
-                <Send className="w-6 h-6 text-blue-400" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4 group cursor-default">
+              <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 transition-colors group-hover:bg-blue-500/20 group-hover:border-blue-500/40">
+                <Cloud className="w-6 h-6 text-blue-400" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-200 text-base mb-1">Telegram Storage</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">Files stored reliably in Telegram servers</p>
+                <h3 className="font-medium text-white text-base mb-1.5">Infinite Scale</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">Leverage Telegram\'s immense redundant infrastructure natively.</p>
               </div>
             </div>
-            <div className="space-y-3 group cursor-default">
-              <div className="w-12 h-12 rounded-xl bg-white/5 flex flex-col items-center justify-center border border-white/10 transition-all duration-300 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/30 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.15)]">
+            <div className="space-y-4 group cursor-default">
+              <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 transition-colors group-hover:bg-emerald-500/20 group-hover:border-emerald-500/40">
                 <Shield className="w-6 h-6 text-emerald-400" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-200 text-base mb-1">End-to-End Secure</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">Your files are private and encrypted</p>
+                <h3 className="font-medium text-white text-base mb-1.5">Bank-grade Security</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">Your data workflow is fully encrypted and private to you.</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="relative z-10 text-sm text-gray-500/80 font-medium">
-          &copy; {new Date().getFullYear()} NDrive by <a href="https://ntechbd.app" target="_blank" rel="noopener noreferrer" className="font-semibold text-gray-400 hover:text-blue-400 transition-colors underline decoration-transparent hover:decoration-blue-400/50 underline-offset-4">Ntechbd Solutions</a>. All rights reserved.
+        <div className="relative z-10 text-sm xl:text-base text-zinc-500 font-medium flex items-center gap-2">
+          &copy; {new Date().getFullYear()} NDrive by 
+          <a href="https://ntechbd.app" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-white transition-colors underline decoration-transparent hover:decoration-white/50 underline-offset-4">
+            Ntechbd Solutions
+          </a>
         </div>
       </div>
 
