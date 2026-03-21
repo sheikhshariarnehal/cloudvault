@@ -54,10 +54,10 @@ export function UserMenu() {
       <DropdownMenuContent 
         align="end" 
         sideOffset={8} 
-        className="w-[360px] p-0 rounded-3xl border border-[#dadce0] bg-[#eef0f4] dark:bg-gray-900 shadow-md overflow-hidden font-sans"
+        className="w-[calc(100vw-1rem)] max-w-[360px] p-0 rounded-3xl border border-[#dadce0] bg-[#eef0f4] dark:bg-gray-900 shadow-md overflow-hidden font-sans"
       >
         {/* User info header card */}
-        <div className="bg-white dark:bg-gray-800 m-2 rounded-[20px] p-4 flex flex-col items-center justify-center pt-8 pb-6">
+        <div className="bg-white dark:bg-gray-800 m-1.5 sm:m-2 rounded-[20px] p-4 flex flex-col items-center justify-center pt-8 pb-6">
           <Avatar className="h-[72px] w-[72px] mb-3 ring-2 ring-border flex-shrink-0 bg-transparent">
             <AvatarImage src={avatarUrl} alt={displayName} />
             <AvatarFallback className="bg-[#ab47bc] text-white text-[28px] font-medium">
@@ -71,12 +71,12 @@ export function UserMenu() {
             className="w-auto px-6 py-2 rounded-full border border-[#dadce0] dark:border-gray-700 text-[#0b57d0] dark:text-blue-400 text-[14px] font-medium hover:bg-[#f8f9fa] dark:hover:bg-gray-700 transition-colors"
             onClick={() => router.push("/drive/settings")}
           >
-            Manage your Google Account
+            Manage your NDrive Account
           </button>
         </div>
 
         {/* Lower actions section bg-[#eef0f4] */}
-        <div className="flex bg-white dark:bg-gray-800 m-2 mt-0.5 rounded-[20px] border border-transparent overflow-hidden h-[54px]">
+        <div className="flex bg-white dark:bg-gray-800 m-1.5 sm:m-2 mt-0.5 rounded-[20px] border border-transparent overflow-hidden h-[54px]">
           <button 
             className="flex-1 flex items-center justify-center gap-2 hover:bg-[#f8f9fa] dark:hover:bg-gray-700 text-[#202124] dark:text-gray-200 text-[14px] font-medium transition-colors"
             onClick={() => router.push("/drive/settings")}
@@ -96,7 +96,7 @@ export function UserMenu() {
           </button>
         </div>
 
-        <div className="flex justify-center items-center gap-4 pt-1 pb-3 text-[12px] text-[#5f6368] dark:text-gray-400 bg-[#eef0f4] dark:bg-gray-900 border-t-0 border-[#eef0f4] dark:border-gray-800">
+        <div className="flex justify-center items-center gap-3 sm:gap-4 pt-1 pb-3 text-[11px] sm:text-[12px] text-[#5f6368] dark:text-gray-400 bg-[#eef0f4] dark:bg-gray-900 border-t-0 border-[#eef0f4] dark:border-gray-800">
            <a href="#" className="hover:text-[#202124] hover:bg-[#f1f3f4] px-1.5 py-0.5 rounded transition-colors">Privacy Policy</a>
            <span>•</span>
            <a href="#" className="hover:text-[#202124] hover:bg-[#f1f3f4] px-1.5 py-0.5 rounded transition-colors">Terms of Service</a>
