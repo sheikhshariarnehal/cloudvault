@@ -1,13 +1,13 @@
 "use client";
 import NextImage from "next/image";
-import { ShaderBackground } from "@/components/auth/shader-background";
+import { ShaderAnimation } from "@/components/ui/shader-lines";
 import { ShieldCheck, Zap, HardDrive } from "lucide-react";
 
 export function AuthBranding() {
   return (
     <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center bg-[#09090b] text-white relative overflow-hidden text-center selection:bg-blue-500/30">
-      {/* WebGL Shader Background or a Subtle Gradient Mesh */}
-      <ShaderBackground />
+      {/* WebGL Shader Animation */}
+      <ShaderAnimation />
 
       {/* Modern Vignette Overlay */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#09090b_100%)] pointer-events-none z-0"></div>
