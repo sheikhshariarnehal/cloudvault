@@ -2,12 +2,6 @@
 
 import { useEffect, useRef } from "react"
 
-declare global {
-  interface Window {
-    THREE: any
-  }
-}
-
 export function ShaderAnimation() {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
@@ -25,35 +19,55 @@ export function ShaderAnimation() {
   })
 
   useEffect(() => {
-    // Load Three.js dynamically
-    const script = document.createElement("script")
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/89/three.min.js"
-    script.async = true
-    script.onload = () => {
-      if (containerRef.current && window.THREE) {
-        initThreeJS()
-      }
-    }
-    document.head.appendChild(script)
+    let isActive = true
+    let resizeHandler: (() => void) | null = null
+
+    const startTimer = window.setTimeout(() => {
+      void initThreeJS((cleanup) => {
+        resizeHandler = cleanup
+      })
+    }, 180)
 
     return () => {
-      // Cleanup
+      isActive = false
+      window.clearTimeout(startTimer)
+
+      if (resizeHandler) {
+        resizeHandler()
+      }
+
       if (sceneRef.current.animationId) {
         cancelAnimationFrame(sceneRef.current.animationId)
       }
+
       if (sceneRef.current.renderer) {
         sceneRef.current.renderer.dispose()
       }
-      if (document.head.contains(script)) {
-        document.head.removeChild(script)
+
+      const mesh = sceneRef.current.scene?.children?.[0]
+      if (mesh?.geometry) {
+        mesh.geometry.dispose()
       }
+      if (mesh?.material) {
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach((material: { dispose: () => void }) => material.dispose())
+        } else {
+          mesh.material.dispose()
+        }
+      }
+
+      sceneRef.current.renderer?.forceContextLoss?.()
+
+      if (!isActive) return
     }
   }, [])
 
-  const initThreeJS = () => {
-    if (!containerRef.current || !window.THREE) return
+  const initThreeJS = async (onResizeCleanup: (cleanup: () => void) => void) => {
+    if (!containerRef.current) return
 
-    const THREE = window.THREE
+    const THREE = await import("three")
+    if (!containerRef.current) return
+
     const container = containerRef.current
 
     // Clear any existing content
@@ -67,7 +81,7 @@ export function ShaderAnimation() {
     const scene = new THREE.Scene()
 
     // Create geometry
-    const geometry = new THREE.PlaneBufferGeometry(2, 2)
+    const geometry = new THREE.PlaneGeometry(2, 2)
 
     // Define uniforms
     const uniforms = {
@@ -136,8 +150,8 @@ export function ShaderAnimation() {
     scene.add(mesh)
 
     // Initialize renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-    renderer.setPixelRatio(window.devicePixelRatio)
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" })
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     container.appendChild(renderer.domElement)
 
     // Store references
@@ -158,7 +172,10 @@ export function ShaderAnimation() {
     }
 
     onWindowResize()
-    window.addEventListener("resize", onWindowResize, false)
+    window.addEventListener("resize", onWindowResize, { passive: true })
+    onResizeCleanup(() => {
+      window.removeEventListener("resize", onWindowResize)
+    })
 
     // Animation loop
     const animate = () => {

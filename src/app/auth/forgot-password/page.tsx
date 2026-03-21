@@ -49,7 +49,7 @@ export default function ForgotPasswordPage() {
             We've sent a reset link to <strong className="text-white break-all">{email}</strong>.
             Check your inbox and follow the link.
           </p>
-          <Link href="/auth/login" className="block outline-none mt-2">
+          <Link href="/auth/login" prefetch={false} className="block outline-none mt-2">
             <Button className="w-full h-10 bg-[#2563eb] hover:bg-[#1d4ed8] text-white border-0 transition-colors text-[13px] font-medium">
               Back to Sign In
             </Button>
@@ -108,6 +108,7 @@ export default function ForgotPasswordPage() {
 
             <Link
               href="/auth/login"
+              prefetch={false}
               className="flex items-center justify-center gap-1.5 text-[13px] text-zinc-400 hover:text-white transition-colors mt-6 font-medium"
             >
               <ArrowLeft className="h-3.5 w-3.5" />

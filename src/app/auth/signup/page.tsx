@@ -193,7 +193,7 @@ export default function SignUpPage() {
 
             <p className="text-center text-[13px] text-zinc-400 mt-4">
               Already have an account?{" "}
-              <Link href="/auth/login" className="text-white font-medium hover:underline">
+              <Link href="/auth/login" prefetch={false} className="text-white font-medium hover:underline">
                 Sign in
               </Link>
             </p>

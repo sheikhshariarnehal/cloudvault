@@ -1,8 +1,13 @@
 "use client";
 import NextImage from "next/image";
-import { ShaderAnimation } from "@/components/ui/shader-lines";
 import { ShieldCheck, Zap, HardDrive } from "lucide-react";
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+
+const ShaderAnimation = dynamic(
+  () => import("@/components/ui/shader-lines").then((mod) => mod.ShaderAnimation),
+  { ssr: false }
+);
 
 export function AuthBranding() {
   const [showShader, setShowShader] = useState(false);
