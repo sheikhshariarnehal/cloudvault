@@ -9,7 +9,6 @@ import dynamic from "next/dynamic";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useFilesStore } from "@/store/files-store";
 import { useUIStore } from "@/store/ui-store";
-import { FolderTree } from "@/components/sidebar/folder-tree";
 import { NavItem } from "@/components/sidebar/nav-item";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -70,13 +69,6 @@ function SidebarLoadingSkeleton() {
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={`nav-${i}`} className="h-10 rounded-full bg-[#e8eaed] animate-pulse" />
         ))}
-
-        <div className="px-1 mt-4 space-y-2">
-          <div className="h-3 w-24 rounded bg-[#e8eaed] animate-pulse" />
-          <div className="h-8 rounded-full bg-[#f1f3f4] animate-pulse" />
-          <div className="h-8 rounded-full bg-[#f1f3f4] animate-pulse" />
-          <div className="h-8 rounded-full bg-[#f1f3f4] animate-pulse" />
-        </div>
       </nav>
 
       <div className="px-4 pb-3">
@@ -90,8 +82,6 @@ export function Sidebar() {
   const [secondaryReady, setSecondaryReady] = useState(false);
   const pathname = usePathname();
   const { user, isGuest, isLoading: authLoading } = useAuth();
-  // Use granular selectors so Sidebar only re-renders when these specific values change.
-  const folders = useFilesStore((s) => s.folders);
   const filesLoading = useFilesStore((s) => s.isLoading);
   const dataLoaded = useFilesStore((s) => s.dataLoaded);
   const openFilePicker = useUIStore((s) => s.openFilePicker);
@@ -100,22 +90,6 @@ export function Sidebar() {
   const uploadFiles = useUIStore((s) => s.uploadFiles);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const showLoadingSkeleton = authLoading || filesLoading || !dataLoaded;
-
-  // Memoize the root-level folder list to avoid a new array reference on every render.
-  const rootFolders = useMemo(() => folders.filter((f) => !f.parent_id), [folders]);
-  const childrenByParent = useMemo(() => {
-    const map = new Map<string, typeof folders>();
-    for (const folder of folders) {
-      if (!folder.parent_id) continue;
-      const list = map.get(folder.parent_id);
-      if (list) {
-        list.push(folder);
-      } else {
-        map.set(folder.parent_id, [folder]);
-      }
-    }
-    return map;
-  }, [folders]);
 
   const handleFolderUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -188,15 +162,6 @@ export function Sidebar() {
                 badge={item.badge}
               />
             ))}
-
-            {/* Folder Tree */}
-            <div className="px-1 mt-4">
-              {secondaryReady ? (
-                <FolderTree folders={rootFolders} childrenByParent={childrenByParent} />
-              ) : (
-                <p className="text-xs text-muted-foreground px-2 py-1">Loading folders...</p>
-              )}
-            </div>
           </nav>
 
           {/* Storage Meter */}
