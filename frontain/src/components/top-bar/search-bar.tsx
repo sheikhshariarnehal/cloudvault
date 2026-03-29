@@ -51,7 +51,7 @@ export function SearchBar() {
     <div className="relative group w-full max-w-[720px]">
       {/* Search icon */}
       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-        <Search className="h-4 w-4 text-[#5f6368] group-focus-within:text-[#202124] transition-colors" />
+        <Search className="h-4 w-4 text-[#5f6368] group-focus-within:text-[#202124] transition-colors" aria-hidden="true" />
       </div>
 
       <Input

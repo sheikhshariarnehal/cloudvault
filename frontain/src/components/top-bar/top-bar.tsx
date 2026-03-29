@@ -17,7 +17,7 @@ export function TopBar() {
   const isAuthenticated = !isGuest && !!user;
 
   return (
-    <header className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 h-14 sm:h-16 bg-background text-foreground shrink-0 sticky top-0 z-40">
+    <header className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 h-14 sm:h-16 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 text-foreground shrink-0 sticky top-0 z-40">
       {/* Mobile hamburger — hidden on desktop */}
       <Button
         variant="ghost"
@@ -26,7 +26,7 @@ export function TopBar() {
         onClick={toggleSidebar}
         aria-label="Toggle sidebar"
       >
-        <Menu className="h-5 w-5" />
+        <Menu className="h-5 w-5" aria-hidden="true" />
       </Button>
 
       {/* Search — grows to fill available space, aligned to the start */}

@@ -212,6 +212,8 @@ export default function DashboardLayout({
     return () => { document.body.style.overflow = ""; };
   }, [sidebarOpen]);
 
+  const shouldRenderTelegramBanner = !!user && !isGuest && (isTelegramStatusLoading || (!isTelegramConnected && !telegramBannerDismissed));
+
   return (
     <UploadZone folderId={currentFolderId}>
       <div className="flex h-dvh bg-background text-foreground overflow-hidden">
@@ -242,7 +244,7 @@ export default function DashboardLayout({
           )}
 
             {/* Telegram Connect Banner */}
-            {user && !isGuest && (
+            {shouldRenderTelegramBanner && (
               <div className="px-3 pt-3 sm:px-4" aria-hidden={isTelegramStatusLoading ? true : undefined}>
                 {isTelegramStatusLoading ? (
                   // Reserve banner space during async status check to avoid layout shift.

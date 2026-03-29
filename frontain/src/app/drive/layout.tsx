@@ -328,6 +328,9 @@ export default function DashboardLayout({
     return () => { document.body.style.overflow = ""; };
   }, [sidebarOpen]);
 
+  const shouldShowTelegramBanner =
+    !!user && !isGuest && !isTelegramStatusLoading && !isTelegramConnected && !telegramBannerDismissed;
+
   return (
     <UploadZone folderId={currentFolderId}>
       <div className="flex h-dvh bg-background text-foreground overflow-hidden">
@@ -359,38 +362,36 @@ export default function DashboardLayout({
           )}
 
           {/* Telegram Connect Banner */}
-          {user && !isGuest && (
+          {shouldShowTelegramBanner && (
             <div className="px-3 pt-3 sm:px-4">
-              {!isTelegramStatusLoading && !isTelegramConnected && !telegramBannerDismissed ? (
-                <div className="relative flex flex-col gap-3 rounded-2xl border border-[#1a73e8] bg-[#d3e3fd] px-4 py-3 shadow-[0_1px_2px_rgba(26,115,232,0.08)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5 sm:py-3.5">
-                  <div className="flex min-w-0 items-start gap-3 sm:items-center">
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center">
-                      <Telegram className="h-6 w-6" />
-                    </div>
-                    <p className="min-w-0 pr-8 text-sm leading-6 text-[#202124] sm:pr-0 sm:text-[15px]">
-                      Connect your Telegram for <span className="font-semibold">unlimited personal storage</span>
-                    </p>
+              <div className="relative flex flex-col gap-3 rounded-2xl border border-[#1a73e8] bg-[#d3e3fd] px-4 py-3 shadow-[0_1px_2px_rgba(26,115,232,0.08)] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5 sm:py-3.5">
+                <div className="flex min-w-0 items-start gap-3 sm:items-center">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center">
+                    <Telegram className="h-6 w-6" />
                   </div>
-                  <div className="flex w-full items-center gap-2.5 pr-10 sm:w-auto sm:flex-shrink-0 sm:justify-end sm:pr-0">
-                    <button
-                      onClick={() => useUIStore.getState().setConnectTelegramModalOpen(true)}
-                      className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-4 text-sm font-medium text-[#3c4043] shadow-none transition-all hover:bg-[#f8f9fa] hover:border-[#dadce0] sm:w-auto"
-                    >
-                      Connect
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTelegramBannerDismissed(true);
-                        sessionStorage.setItem("telegram-banner-dismissed", "true");
-                      }}
-                      className="absolute right-2 top-2 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#5f6368] transition-colors hover:bg-white/50 hover:text-[#202124] sm:static"
-                      aria-label="Dismiss"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
+                  <p className="min-w-0 pr-8 text-sm leading-6 text-[#202124] sm:pr-0 sm:text-[15px]">
+                    Connect your Telegram for <span className="font-semibold">unlimited personal storage</span>
+                  </p>
                 </div>
-              ) : null}
+                <div className="flex w-full items-center gap-2.5 pr-10 sm:w-auto sm:flex-shrink-0 sm:justify-end sm:pr-0">
+                  <button
+                    onClick={() => useUIStore.getState().setConnectTelegramModalOpen(true)}
+                    className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-full border border-[#dadce0] bg-white px-4 text-sm font-medium text-[#3c4043] shadow-none transition-all hover:bg-[#f8f9fa] hover:border-[#dadce0] sm:w-auto"
+                  >
+                    Connect
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTelegramBannerDismissed(true);
+                      sessionStorage.setItem("telegram-banner-dismissed", "true");
+                    }}
+                    className="absolute right-2 top-2 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#5f6368] transition-colors hover:bg-white/50 hover:text-[#202124] sm:static"
+                    aria-label="Dismiss"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
