@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "recharts": "^3.8.0"
-  },
-  "devDependencies": {
-    "@playwright/test": "^1.58.2"
-  }
-}
