@@ -68,9 +68,7 @@ async function getFolderContentsRecursive(
 
   const allFiles = files || [];
   const allFolders = subFolders || [];
-  let totalSize = allFiles.reduce((sum: number, f: any) => sum + (f.size_bytes || 0), 0);
-
-  // Recurse into sub-folders to compute total size
+    let totalSize = allFiles.reduce((sum: number, f: Record<string, unknown>) => sum + ((f.size_bytes as number) || 0), 0);
   for (const sf of allFolders) {
     const sub = await getFolderContentsRecursive(supabase, sf.id);
     totalSize += sub.totalSize;

@@ -505,6 +505,69 @@ router.get("/complete-status", (req: Request, res: Response) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /api/chunked-upload/complete-stream?jobId=xxx
+// Server-Sent Events (SSE) stream for realtime push-based upload progress.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/complete-stream", (req: Request, res: Response) => {
+  const jobId = req.query.jobId as string;
+  if (!jobId) {
+    res.status(400).json({ error: "Missing jobId" });
+    return;
+  }
+
+  const job = completeJobs.get(jobId);
+  if (!job) {
+    res.status(404).json({ error: "Complete job not found or expired" });
+    return;
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  const sendStatus = () => {
+    const currentJob = completeJobs.get(jobId);
+    if (!currentJob) return; // Cleaned up
+
+    const session = sessions.get(currentJob.uploadId);
+    const data = {
+      jobId,
+      uploadId: currentJob.uploadId,
+      state: currentJob.state,
+      telegramProgress: session?.telegramProgress ?? (currentJob.state === "success" ? 1 : 0),
+      telegramUploadedBytes: session?.telegramUploadedBytes ?? null,
+      error: currentJob.error,
+    };
+
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  // Immediate first state
+  sendStatus();
+
+  const intervalId = setInterval(() => {
+    const currentJob = completeJobs.get(jobId);
+    if (!currentJob) {
+      clearInterval(intervalId);
+      res.end();
+      return;
+    }
+
+    sendStatus();
+
+    if (currentJob.state === "success" || currentJob.state === "failed") {
+      clearInterval(intervalId);
+      res.end();
+    }
+  }, 300);
+
+  req.on("close", () => {
+    clearInterval(intervalId);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/chunked-upload/complete-result?jobId=xxx
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/complete-result", (req: Request, res: Response) => {

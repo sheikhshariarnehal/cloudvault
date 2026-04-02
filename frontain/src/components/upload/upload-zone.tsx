@@ -10,6 +10,20 @@ import { extractVideoThumbnail } from "@/lib/utils/video-thumbnail";
 import { extractImageThumbnail } from "@/lib/utils/image-thumbnail";
 import { Upload, FolderUp, CloudUpload } from "lucide-react";
 
+// Carries Telegram rate-limit info through the error chain
+class RateLimitError extends Error {
+  retryAfter: number;
+  constructor(message: string, retryAfter: number) {
+    super(message);
+    this.retryAfter = retryAfter;
+  }
+}
+
+type RateLimitLikeError = Error & {
+  isRateLimit?: boolean;
+  retryAfter?: number;
+};
+
 // ─── Folder / Directory Handling Utilities ──────────────────────────────────
 
 interface FileWithPath {
@@ -151,7 +165,7 @@ function getFilesFromInputEvent(
     const file = files[i];
     // webkitRelativePath is set when using webkitdirectory attribute
     // e.g. "myFolder/subdir/image.png"
-    const relativePath = (file as any).webkitRelativePath || "";
+    const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || "";
     const segments = relativePath
       ? relativePath.split("/").slice(0, -1) // remove the filename itself
       : [];
@@ -218,7 +232,7 @@ interface UploadZoneProps {
 
 export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   const { user, guestSessionId } = useAuth();
-  const { addToUploadQueue, updateUploadStatus, updateUploadProgress, updateUploadBytes, addFile, addFolder } =
+  const { addToUploadQueue, updateUploadStatus, updateUploadProgress, updateUploadBytes, updateUploadPhase, updateUploadSpeed, addFile, addFolder } =
     useFilesStore();
 
   // ── Drag state — managed manually (no react-dropzone) ─────────────
@@ -260,8 +274,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
   ) => {
     const CHUNK_PHASE_PROGRESS = 82;
     const TELEGRAM_PHASE_PROGRESS = 16;
-    const TELEGRAM_POLL_INTERVAL_ACTIVE_MS = 700;
-    const TELEGRAM_POLL_INTERVAL_IDLE_MS = 1500;
+    updateUploadPhase(queueId, "chunks");
 
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
@@ -289,10 +302,24 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     // Track per-chunk byte progress for smooth UI updates
     const chunkBytesLoaded = new Array(totalChunks).fill(0);
     const chunkBytesTotal = new Array(totalChunks).fill(0);
+    
+    let lastChunkBytes = 0;
+    let lastChunkTime = Date.now();
+    
     const updateChunkProgress = () => {
       const loaded = chunkBytesLoaded.reduce((a, b) => a + b, 0);
       const total = file.size;
       const chunkFraction = total > 0 ? loaded / total : 0;
+      
+      const now = Date.now();
+      const dtSec = (now - lastChunkTime) / 1000;
+      if (dtSec >= 0.5) {
+        const speedBps = (loaded - lastChunkBytes) / dtSec;
+        updateUploadSpeed(queueId, Math.max(0, speedBps));
+        lastChunkBytes = loaded;
+        lastChunkTime = now;
+      }
+
       // Keep UI bytes aligned to the same staged progress model as the percent bar.
       const stagedLoaded = Math.round(file.size * chunkFraction * (CHUNK_PHASE_PROGRESS / 100));
       const pct = Math.round(chunkFraction * CHUNK_PHASE_PROGRESS);
@@ -406,73 +433,97 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       throw new Error("Complete start did not return jobId");
     }
 
-    let attempts = 0;
-    let pollDelayMs = 300;
-    let lastTelegramProgress = 0;
-    const maxAttempts = 900; // ~22.5 minutes at 1.5s interval
-    while (attempts < maxAttempts) {
-      attempts++;
-      await new Promise((r) => setTimeout(r, pollDelayMs));
+    updateUploadPhase(queueId, "telegram");
+    await new Promise<void>((resolve, reject) => {
+      const source = new EventSource(`/api/upload/complete/stream?jobId=${encodeURIComponent(jobId)}`);
 
-      const statusRes = await fetch(
-        `/api/upload/complete/status?jobId=${encodeURIComponent(jobId)}&t=${Date.now()}`,
-        { cache: "no-store" }
-      );
-      const status = await statusRes.json().catch(() => ({}));
+      let lastBytes = 0;
+      let lastTime = Date.now();
+      let lastTelegramProgress = 0;
+      let hasResolved = false;
+      let errorCount = 0;
 
-      if (!statusRes.ok) {
-        if (statusRes.status === 429) {
-          const retryAfter = status.retry_after ?? 30;
-          const err: Error & { retryAfter?: number; isRateLimit?: boolean } =
-            new Error(status.error || `Rate limited. Retry after ${retryAfter}s`);
-          err.retryAfter = retryAfter;
-          err.isRateLimit = true;
-          throw err;
+      const finish = (err?: Error) => {
+        if (hasResolved) return;
+        hasResolved = true;
+        source.close();
+        if (err) reject(err);
+        else resolve();
+      };
+
+      source.onmessage = (event) => {
+        try {
+          const status = JSON.parse(event.data);
+
+          if (status.state === "failed") {
+            const msg = status.error || "Telegram upload failed";
+            let retryWait = null;
+            if (msg.includes("FLOOD_WAIT_")) {
+              retryWait = parseInt(msg.split("FLOOD_WAIT_")[1], 10);
+            }
+            if (retryWait) {
+              const err: Error & { retryAfter?: number; isRateLimit?: boolean } =
+                new Error(`Rate limited. Retry after ${retryWait}s`);
+              err.retryAfter = retryWait;
+              err.isRateLimit = true;
+              return finish(err);
+            }
+            return finish(new Error(msg));
+          }
+
+          if (status.state === "success") {
+            updateUploadProgress(queueId, 99);
+            updateUploadBytes(queueId, Math.round(file.size * 0.99), file.size);
+            return finish();
+          }
+
+          const progressFromBytes =
+            typeof status.telegramUploadedBytes === "number" && file.size > 0
+              ? Math.min(Math.max(status.telegramUploadedBytes / file.size, 0), 1)
+              : null;
+          const progressFromRatio =
+            typeof status.telegramProgress === "number"
+              ? Math.min(Math.max(status.telegramProgress, 0), 1)
+              : null;
+
+          if (progressFromBytes !== null || progressFromRatio !== null) {
+            const nextProgress = progressFromBytes ?? progressFromRatio ?? 0;
+            const normalizedProgress = Math.max(lastTelegramProgress, nextProgress);
+            lastTelegramProgress = normalizedProgress;
+
+            const pct = CHUNK_PHASE_PROGRESS + Math.round(normalizedProgress * TELEGRAM_PHASE_PROGRESS);
+            const stagedLoaded = Math.round(
+              file.size * ((CHUNK_PHASE_PROGRESS + normalizedProgress * TELEGRAM_PHASE_PROGRESS) / 100)
+            );
+            updateUploadProgress(queueId, Math.min(pct, 98));
+            updateUploadBytes(queueId, stagedLoaded, file.size);
+          }
+
+          if (typeof status.telegramUploadedBytes === "number") {
+            const now = Date.now();
+            const dtSec = (now - lastTime) / 1000;
+            if (dtSec >= 0.5) {
+              const speedBps = (status.telegramUploadedBytes - lastBytes) / dtSec;
+              updateUploadSpeed(queueId, Math.max(0, speedBps));
+              lastBytes = status.telegramUploadedBytes;
+              lastTime = now;
+            }
+          }
+        } catch (e) {
+          // Ignore parsing errors
         }
-        pollDelayMs = TELEGRAM_POLL_INTERVAL_IDLE_MS;
-        continue;
-      }
+      };
 
-      const progressFromBytes =
-        typeof status.telegramUploadedBytes === "number" && file.size > 0
-          ? Math.min(Math.max(status.telegramUploadedBytes / file.size, 0), 1)
-          : null;
-      const progressFromRatio =
-        typeof status.telegramProgress === "number"
-          ? Math.min(Math.max(status.telegramProgress, 0), 1)
-          : null;
+      source.onerror = () => {
+        errorCount++;
+        // If we fail repeatedly (e.g., backend restart/proxy failure), abort rather than waiting forever.
+        if (errorCount > 3) {
+          finish(new Error("EventSource connection lost"));
+        }
+      };
+    });
 
-      if (progressFromBytes !== null || progressFromRatio !== null) {
-        const nextProgress = progressFromBytes ?? progressFromRatio ?? 0;
-        const normalizedProgress = Math.max(lastTelegramProgress, nextProgress);
-        lastTelegramProgress = normalizedProgress;
-
-        const pct = CHUNK_PHASE_PROGRESS + Math.round(normalizedProgress * TELEGRAM_PHASE_PROGRESS);
-        const stagedLoaded = Math.round(
-          file.size * ((CHUNK_PHASE_PROGRESS + normalizedProgress * TELEGRAM_PHASE_PROGRESS) / 100)
-        );
-        updateUploadProgress(queueId, Math.min(pct, 98));
-        updateUploadBytes(queueId, stagedLoaded, file.size);
-      }
-
-      pollDelayMs = status.state === "uploading"
-        ? TELEGRAM_POLL_INTERVAL_ACTIVE_MS
-        : TELEGRAM_POLL_INTERVAL_IDLE_MS;
-
-      if (status.state === "failed") {
-        throw new Error(status.error || "Telegram upload failed");
-      }
-
-      if (status.state === "success") {
-        updateUploadProgress(queueId, 99);
-        updateUploadBytes(queueId, Math.round(file.size * 0.99), file.size);
-        break;
-      }
-    }
-
-    if (attempts >= maxAttempts) {
-      throw new Error("Timed out waiting for Telegram upload completion");
-    }
+    updateUploadPhase(queueId, "finalizing");
 
     const finalizeRes = await fetch("/api/upload/finalize", {
       method: "POST",
@@ -507,7 +558,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
     updateUploadBytes(queueId, file.size, file.size);
     updateUploadProgress(queueId, 100);
     return data;
-  }, [user, guestSessionId, updateUploadProgress, updateUploadBytes, CHUNK_SIZE]);
+  }, [user, guestSessionId, updateUploadProgress, updateUploadBytes, CHUNK_SIZE, updateUploadPhase, updateUploadSpeed]);
 
   const uploadFile = useCallback(async (
     queueId: string,
@@ -659,20 +710,6 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
         return null;
       }
     })();
-
-    // Carries Telegram rate-limit info through the error chain
-    class RateLimitError extends Error {
-      retryAfter: number;
-      constructor(message: string, retryAfter: number) {
-        super(message);
-        this.retryAfter = retryAfter;
-      }
-    }
-
-    type RateLimitLikeError = Error & {
-      isRateLimit?: boolean;
-      retryAfter?: number;
-    };
 
     const MAX_ATTEMPTS = 6;
 
@@ -1090,7 +1127,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       const files = e.target.files;
       if (files && files.length > 0) {
         const hasRelativePaths = Array.from(files).some(
-          (f) => (f as any).webkitRelativePath
+          (f) => (f as File & { webkitRelativePath?: string }).webkitRelativePath
         );
         if (hasRelativePaths) {
           const filesWithPaths = getFilesFromInputEvent(files);
@@ -1135,7 +1172,7 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
 
   useEffect(() => {
     setUploadFiles((files: File[]) => {
-      const hasRelativePaths = files.some((f) => (f as any).webkitRelativePath);
+      const hasRelativePaths = files.some((f) => (f as File & { webkitRelativePath?: string }).webkitRelativePath);
       if (hasRelativePaths) {
         const filesWithPaths = getFilesFromInputEvent(files as unknown as FileList);
         onDropWithFolders(filesWithPaths);

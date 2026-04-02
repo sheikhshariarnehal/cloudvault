@@ -186,6 +186,8 @@ interface FilesState {
   addToUploadQueue: (item: UploadQueueItem) => void;
   updateUploadProgress: (id: string, progress: number) => void;
   updateUploadBytes: (id: string, bytesLoaded: number, bytesTotal: number) => void;
+  updateUploadPhase: (id: string, phase: NonNullable<UploadQueueItem["uploadPhase"]>) => void;
+  updateUploadSpeed: (id: string, speedBps: number) => void;
   updateUploadStatus: (id: string, status: UploadQueueItem["status"], error?: string) => void;
   removeFromUploadQueue: (id: string) => void;
   clearUploadQueue: () => void;
@@ -291,6 +293,18 @@ export const useFilesStore = create<FilesState>((set) => ({
     set((state) => ({
       uploadQueue: state.uploadQueue.map((item) =>
         item.id === id ? { ...item, bytesLoaded, bytesTotal } : item
+      ),
+    })),
+  updateUploadPhase: (id, phase) =>
+    set((state) => ({
+      uploadQueue: state.uploadQueue.map((item) =>
+        item.id === id ? { ...item, uploadPhase: phase } : item
+      ),
+    })),
+  updateUploadSpeed: (id, speedBps) =>
+    set((state) => ({
+      uploadQueue: state.uploadQueue.map((item) =>
+        item.id === id ? { ...item, speedBps } : item
       ),
     })),
   updateUploadStatus: (id, status, error) =>

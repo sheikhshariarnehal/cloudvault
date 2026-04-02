@@ -14,6 +14,19 @@ function formatBytes(bytes: number): string {
   return `${i === 0 ? value : value.toFixed(value < 10 ? 1 : 0)} ${units[i]}`;
 }
 
+function formatEta(bytes: number, totalBytes: number, speedBps: number): string {
+  if (speedBps <= 0 || totalBytes <= 0 || bytes >= totalBytes) return "";
+  const remaining = Math.max(0, totalBytes - bytes);
+  const secs = Math.round(remaining / speedBps);
+  if (secs < 60) return `${secs}s left`;
+  const mins = Math.floor(secs / 60);
+  const rSecs = secs % 60;
+  if (mins < 60) return `${mins}m ${rSecs}s left`;
+  const hrs = Math.floor(mins / 60);
+  const rMins = mins % 60;
+  return `${hrs}h ${rMins}m left`;
+}
+
 /** Circular indeterminate spinner – pure SVG, no extra deps */
 function Spinner({ className = "" }: { className?: string }) {
   return (
@@ -40,6 +53,8 @@ function Spinner({ className = "" }: { className?: string }) {
     </svg>
   );
 }
+
+import type { UploadQueueItem } from "@/types/file.types";
 
 /* ── component ───────────────────────────────────────────────────── */
 
@@ -92,10 +107,16 @@ export function UploadProgress() {
     console.log("Share:", fileName);
   }, []);
 
-  const getUploadingLabel = useCallback((progress: number): string => {
-    if (progress >= 99) return "Finalizing";
-    if (progress >= 82) return "Uploading to Telegram";
-    if (progress >= 5) return "Uploading chunks";
+  const getUploadingLabel = useCallback((item: UploadQueueItem): string => {
+    if (item.uploadPhase === "finalizing") return "Finalizing";
+    if (item.uploadPhase === "telegram") return "Uploading to Telegram";
+    if (item.uploadPhase === "chunks") return "Uploading chunks";
+    if (item.uploadPhase === "preparing") return "Preparing";
+
+    // fallback
+    if (item.progress >= 99) return "Finalizing";
+    if (item.progress >= 82) return "Uploading to Telegram";
+    if (item.progress >= 5) return "Uploading chunks";
     return "Preparing";
   }, []);
 
@@ -218,7 +239,10 @@ export function UploadProgress() {
                   )}
                   {item.status === "uploading" && (
                     <>
-                      {getUploadingLabel(item.progress)} &middot; {item.progress}% &middot; {formatBytes(item.bytesLoaded)} / {formatBytes(item.bytesTotal)}
+                      {getUploadingLabel(item)} &middot; {item.progress}% &middot; {formatBytes(item.bytesLoaded)} / {formatBytes(item.bytesTotal)}
+                      {item.speedBps != null && item.speedBps > 0 && (
+                        <span> &middot; {formatBytes(item.speedBps)}/s &middot; {formatEta(item.bytesLoaded, item.bytesTotal, item.speedBps)}</span>
+                      )}
                     </>
                   )}
                   {item.status === "pending" && (

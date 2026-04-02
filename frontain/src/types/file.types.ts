@@ -143,6 +143,8 @@ export interface UploadQueueItem {
   bytesTotal: number;
   status: "pending" | "uploading" | "success" | "error" | "duplicate";
   error?: string;
+  uploadPhase?: "preparing" | "chunks" | "telegram" | "finalizing";
+  speedBps?: number;
 }
 
 export interface BreadcrumbItem {
