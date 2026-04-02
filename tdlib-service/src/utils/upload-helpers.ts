@@ -7,13 +7,21 @@
 
 import fs from "fs";
 import { fileToBase64DataUri } from "./stream.js";
-import { acquireUploadSlot, releaseUploadSlot } from "./concurrency.js";
+import {
+  acquireUploadSlot,
+  markUploadRateLimited,
+  releaseUploadSlot,
+} from "./concurrency.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TDLibClient = any;
 
 // ── Re-export concurrency helpers for convenience ────────────────────────────
-export { acquireUploadSlot, releaseUploadSlot } from "./concurrency.js";
+export {
+  acquireUploadSlot,
+  markUploadRateLimited,
+  releaseUploadSlot,
+} from "./concurrency.js";
 
 /**
  * Optional session reference so we can update Telegram upload progress
@@ -325,6 +333,50 @@ export function buildDocumentFallbackParams(
   };
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendWithRateLimitRetries(
+  client: TDLibClient,
+  params: Record<string, unknown>,
+  fileSize: number,
+  session: ProgressSession | undefined,
+  label: string,
+): Promise<Record<string, unknown>> {
+  const maxSendAttempts = Math.max(
+    1,
+    parseInt(process.env.TDLIB_MAX_SEND_ATTEMPTS || "4", 10),
+  );
+
+  for (let attempt = 1; attempt <= maxSendAttempts; attempt++) {
+    try {
+      const pending = (await client.invoke(params)) as Record<string, unknown>;
+      return await waitForMessageSent(client, pending, fileSize, session);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const waitSec = parseFloodWait(errMsg);
+
+      if (waitSec !== null) {
+        markUploadRateLimited(waitSec);
+
+        if (attempt < maxSendAttempts) {
+          const jitterMs = Math.floor(Math.random() * 1000);
+          console.warn(
+            `[Upload] Telegram flood wait (${waitSec}s) during ${label}; retrying (${attempt + 1}/${maxSendAttempts})`,
+          );
+          await sleep(waitSec * 1000 + jitterMs);
+          continue;
+        }
+      }
+
+      throw err;
+    }
+  }
+
+  throw new Error(`[Upload] Exhausted retries while sending ${label}`);
+}
+
 /**
  * Send a file to Telegram with automatic document fallback on media rejection.
  * Combines ensureChatLoaded + invokeWithSlot + waitForMessageSent + extractFileInfo
@@ -344,19 +396,34 @@ export async function sendMessageWithFallback(
   const sendParams = buildSendParams(chatId, localFilePath, fileName, mimeType);
   const documentFallbackParams = buildDocumentFallbackParams(chatId, localFilePath, fileName);
 
+  await acquireUploadSlot();
   let sentMessage: Record<string, unknown>;
   try {
-    const pending = await invokeWithSlot(client, sendParams);
-    sentMessage = await waitForMessageSent(client, pending, fileSize, session);
-  } catch (sendErr) {
-    const sendErrMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
-    if (isMediaRejection(sendErrMsg)) {
-      console.warn(`[Upload] Media rejected (${sendErrMsg}), retrying as document...`);
-      const pending = await invokeWithSlot(client, documentFallbackParams);
-      sentMessage = await waitForMessageSent(client, pending, fileSize, session);
-    } else {
-      throw sendErr;
+    try {
+      sentMessage = await sendWithRateLimitRetries(
+        client,
+        sendParams,
+        fileSize,
+        session,
+        "primary send",
+      );
+    } catch (sendErr) {
+      const sendErrMsg = sendErr instanceof Error ? sendErr.message : String(sendErr);
+      if (isMediaRejection(sendErrMsg)) {
+        console.warn(`[Upload] Media rejected (${sendErrMsg}), retrying as document...`);
+        sentMessage = await sendWithRateLimitRetries(
+          client,
+          documentFallbackParams,
+          fileSize,
+          session,
+          "document fallback",
+        );
+      } else {
+        throw sendErr;
+      }
     }
+  } finally {
+    releaseUploadSlot();
   }
 
   const fileInfo = extractFileInfo(sentMessage);

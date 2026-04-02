@@ -89,12 +89,14 @@ In the **Resources** step:
 
 | Setting | Value |
 |---------|-------|
-| **Source Directory** | `/tdlib-service` |
+| **Source Directory** | `tdlib-service` |
 | **Dockerfile path** | `tdlib-service/Dockerfile` |
 | **HTTP Port** | `3001` |
 | **Health Check Path** | `/health` |
 
 > If DigitalOcean does not auto-detect, choose **Docker Hub / Dockerfile** and point it at `tdlib-service/Dockerfile`.
+>
+> If you want the deployed backend to follow a different branch, change the app's **Source Branch** in DigitalOcean and save. With **Autodeploy** enabled, the service redeploys automatically after the branch update.
 
 **Plan size:** Choose at minimum the **Basic — 1 vCPU / 1 GB RAM** plan. TDLib loads a native binary and needs some memory headroom. **$12/mo** plan is sufficient for personal use.
 

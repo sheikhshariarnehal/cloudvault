@@ -1,5 +1,5 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
-import { uploadToBackend } from "@/lib/telegram/upload";
+import { BackendUploadError, uploadToBackend } from "@/lib/telegram/upload";
 import { createClient } from "@/lib/supabase/server";
 import { resolveUploadThumbnail } from "@/lib/telegram/upload-thumbnail";
 
@@ -160,6 +160,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ file: fileRecord }, { status: 201 });
   } catch (error) {
     console.error("Upload error:", error);
+
+    if (error instanceof BackendUploadError) {
+      if (error.status === 429) {
+        const retryAfter = error.retryAfter ?? 30;
+        return NextResponse.json(
+          { error: error.message, retry_after: retryAfter },
+          {
+            status: 429,
+            headers: { "Retry-After": String(retryAfter) },
+          },
+        );
+      }
+
+      const status = error.status >= 400 && error.status < 600 ? error.status : 502;
+      return NextResponse.json({ error: error.message }, { status });
+    }
+
     const errorMessage = error instanceof Error ? error.message : "Upload failed";
     if (errorMessage.toLowerCase().includes("formdata")) {
       return NextResponse.json({ error: "Invalid multipart form data" }, { status: 400 });

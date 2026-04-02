@@ -29,6 +29,43 @@ export interface TDLibUploadResponse {
   session_expired?: boolean;
 }
 
+export class BackendUploadError extends Error {
+  status: number;
+  retryAfter: number | null;
+  payload: unknown;
+
+  constructor(message: string, status: number, retryAfter: number | null, payload: unknown) {
+    super(message);
+    this.name = "BackendUploadError";
+    this.status = status;
+    this.retryAfter = retryAfter;
+    this.payload = payload;
+  }
+}
+
+function parseRetryAfterSeconds(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.ceil(value);
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+
+    const retryAfterMatch = value.match(/retry after\s+(\d+)/i);
+    if (retryAfterMatch) {
+      const matched = Number.parseInt(retryAfterMatch[1], 10);
+      if (Number.isFinite(matched) && matched > 0) {
+        return matched;
+      }
+    }
+  }
+
+  return null;
+}
+
 /**
  * Build authorization headers for the TDLib service.
  */
@@ -72,8 +109,35 @@ export async function uploadToBackend(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Backend upload failed: ${error}`);
+    const headerRetryAfter = parseRetryAfterSeconds(response.headers.get("Retry-After"));
+    const contentType = response.headers.get("content-type") || "";
+
+    let payload: unknown = null;
+    let message = `Backend upload failed with status ${response.status}`;
+    let retryAfter = headerRetryAfter;
+
+    if (contentType.includes("application/json")) {
+      const errorData = (await response.json().catch(() => null)) as
+        | { error?: string; retry_after?: number | string }
+        | null;
+      payload = errorData;
+
+      if (errorData?.error) {
+        message = errorData.error;
+      }
+
+      retryAfter = parseRetryAfterSeconds(errorData?.retry_after) ?? headerRetryAfter;
+    } else {
+      const errorText = await response.text();
+      payload = errorText;
+
+      if (errorText) {
+        message = errorText;
+        retryAfter = parseRetryAfterSeconds(errorText) ?? headerRetryAfter;
+      }
+    }
+
+    throw new BackendUploadError(message, response.status, retryAfter, payload);
   }
 
   return response.json() as Promise<TDLibUploadResponse>;

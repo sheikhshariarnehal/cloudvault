@@ -628,6 +628,11 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       }
     }
 
+    type RateLimitLikeError = Error & {
+      isRateLimit?: boolean;
+      retryAfter?: number;
+    };
+
     const MAX_ATTEMPTS = 6;
 
     const attemptUpload = async (attempt: number): Promise<void> => {
@@ -730,11 +735,27 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Upload failed";
+        const rateLimitLikeError = error instanceof Error
+          ? (error as RateLimitLikeError)
+          : null;
+
+        const retryAfterFromMessage = (() => {
+          if (!(error instanceof Error)) return null;
+          const match =
+            error.message.match(/retry after\s+(\d+)/i) ||
+            error.message.match(/FLOOD_WAIT[_\s](\d+)/i);
+          if (!match) return null;
+          const parsed = Number.parseInt(match[1], 10);
+          return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+        })();
 
         // For chunked uploads, don't retry the whole thing on non-rate-limit errors
         // (chunks are already individual requests, retrying everything would be wasteful)
         const isChunked = file.size > CHUNK_THRESHOLD;
-        const isRateLimit = error instanceof RateLimitError || (error as any)?.isRateLimit;
+        const isRateLimit =
+          error instanceof RateLimitError ||
+          rateLimitLikeError?.isRateLimit === true ||
+          retryAfterFromMessage !== null;
 
         if (attempt >= MAX_ATTEMPTS || (isChunked && !isRateLimit)) {
           console.error("Upload error:", message, error);
@@ -746,9 +767,17 @@ export function UploadZone({ children, folderId = null }: UploadZoneProps) {
         if (error instanceof RateLimitError) {
           delay = (error.retryAfter + Math.random() * 2) * 1000;
           console.warn(`[Upload] Rate limited by Telegram – waiting ${error.retryAfter}s before retry (attempt ${attempt}/${MAX_ATTEMPTS})`);
-        } else if ((error as any)?.isRateLimit) {
-          delay = ((error as any).retryAfter + Math.random() * 2) * 1000;
-          console.warn(`[Upload] Rate limited – waiting before retry (attempt ${attempt}/${MAX_ATTEMPTS})`);
+        } else if (rateLimitLikeError?.isRateLimit) {
+          const retryAfter =
+            typeof rateLimitLikeError.retryAfter === "number" &&
+            Number.isFinite(rateLimitLikeError.retryAfter)
+              ? rateLimitLikeError.retryAfter
+              : 30;
+          delay = (retryAfter + Math.random() * 2) * 1000;
+          console.warn(`[Upload] Rate limited – waiting ${retryAfter}s before retry (attempt ${attempt}/${MAX_ATTEMPTS})`);
+        } else if (retryAfterFromMessage !== null) {
+          delay = (retryAfterFromMessage + Math.random() * 2) * 1000;
+          console.warn(`[Upload] Rate limited by backend hint – waiting ${retryAfterFromMessage}s before retry (attempt ${attempt}/${MAX_ATTEMPTS})`);
         } else {
           delay = Math.pow(2, attempt) * 1000;
         }
