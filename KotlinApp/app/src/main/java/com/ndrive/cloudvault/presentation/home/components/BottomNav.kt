@@ -2,11 +2,11 @@
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Icon
@@ -26,19 +26,19 @@ fun NDriveBottomNav(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val items = listOf("Home", "Starred", "Shared", "Files")
-    val routes = listOf("home", "starred", "shared", "files")
-    
+    val items = listOf("Home", "Starred", "Photos", "Files")
+    val routes = listOf("home", "starred", "photos", "files")
+
     val selectedIcons = listOf(
         Icons.Filled.Home,
         Icons.Filled.Star,
-        Icons.Filled.Group,
+        Icons.Filled.Photo,
         Icons.Filled.Folder
     )
     val unselectedIcons = listOf(
         Icons.Outlined.Home,
         Icons.Outlined.StarBorder,
-        Icons.Outlined.Group,
+        Icons.Outlined.Photo,
         Icons.Outlined.Folder
     )
 

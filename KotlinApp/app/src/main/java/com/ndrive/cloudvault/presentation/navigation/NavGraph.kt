@@ -14,6 +14,7 @@ import com.ndrive.cloudvault.presentation.auth.SignupScreen
 import com.ndrive.cloudvault.presentation.home.HomeScreen
 import com.ndrive.cloudvault.presentation.home.FilesScreen
 import com.ndrive.cloudvault.presentation.home.StarredScreen
+import com.ndrive.cloudvault.presentation.home.PhotosScreen
 import androidx.compose.material3.Scaffold
 import com.ndrive.cloudvault.presentation.home.components.NDriveBottomNav
 
@@ -41,11 +42,8 @@ fun NDriveNavGraph(navController: NavHostController) {
         composable("starred") {
             StarredScreen(navController)
         }
-        composable("shared") {
-            // Placeholder
-            Scaffold(bottomBar = { NDriveBottomNav(navController) }) { padding ->
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Shared Screen") }
-            }
+        composable("photos") {
+            PhotosScreen(navController)
         }
     }
 }
