@@ -52,6 +52,18 @@ fun HomeScreen(navController: androidx.navigation.NavController) {
         isLoading = false
     }
 
+    val mockFiles = remember {
+        listOf(
+            Triple("Monthly Notes", "You edited \u2022 10:23 AM", Color(0xFF4285F4)),
+            Triple("Leadership & Organization...", "Mustafa Krishnamurthy replied...", Color(0xFFF4B400)),
+            Triple("Monthly Forecast", "You edited \u2022 Nov 1, 2022", Color(0xFF0F9D58)),
+            Triple("Monthly Revenue", "You edited \u2022 Nov 1, 2022", Color(0xFF0F9D58)),
+            Triple("Q4 Proposal", "Rose James commented \u2022 Oct 31...", Color(0xFFDB4437)),
+            Triple("Project Harrison Tracker", "You opened \u2022 Oct 31, 2022", Color(0xFF0F9D58)),
+            Triple("Acme_ExpenseForm", "You edited \u2022 Oct 31, 2022", Color(0xFF4285F4))
+        )
+    }
+
     Scaffold(
         containerColor = backgroundColor,
         topBar = {
@@ -213,16 +225,6 @@ fun HomeScreen(navController: androidx.navigation.NavController) {
                     }
                 }
             } else {
-                val mockFiles = listOf(
-                    Triple("Monthly Notes", "You edited \u2022 10:23 AM", Color(0xFF4285F4)),
-                    Triple("Leadership & Organization...", "Mustafa Krishnamurthy replied...", Color(0xFFF4B400)),
-                    Triple("Monthly Forecast", "You edited \u2022 Nov 1, 2022", Color(0xFF0F9D58)),
-                    Triple("Monthly Revenue", "You edited \u2022 Nov 1, 2022", Color(0xFF0F9D58)),
-                    Triple("Q4 Proposal", "Rose James commented \u2022 Oct 31...", Color(0xFFDB4437)),
-                    Triple("Project Harrison Tracker", "You opened \u2022 Oct 31, 2022", Color(0xFF0F9D58)),
-                    Triple("Acme_ExpenseForm", "You edited \u2022 Oct 31, 2022", Color(0xFF4285F4))
-                )
-
                 items(mockFiles.size) { index ->
                     if (isGridView) {
                         FileCard(name = mockFiles[index].first, isImage = false) {}
