@@ -32,11 +32,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+data class DrawerItem(
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val text: String
+)
+
 @Composable
 fun AppDrawer(
     isOpen: Boolean,
     onClose: () -> Unit
 ) {
+    val drawerItems = remember {
+        listOf(
+            DrawerItem(Icons.Outlined.Schedule, "Recent"),
+            DrawerItem(Icons.Outlined.FileUpload, "Uploads"),
+            DrawerItem(Icons.Outlined.CheckCircle, "Offline"),
+            DrawerItem(Icons.Outlined.DeleteOutline, "Trash"),
+            DrawerItem(Icons.Outlined.ErrorOutline, "Spam"),
+            DrawerItem(Icons.Outlined.Settings, "Settings"),
+            DrawerItem(Icons.AutoMirrored.Outlined.HelpOutline, "Help & feedback"),
+            DrawerItem(Icons.Outlined.Cloud, "Storage")
+        )
+    }
+
     AnimatedVisibility(
         visible = isOpen,
         enter = fadeIn(animationSpec = tween(durationMillis = 300)),
@@ -100,50 +118,17 @@ fun AppDrawer(
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
 
                     // Menu Items
-                    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
-                        DrawerMenuItem(
-                            icon = Icons.Outlined.Schedule,
-                            text = "Recent",
-                            onClick = onClose
-                        )
-                        DrawerMenuItem(
-                            icon = Icons.Outlined.FileUpload,
-                            text = "Uploads",
-                            onClick = onClose
-                        )
-                        DrawerMenuItem(
-                            icon = Icons.Outlined.CheckCircle,
-                            text = "Offline",
-                            onClick = onClose
-                        )
-                        DrawerMenuItem(
-                            icon = Icons.Outlined.DeleteOutline,
-                            text = "Trash",
-                            onClick = onClose
-                        )
-                        DrawerMenuItem(
-                            icon = Icons.Outlined.ErrorOutline,
-                            text = "Spam",
-                            onClick = onClose
-                        )
-                        DrawerMenuItem(
-                            icon = Icons.Outlined.Settings,
-                            text = "Settings",
-                            onClick = onClose
-                        )
-                        DrawerMenuItem(
-                            icon = Icons.AutoMirrored.Outlined.HelpOutline,
-                            text = "Help & feedback",
-                            onClick = onClose
-                        )
-                        DrawerMenuItem(
-                            icon = Icons.Outlined.Cloud,
-                            text = "Storage",
-                            onClick = onClose
-                        )
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        items(drawerItems, key = { it.text }) { item ->
+                            DrawerMenuItem(
+                                icon = item.icon,
+                                text = item.text,
+                                onClick = onClose
+                            )
+                        }
                     }
-
-                    Spacer(modifier = Modifier.weight(1f))
 
                     // Footer / Storage
                     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp).navigationBarsPadding()) {
@@ -175,6 +160,7 @@ fun AppDrawer(
             }
         }
     }
+}
 }
 
 @Composable
