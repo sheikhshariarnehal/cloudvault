@@ -38,17 +38,6 @@ fun LoginScreen(
     val primaryColor = if (isDark) Color(0xFF1F2937) else Color(0xFF0A1021)
     val dividerColor = if (isDark) Color(0xFF374151) else Color(0xFFB0BEC5)
 
-    // A sharper, more accurate triangle matching the mockup
-    val customShape = GenericShape { size, _ ->
-        val triangleHeight = size.height * 0.20f // Use relative height for perfect scaling
-        moveTo(0f, triangleHeight)
-        lineTo(size.width / 2f, 0f)
-        lineTo(size.width, triangleHeight)
-        lineTo(size.width, size.height)
-        lineTo(0f, size.height)
-        close()
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -88,16 +77,16 @@ fun LoginScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.75f)
+                .fillMaxHeight(0.70f)
                 .align(Alignment.BottomCenter)
-                .clip(customShape)
+                .clip(RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp))
                 .background(bottomBgColor)
                 .padding(horizontal = 32.dp),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 80.dp), // Start content below the triangle peak
+                    .padding(top = 48.dp), // Start content slightly below the rounded top
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
