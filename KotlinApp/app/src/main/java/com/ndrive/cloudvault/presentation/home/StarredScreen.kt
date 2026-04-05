@@ -30,6 +30,8 @@ import kotlinx.coroutines.delay
 
 import com.ndrive.cloudvault.presentation.home.components.GridListToggle
 import com.ndrive.cloudvault.presentation.home.components.CreateNewBottomSheet
+import com.ndrive.cloudvault.presentation.home.components.AppDrawer
+import com.ndrive.cloudvault.presentation.home.components.TopSearchBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +40,7 @@ fun StarredScreen(navController: NavController) {
     var isLoading by remember { mutableStateOf(true) }
 
     var showCreateSheet by remember { mutableStateOf(false) }
+    var showAppDrawer by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     
     val backgroundColor = Color(0xFFF8F9FA)
@@ -60,40 +63,10 @@ fun StarredScreen(navController: NavController) {
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
                 // Beautiful Pill Search Bar
-                Surface(
-                    shape = CircleShape,
-                    color = searchBarColor,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(horizontal = 16.dp)
-                        .clickable { /* Handle search */ }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Menu, "Menu", tint = Color.DarkGray)
-                        Spacer(Modifier.width(16.dp))
-                        Text(
-                            text = "Search in Drive",
-                            fontSize = 16.sp,
-                            color = Color.DarkGray,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Surface(
-                            shape = CircleShape,
-                            color = avatarColor,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("R", color = Color.White, fontWeight = FontWeight.Medium)
-                            }
-                        }
-                    }
-                }
+                TopSearchBar(
+                    onMenuClick = { showAppDrawer = true },
+                    onProfileClick = { navController.navigate("profile_route") }
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 HorizontalDivider(thickness = 1.dp, color = Color(0xFFE0E0E0))
             }
@@ -197,4 +170,9 @@ fun StarredScreen(navController: NavController) {
             onDismissRequest = { showCreateSheet = false }
         )
     }
+
+    AppDrawer(
+        isOpen = showAppDrawer,
+        onClose = { showAppDrawer = false }
+    )
 }

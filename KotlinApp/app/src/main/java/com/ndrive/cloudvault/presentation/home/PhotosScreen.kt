@@ -1,4 +1,4 @@
-﻿package com.ndrive.cloudvault.presentation.home
+package com.ndrive.cloudvault.presentation.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,6 +31,8 @@ import com.ndrive.cloudvault.presentation.home.components.FileRow
 import com.ndrive.cloudvault.presentation.home.components.GridListToggle
 import com.ndrive.cloudvault.presentation.home.components.NDriveBottomNav
 import com.ndrive.cloudvault.presentation.home.components.CreateNewBottomSheet
+import com.ndrive.cloudvault.presentation.home.components.TopSearchBar
+import com.ndrive.cloudvault.presentation.home.components.AppDrawer
 import kotlinx.coroutines.delay
 
 @Composable
@@ -70,6 +72,7 @@ fun PhotosScreen(navController: NavController) {
     var isLoading by remember { mutableStateOf(true) }
 
     var showCreateSheet by remember { mutableStateOf(false) }
+    var showAppDrawer by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
 
     val backgroundColor = Color(0xFFF8F9FA)
@@ -91,40 +94,10 @@ fun PhotosScreen(navController: NavController) {
                     .statusBarsPadding()
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    shape = CircleShape,
-                    color = searchBarColor,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(horizontal = 16.dp)
-                        .clickable { /* Handle search */ }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Menu, "Menu", tint = Color.DarkGray)
-                        Spacer(Modifier.width(16.dp))
-                        Text(
-                            text = "Search in Photos",
-                            fontSize = 16.sp,
-                            color = Color.DarkGray,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Surface(
-                            shape = CircleShape,
-                            color = avatarColor,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("R", color = Color.White, fontWeight = FontWeight.Medium)
-                            }
-                        }
-                    }
-                }
+                TopSearchBar(
+                    onMenuClick = { showAppDrawer = true },
+                    onProfileClick = { navController.navigate("profile_route") }
+                )
                 Spacer(modifier = Modifier.height(16.dp))
             }
         },
@@ -255,4 +228,8 @@ fun PhotosScreen(navController: NavController) {
             onDismissRequest = { showCreateSheet = false }
         )
     }
+    AppDrawer(
+        isOpen = showAppDrawer,
+        onClose = { showAppDrawer = false }
+    )
 }
