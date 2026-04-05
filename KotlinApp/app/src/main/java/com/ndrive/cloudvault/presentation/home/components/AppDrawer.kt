@@ -1,5 +1,7 @@
 package com.ndrive.cloudvault.presentation.home.components
 
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -37,14 +39,8 @@ fun AppDrawer(
 ) {
     AnimatedVisibility(
         visible = isOpen,
-        enter = slideInHorizontally(
-            initialOffsetX = { fullWidth -> -fullWidth },
-            animationSpec = tween(durationMillis = 300)
-        ) + fadeIn(),
-        exit = slideOutHorizontally(
-            targetOffsetX = { fullWidth -> -fullWidth },
-            animationSpec = tween(durationMillis = 300)
-        ) + fadeOut()
+        enter = fadeIn(animationSpec = tween(durationMillis = 300)),
+        exit = fadeOut(animationSpec = tween(durationMillis = 300))
     ) {
         Box(
             modifier = Modifier
@@ -55,17 +51,28 @@ fun AppDrawer(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                 ) { onClose() }
         ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.85f)
-                    .align(Alignment.CenterStart)
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-                    ) {
-                        // Consume clicks so they don't close the overlay
-                    },
+            AnimatedVisibility(
+                visible = isOpen,
+                enter = slideInHorizontally(
+                    initialOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                ),
+                exit = slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                ),
+                modifier = Modifier.align(Alignment.CenterStart)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(0.85f)
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                        ) {
+                            // Consume clicks so they don't close the overlay
+                        },
                 color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
                 shadowElevation = 8.dp

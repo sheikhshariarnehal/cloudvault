@@ -21,6 +21,7 @@ import com.ndrive.cloudvault.presentation.home.HomeScreen
 import com.ndrive.cloudvault.presentation.home.FilesScreen
 import com.ndrive.cloudvault.presentation.home.StarredScreen
 import com.ndrive.cloudvault.presentation.home.PhotosScreen
+import com.ndrive.cloudvault.presentation.profile.ProfileScreen
 import androidx.compose.material3.Scaffold
 import com.ndrive.cloudvault.presentation.home.components.NDriveBottomNav
 
@@ -88,6 +89,9 @@ fun NDriveNavGraph(navController: NavHostController) {
             popExitTransition = { fadeOut(animationSpec = tween(200)) }
         ) {
             PhotosScreen(navController)
+        }
+        composable("profile_route") {
+            ProfileScreen(navController)
         }
     }
 }
