@@ -30,6 +30,7 @@ import com.ndrive.cloudvault.presentation.common.shimmerEffect
 import com.ndrive.cloudvault.presentation.home.components.FileRow
 import com.ndrive.cloudvault.presentation.home.components.GridListToggle
 import com.ndrive.cloudvault.presentation.home.components.NDriveBottomNav
+import com.ndrive.cloudvault.presentation.home.components.CreateNewBottomSheet
 import kotlinx.coroutines.delay
 
 @Composable
@@ -67,6 +68,9 @@ fun PhotoThumbnail(url: String, isLoading: Boolean = false) {
 fun PhotosScreen(navController: NavController) {
     var isGridView by remember { mutableStateOf(true) } // Photos usually default to grid
     var isLoading by remember { mutableStateOf(true) }
+
+    var showCreateSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
 
     val backgroundColor = Color(0xFFF8F9FA)
     val searchBarColor = Color(0xFFEDF2FA)
@@ -131,7 +135,7 @@ fun PhotosScreen(navController: NavController) {
                 shadowElevation = 4.dp,
                 modifier = Modifier
                     .padding(end = 8.dp, bottom = 8.dp)
-                    .clickable { /* New Action */ }
+                    .clickable { showCreateSheet = true }
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
@@ -243,5 +247,12 @@ fun PhotosScreen(navController: NavController) {
                 }
             }
         }
+    }
+    
+    if (showCreateSheet) {
+        CreateNewBottomSheet(
+            sheetState = sheetState,
+            onDismissRequest = { showCreateSheet = false }
+        )
     }
 }

@@ -30,6 +30,7 @@ import com.ndrive.cloudvault.presentation.home.components.NDriveBottomNav
 import kotlinx.coroutines.delay
 
 import com.ndrive.cloudvault.presentation.home.components.GridListToggle
+import com.ndrive.cloudvault.presentation.home.components.CreateNewBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +38,9 @@ fun HomeScreen(navController: androidx.navigation.NavController) {
     var isGridView by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedTabIndex by remember { mutableStateOf(0) }
+    
+    var showCreateSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
 
     val backgroundColor = Color(0xFFF8F9FA) // Light grey background like Google Drive
     val searchBarColor = Color(0xFFEDF2FA)
@@ -145,7 +149,7 @@ fun HomeScreen(navController: androidx.navigation.NavController) {
                 shadowElevation = 4.dp, // Soft shadow
                 modifier = Modifier
                     .padding(end = 8.dp, bottom = 8.dp)
-                    .clickable { /* New Action */ }
+                    .clickable { showCreateSheet = true }
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
@@ -233,5 +237,12 @@ fun HomeScreen(navController: androidx.navigation.NavController) {
                 }
             }
         }
+    }
+    
+    if (showCreateSheet) {
+        CreateNewBottomSheet(
+            sheetState = sheetState,
+            onDismissRequest = { showCreateSheet = false }
+        )
     }
 }
