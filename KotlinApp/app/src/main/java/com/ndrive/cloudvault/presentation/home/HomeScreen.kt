@@ -1,5 +1,8 @@
 package com.ndrive.cloudvault.presentation.home
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.ndrive.cloudvault.domain.model.UploadState
 import com.ndrive.cloudvault.presentation.home.components.AppDrawer
 import com.ndrive.cloudvault.presentation.home.components.CreateNewBottomSheet
 import com.ndrive.cloudvault.presentation.home.components.FileCard
@@ -64,6 +69,7 @@ import com.ndrive.cloudvault.presentation.home.components.FolderCard
 import com.ndrive.cloudvault.presentation.home.components.GridListToggle
 import com.ndrive.cloudvault.presentation.home.components.NDriveBottomNav
 import com.ndrive.cloudvault.presentation.home.components.TopSearchBar
+import com.ndrive.cloudvault.presentation.upload.UploadProgressOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,8 +81,23 @@ fun HomeScreen(
     var selectedTabIndex by remember { mutableStateOf(0) }
     var showCreateSheet by remember { mutableStateOf(false) }
     var showAppDrawer by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState()
     val uiState by viewModel.uiState.collectAsState()
+
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { fileUri ->
+        if (fileUri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    fileUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            viewModel.uploadFile(fileUri)
+        }
+    }
 
     val visibleFolders = remember(uiState.folders, uiState.query) { viewModel.filteredFolders() }
     val visibleFiles = remember(uiState.files, uiState.query) { viewModel.filteredFiles() }
@@ -230,6 +251,18 @@ fun HomeScreen(
                 }
             }
 
+            if (uiState.uploadState !is UploadState.Idle) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    UploadProgressOverlay(
+                        state = uiState.uploadState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        onDismiss = { viewModel.clearUploadState() }
+                    )
+                }
+            }
+
             if (uiState.isLoading) {
                 items(10) {
                     if (isGridView) {
@@ -358,7 +391,11 @@ fun HomeScreen(
     if (showCreateSheet) {
         CreateNewBottomSheet(
             sheetState = sheetState,
-            onDismissRequest = { showCreateSheet = false }
+            onDismissRequest = { showCreateSheet = false },
+            onUploadClick = {
+                showCreateSheet = false
+                openDocumentLauncher.launch(arrayOf("*/*"))
+            }
         )
     }
 

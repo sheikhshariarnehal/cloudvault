@@ -19,7 +19,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun CreateNewBottomSheet(
     sheetState: SheetState,
-    onDismissRequest: () -> Unit
+    onDismissRequest: () -> Unit,
+    onUploadClick: (() -> Unit)? = null,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -46,7 +47,17 @@ fun CreateNewBottomSheet(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 CreateNewItem(icon = Icons.Default.CreateNewFolder, label = "Folder", onClick = onDismissRequest)
-                CreateNewItem(icon = Icons.Default.FileUpload, label = "Upload", onClick = onDismissRequest)
+                CreateNewItem(
+                    icon = Icons.Default.FileUpload,
+                    label = "Upload",
+                    onClick = {
+                        if (onUploadClick != null) {
+                            onUploadClick()
+                        } else {
+                            onDismissRequest()
+                        }
+                    }
+                )
                 CreateNewItem(icon = Icons.Default.CameraAlt, label = "Scan", onClick = onDismissRequest)
             }
         }

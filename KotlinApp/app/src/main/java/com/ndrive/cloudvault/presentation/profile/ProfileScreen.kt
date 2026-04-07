@@ -18,24 +18,32 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.ManageAccounts
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -48,12 +56,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -118,6 +130,9 @@ fun ProfileScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    var telegramPhoneInput by rememberSaveable { mutableStateOf("") }
+    var telegramCodeInput by rememberSaveable { mutableStateOf("") }
+    var telegramPasswordInput by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { message -> snackbarHostState.showSnackbar(message) }
@@ -134,6 +149,14 @@ fun ProfileScreen(
                 // Clear stack after sign out.
             }
             navController.navigate("login")
+        }
+    }
+
+    LaunchedEffect(uiState.telegramDialogOpen) {
+        if (!uiState.telegramDialogOpen) {
+            telegramPhoneInput = ""
+            telegramCodeInput = ""
+            telegramPasswordInput = ""
         }
     }
 
@@ -283,6 +306,88 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(24.dp))
                 }
 
+                item(key = "Telegram_Storage") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(20.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Outlined.PhoneAndroid,
+                                contentDescription = null,
+                                tint = Color(0xFF0B57D0)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Telegram Storage", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        if (uiState.isTelegramStatusLoading) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    "Checking connection...",
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        } else if (uiState.isTelegramConnected) {
+                            Text(
+                                text = uiState.telegramPhone?.let { "Connected: $it" } ?: "Connected",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Uploads are stored in your own Telegram account.",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            OutlinedButton(
+                                onClick = { viewModel.disconnectTelegram() },
+                                enabled = !uiState.isTelegramActionLoading,
+                            ) {
+                                if (uiState.isTelegramActionLoading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text("Disconnect Telegram")
+                            }
+                        } else {
+                            Text(
+                                text = "Connect your Telegram number to store uploads in your own account.",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Button(
+                                onClick = {
+                                    telegramPhoneInput = uiState.telegramPhone ?: ""
+                                    viewModel.openTelegramDialog()
+                                },
+                                enabled = !uiState.isTelegramActionLoading,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Link,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Connect Telegram")
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+
                 item(key = "Settings_Header") {
                     Text(
                         text = "Settings",
@@ -338,6 +443,142 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+
+    if (uiState.telegramDialogOpen) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!uiState.isTelegramActionLoading) {
+                    viewModel.closeTelegramDialog()
+                }
+            },
+            title = {
+                Text(
+                    when (uiState.telegramConnectStep) {
+                        TelegramConnectStep.PHONE -> "Connect Telegram"
+                        TelegramConnectStep.CODE -> "Enter Verification Code"
+                        TelegramConnectStep.PASSWORD -> "Enter 2FA Password"
+                        TelegramConnectStep.SUCCESS -> "Telegram Connected"
+                    }
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = when (uiState.telegramConnectStep) {
+                            TelegramConnectStep.PHONE -> "Use full international format, e.g. +8801XXXXXXXXX"
+                            TelegramConnectStep.CODE -> "We sent a code to your Telegram app."
+                            TelegramConnectStep.PASSWORD -> "Your account has two-factor authentication enabled."
+                            TelegramConnectStep.SUCCESS -> "All new uploads will be stored in your Telegram account."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+
+                    when (uiState.telegramConnectStep) {
+                        TelegramConnectStep.PHONE -> {
+                            OutlinedTextField(
+                                value = telegramPhoneInput,
+                                onValueChange = { telegramPhoneInput = it },
+                                label = { Text("Phone Number") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                singleLine = true,
+                            )
+                        }
+                        TelegramConnectStep.CODE -> {
+                            OutlinedTextField(
+                                value = telegramCodeInput,
+                                onValueChange = { telegramCodeInput = it.filter(Char::isDigit) },
+                                label = { Text("Code") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                            )
+                        }
+                        TelegramConnectStep.PASSWORD -> {
+                            OutlinedTextField(
+                                value = telegramPasswordInput,
+                                onValueChange = { telegramPasswordInput = it },
+                                label = { Text("Password") },
+                                singleLine = true,
+                            )
+                        }
+                        TelegramConnectStep.SUCCESS -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Filled.CheckCircle,
+                                    contentDescription = null,
+                                    tint = Color(0xFF2E7D32)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Verification complete")
+                            }
+                        }
+                    }
+
+                    if (!uiState.telegramFlowError.isNullOrBlank()) {
+                        Text(
+                            text = uiState.telegramFlowError ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                when (uiState.telegramConnectStep) {
+                    TelegramConnectStep.PHONE -> {
+                        Button(
+                            onClick = { viewModel.sendTelegramCode(telegramPhoneInput) },
+                            enabled = !uiState.isTelegramActionLoading && telegramPhoneInput.isNotBlank(),
+                        ) {
+                            if (uiState.isTelegramActionLoading) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text("Send Code")
+                        }
+                    }
+                    TelegramConnectStep.CODE -> {
+                        Button(
+                            onClick = { viewModel.verifyTelegramCode(telegramCodeInput) },
+                            enabled = !uiState.isTelegramActionLoading && telegramCodeInput.isNotBlank(),
+                        ) {
+                            if (uiState.isTelegramActionLoading) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text("Verify Code")
+                        }
+                    }
+                    TelegramConnectStep.PASSWORD -> {
+                        Button(
+                            onClick = { viewModel.verifyTelegramPassword(telegramPasswordInput) },
+                            enabled = !uiState.isTelegramActionLoading && telegramPasswordInput.isNotBlank(),
+                        ) {
+                            if (uiState.isTelegramActionLoading) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text("Submit Password")
+                        }
+                    }
+                    TelegramConnectStep.SUCCESS -> {
+                        Button(onClick = { viewModel.closeTelegramDialog() }) {
+                            Text("Done")
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                if (uiState.telegramConnectStep != TelegramConnectStep.SUCCESS) {
+                    OutlinedButton(
+                        onClick = { viewModel.closeTelegramDialog() },
+                        enabled = !uiState.isTelegramActionLoading,
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            },
+        )
     }
 }
 

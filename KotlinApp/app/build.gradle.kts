@@ -28,6 +28,16 @@ val supabaseAnonKey =
         ?: System.getenv("SUPABASE_ANON_KEY")
         ?: ""
 
+val tdlibServiceUrl =
+    localProperties.getProperty("TDLIB_SERVICE_URL")
+        ?: System.getenv("TDLIB_SERVICE_URL")
+        ?: "http://10.0.2.2:3001"
+
+val tdlibServiceApiKey =
+    localProperties.getProperty("TDLIB_SERVICE_API_KEY")
+        ?: System.getenv("TDLIB_SERVICE_API_KEY")
+        ?: ""
+
 android {
     namespace = "com.ndrive.cloudvault"
     compileSdk = 35
@@ -48,6 +58,16 @@ android {
             "String",
             "SUPABASE_ANON_KEY",
             "\"${supabaseAnonKey.escapeForBuildConfig()}\""
+        )
+        buildConfigField(
+            "String",
+            "TDLIB_SERVICE_URL",
+            "\"${tdlibServiceUrl.escapeForBuildConfig()}\""
+        )
+        buildConfigField(
+            "String",
+            "TDLIB_SERVICE_API_KEY",
+            "\"${tdlibServiceApiKey.escapeForBuildConfig()}\""
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
