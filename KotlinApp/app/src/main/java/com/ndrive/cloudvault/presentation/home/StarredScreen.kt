@@ -204,7 +204,7 @@ fun StarredScreen(
                     items(uiState.files.size) { index -> 
                         val file = uiState.files[index]
                         if(isGridView) {
-                           FileCard(name=file.name, isImage=file.mimeType.startsWith("image/")) {} 
+                           FileCard(name=file.name, thumbnailUrl=file.thumbnailUrl, isImage=file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {} 
                         } else {
                            FileRow(
                                name=file.name, 
@@ -226,5 +226,6 @@ fun StarredScreen(
         )
     }
 }
+
 
 

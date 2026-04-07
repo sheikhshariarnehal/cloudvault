@@ -201,7 +201,7 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
                     items(uiState.files.size) { index -> 
                         val file = uiState.files[index]
                         if(isGridView) {
-                           FileCard(name=file.name, isImage=file.mimeType.startsWith("image/")) {} 
+                           FileCard(name=file.name, thumbnailUrl=file.thumbnailUrl, isImage=file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {} 
                         } else {
                            FileRow(
                                name=file.name, 
@@ -225,6 +225,7 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
 }
 
 class FileMock(val name: String, val subtitle: String, val tint: Color, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+
 
 
 

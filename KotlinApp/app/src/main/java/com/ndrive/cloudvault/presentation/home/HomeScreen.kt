@@ -291,7 +291,7 @@ fun HomeScreen(
                         FileCard(
                             name = file.name,
                             thumbnailUrl = file.thumbnailUrl,
-                            isImage = file.mimeType.startsWith("image/")
+                            isImage = file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")
                         ) {}
                     } else {
                         val subtitle = buildString {
@@ -377,4 +377,5 @@ private fun formatBytes(bytes: Long): String {
     val gb = mb / 1024.0
     return "%.2f GB".format(gb)
 }
+
 
