@@ -1,4 +1,4 @@
-﻿package com.ndrive.cloudvault.presentation.navigation
+package com.ndrive.cloudvault.presentation.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween

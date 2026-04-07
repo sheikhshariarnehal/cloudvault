@@ -5,5 +5,5 @@ data class DriveFolder(
 	val name: String,
 	val parentId: String?,
 	val updatedAt: String?,
-	val color: String?
-)
+        val color: String?,
+        val isStarred: Boolean = false)

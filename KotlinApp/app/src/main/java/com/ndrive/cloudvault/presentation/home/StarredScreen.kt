@@ -1,4 +1,4 @@
-﻿package com.ndrive.cloudvault.presentation.home
+package com.ndrive.cloudvault.presentation.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,20 +11,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Slideshow
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
 import com.ndrive.cloudvault.presentation.home.components.FileCard
 import com.ndrive.cloudvault.presentation.home.components.FileRow
+import com.ndrive.cloudvault.presentation.home.components.FolderCard
 import com.ndrive.cloudvault.presentation.home.components.NDriveBottomNav
 import kotlinx.coroutines.delay
 
@@ -35,20 +41,21 @@ import com.ndrive.cloudvault.presentation.home.components.TopSearchBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StarredScreen(navController: NavController) {
+fun StarredScreen(
+    navController: androidx.navigation.NavController,
+    viewModel: StarredViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
     var isGridView by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(true) }
+
+    var selectedTabIndex by remember { mutableStateOf(2) } // Defaulting to "Starred"
 
     var showCreateSheet by remember { mutableStateOf(false) }
     var showAppDrawer by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
-    
-    val backgroundColor = MaterialTheme.colorScheme.background
 
-    LaunchedEffect(Unit) {
-        delay(1200)
-        isLoading = false
-    }
+    val backgroundColor = MaterialTheme.colorScheme.background
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     Scaffold(
         containerColor = backgroundColor,
@@ -60,117 +67,164 @@ fun StarredScreen(navController: NavController) {
                     .statusBarsPadding()
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
-                // Beautiful Pill Search Bar
                 TopSearchBar(
                     onMenuClick = { showAppDrawer = true },
-                    onProfileClick = { navController.navigate("profile_route") }
+                    onProfileClick = { navController.navigate("profile_route") },
+                    onSearchClick = { navController.navigate("search") }
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant)
-            }
-        },
-        floatingActionButton = {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shadowElevation = 4.dp,
-                modifier = Modifier
-                    .padding(end = 8.dp, bottom = 8.dp)
-                    .clickable { showCreateSheet = true }
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "New", tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        "New",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 15.sp
-                    )
-                }
-            }
-        },
-        bottomBar = { NDriveBottomNav(navController) }
-    ) { padding ->
-        LazyVerticalGrid(
-            columns = if (isGridView) GridCells.Fixed(2) else GridCells.Fixed(1),
-            contentPadding = PaddingValues(
-                start = if (isGridView) 16.dp else 0.dp,
-                end = if (isGridView) 16.dp else 0.dp,
-                top = padding.calculateTopPadding(),
-                bottom = padding.calculateBottomPadding() + 88.dp
-            ),
-            horizontalArrangement = Arrangement.spacedBy(if (isGridView) 12.dp else 0.dp),
-            verticalArrangement = Arrangement.spacedBy(if (isGridView) 12.dp else 0.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+
+                // Tabs and Grid/List toggle row
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = if (isGridView) 0.dp else 16.dp, vertical = 8.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "Starred files",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    val tabs = listOf("All", "Recent", "Starred")
+                    ScrollableTabRow(
+                        selectedTabIndex = selectedTabIndex,
+                        containerColor = backgroundColor,
+                        contentColor = primaryColor,
+                        edgePadding = 0.dp,
+                        divider = {},
+                        indicator = { tabPositions ->
+                            if (selectedTabIndex < tabPositions.size) {
+                                Box(
+                                    modifier = Modifier
+                                        .tabIndicatorOffset(tabPositions[selectedTabIndex])
+                                        .height(3.dp)
+                                        .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                                        .background(primaryColor)
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        tabs.forEachIndexed { index, title ->
+                            Tab(
+                                selected = selectedTabIndex == index,
+                                onClick = { selectedTabIndex = index },
+                                text = {
+                                    Text(
+                                        text = title,
+                                        fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (selectedTabIndex == index) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    GridListToggle(
+                        isGridView = isGridView,
+                        onToggle = { isGridView = !isGridView }
                     )
-                    GridListToggle(isGridView = isGridView, onToggle = { isGridView = !isGridView })
                 }
             }
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showCreateSheet = true },
+                containerColor = primaryColor,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .shadow(8.dp, RoundedCornerShape(16.dp))
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add New")
+            }
+        },
+        bottomBar = {
+            NDriveBottomNav(navController = navController)
+        }
+    ) { paddingValues ->
+        if (showAppDrawer) {
+            AppDrawer(isOpen = showAppDrawer, onClose = { showAppDrawer = false })
+        }
 
-            if (isLoading) {
-                items(5) {
-                    if (isGridView) FileCard(name = "", isLoading = true) {}
-                    else {
-                        Box(
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(if (isGridView) 2 else 1),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                if (uiState.isLoading) {
+                    items(8) {
+                        if (isGridView) FileCard(name = "", isLoading = true) {}
+                        else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(72.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                        }
+                    }
+                } else if (uiState.files.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(64.dp)
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.LightGray.copy(alpha=0.3f))
-                        )
+                                .padding(vertical = 64.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "No Starred Files",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Add files to starred to see them here",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                }
-            } else {
-                val mockFiles = listOf(
-                    Triple("Project Harrison Tracker", "You opened \u2022 Oct 31, 2022", Color(0xFF0F9D58)),
-                    Triple("Leadership & Organization...", "Mustafa Krishnamurthy replied...", Color(0xFFF4B400)),
-                    Triple("Important Passwords", "You edited \u2022 Last week", Color(0xFF4285F4))
-                )
+                } else {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                       Text(
+                            "Starred Files",
+                            modifier = Modifier.padding(start = if (isGridView) 0.dp else 16.dp, end = if (isGridView) 0.dp else 16.dp, top = 8.dp, bottom = 8.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                       )
+                    }
 
-                items(mockFiles.size) { index ->
-                    if (isGridView) {
-                        FileCard(name = mockFiles[index].first, isImage = false) {}
-                    } else {
-                        FileRow(
-                            name = mockFiles[index].first,
-                            subtitle = mockFiles[index].second,
-                            iconTint = mockFiles[index].third,
-                            isLoading = false
-                        ) {}
+                    items(uiState.files.size) { index -> 
+                        val file = uiState.files[index]
+                        if(isGridView) {
+                           FileCard(name=file.name, isImage=file.mimeType.startsWith("image/")) {} 
+                        } else {
+                           FileRow(
+                               name=file.name, 
+                               subtitle=file.updatedAt?:"Unknown", 
+                               iconTint = Color(0xFFFFC107),
+                               isLoading=false
+                           ) {} 
+                        } 
                     }
                 }
             }
         }
     }
-    
+
     if (showCreateSheet) {
         CreateNewBottomSheet(
             sheetState = sheetState,
             onDismissRequest = { showCreateSheet = false }
         )
     }
-
-    AppDrawer(
-        isOpen = showAppDrawer,
-        onClose = { showAppDrawer = false }
-    )
 }
+
+

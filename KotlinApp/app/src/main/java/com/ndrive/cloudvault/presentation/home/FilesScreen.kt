@@ -1,4 +1,4 @@
-﻿package com.ndrive.cloudvault.presentation.home
+package com.ndrive.cloudvault.presentation.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,6 +14,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Slideshow
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -27,32 +30,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ndrive.cloudvault.presentation.home.components.FileCard
 import com.ndrive.cloudvault.presentation.home.components.FileRow
-import com.ndrive.cloudvault.presentation.home.components.NDriveBottomNav
+import com.ndrive.cloudvault.presentation.home.components.FolderCard
+import com.ndrive.cloudvault.presentation.home.components.NDriveBottomNav       
 import kotlinx.coroutines.delay
 
-import com.ndrive.cloudvault.presentation.home.components.GridListToggle
-import com.ndrive.cloudvault.presentation.home.components.CreateNewBottomSheet
+import com.ndrive.cloudvault.presentation.home.components.GridListToggle        
+import com.ndrive.cloudvault.presentation.home.components.CreateNewBottomSheet  
 import com.ndrive.cloudvault.presentation.home.components.AppDrawer
 import com.ndrive.cloudvault.presentation.home.components.TopSearchBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FilesScreen(navController: androidx.navigation.NavController) {
+fun FilesScreen(navController: androidx.navigation.NavController, viewModel: FilesViewModel = androidx.hilt.navigation.compose.hiltViewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
     var isGridView by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(true) }
+
     var selectedTabIndex by remember { mutableStateOf(0) }
 
     var showCreateSheet by remember { mutableStateOf(false) }
     var showAppDrawer by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
-    
+
     val backgroundColor = MaterialTheme.colorScheme.background
     val primaryColor = MaterialTheme.colorScheme.primary
-
-    LaunchedEffect(Unit) {
-        delay(1200)
-        isLoading = false
-    }
 
     Scaffold(
         containerColor = backgroundColor,
@@ -64,176 +64,152 @@ fun FilesScreen(navController: androidx.navigation.NavController) {
                     .statusBarsPadding()
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
-                // Beautiful Pill Search Bar
                 TopSearchBar(
                     onMenuClick = { showAppDrawer = true },
-                    onProfileClick = { navController.navigate("profile_route") }
+                    onProfileClick = { navController.navigate("profile_route") },
+                    onSearchClick = { navController.navigate("search") }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Custom Tab Row for Files
-                TabRow(
-                    selectedTabIndex = selectedTabIndex,
-                    containerColor = backgroundColor,
-                    contentColor = primaryColor,
-                    divider = { HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant) },
-                    indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
-                            height = 3.dp,
-                            color = primaryColor
-                        )
-                    }
+                // Tabs and Grid/List toggle row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Tab(
-                        selected = selectedTabIndex == 0,
-                        onClick = { selectedTabIndex = 0 },
-                        text = {
-                            Text(
-                                "My Drive",
-                                fontWeight = if (selectedTabIndex == 0) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (selectedTabIndex == 0) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant
+                    val tabs = listOf("All", "Recent", "Starred")
+                    ScrollableTabRow(
+                        selectedTabIndex = selectedTabIndex,
+                        containerColor = backgroundColor,
+                        contentColor = primaryColor,
+                        edgePadding = 0.dp,
+                        divider = {},
+                        indicator = { tabPositions ->
+                            if (selectedTabIndex < tabPositions.size) {
+                                Box(
+                                    modifier = Modifier
+                                        .tabIndicatorOffset(tabPositions[selectedTabIndex])
+                                        .height(3.dp)
+                                        .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                                        .background(primaryColor)
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        tabs.forEachIndexed { index, title ->
+                            Tab(
+                                selected = selectedTabIndex == index,
+                                onClick = { selectedTabIndex = index },
+                                text = {
+                                    Text(
+                                        text = title,
+                                        fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (selectedTabIndex == index) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                modifier = Modifier.padding(vertical = 8.dp)
                             )
                         }
-                    )
-                    Tab(
-                        selected = selectedTabIndex == 1,
-                        onClick = { selectedTabIndex = 1 },
-                        text = {
-                            Text(
-                                "Shared",
-                                fontWeight = if (selectedTabIndex == 1) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (selectedTabIndex == 1) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    GridListToggle(
+                        isGridView = isGridView,
+                        onToggle = { isGridView = !isGridView }
                     )
                 }
             }
         },
         floatingActionButton = {
-            Surface(
+            FloatingActionButton(
+                onClick = { showCreateSheet = true },
+                containerColor = primaryColor,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shadowElevation = 4.dp,
                 modifier = Modifier
-                    .padding(end = 8.dp, bottom = 8.dp)
-                    .clickable { showCreateSheet = true }
+                    .padding(bottom = 16.dp)
+                    .shadow(8.dp, RoundedCornerShape(16.dp))
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "New", tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        "New",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 15.sp
-                    )
-                }
+                Icon(Icons.Default.Add, contentDescription = "Add New")
             }
         },
-        bottomBar = { NDriveBottomNav(navController) }
-    ) { padding ->
-        LazyVerticalGrid(
-            columns = if (isGridView) GridCells.Fixed(2) else GridCells.Fixed(1),
-            contentPadding = PaddingValues(
-                start = if (isGridView) 16.dp else 0.dp,
-                end = if (isGridView) 16.dp else 0.dp,
-                top = padding.calculateTopPadding(),
-                bottom = padding.calculateBottomPadding() + 88.dp
-            ),
-            horizontalArrangement = Arrangement.spacedBy(if (isGridView) 12.dp else 0.dp),
-            verticalArrangement = Arrangement.spacedBy(if (isGridView) 12.dp else 0.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = if (isGridView) 0.dp else 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Name",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    GridListToggle(isGridView = isGridView, onToggle = { isGridView = !isGridView })
-                }
-            }
+        bottomBar = {
+            NDriveBottomNav(navController = navController)
+        }
+    ) { paddingValues ->
+        AppDrawer(isOpen = showAppDrawer, onClose = { showAppDrawer = false })
 
-            if (isLoading) {
-                items(8) {
-                    if (isGridView) FileCard(name = "", isLoading = true) {}
-                    else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(64.dp)
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.LightGray.copy(alpha=0.3f))
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            // Folders and Files content
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(if (isGridView) 2 else 1),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                if (uiState.isLoading) {
+                    items(8) {
+                        if (isGridView) FileCard(name = "", isLoading = true) {}
+                        else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(72.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                        }
+                    }
+                } else {
+                    // Folders Header
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            "Folders",
+                            modifier = Modifier.padding(start = if (isGridView) 0.dp else 16.dp, end = if (isGridView) 0.dp else 16.dp, top = 8.dp, bottom = 8.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-            } else {
-                val mockFolders = listOf(
-                    "Work Documents", "Vacation Photos", "Backups"
-                )
-                val mockFiles = listOf(
-                    Triple("Budget Q3.xlsx", "Modified Today", Color(0xFF0F9D58)),
-                    Triple("Presentation.pptx", "Modified Yesterday", Color(0xFFF4B400)),
-                    Triple("Resume.pdf", "Modified 3 days ago", Color(0xFFDB4437))
-                )
 
-                // Folders Header
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                   Text(
-                        "Folders", 
-                        modifier = Modifier.padding(horizontal = if (isGridView) 0.dp else 16.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                   )
-                }
-
-                items(mockFolders.size) { index ->
-                    if (isGridView) {
-                        FileCard(name = mockFolders[index], isImage = false) {}
-                    } else {
-                        FileRow(
-                            name = mockFolders[index],
-                            subtitle = "2 files",
-                            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            isLoading = false
-                        ) {}
+                    items(uiState.folders.size) { index ->
+                        val folder = uiState.folders[index]
+                        if (isGridView) {
+                            FileCard(name = folder.name, isImage = false) {}
+                        } else {
+                            FolderCard(
+                                name = folder.name,
+                                subtitle = folder.updatedAt ?: "Unknown",
+                                iconTint = Color(0xFF4285F4)
+                            ) {}
+                        }
                     }
-                }
 
-                // Files Header
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                   Text(
-                        "Files", 
-                        modifier = Modifier.padding(start = if (isGridView) 0.dp else 16.dp, end = if (isGridView) 0.dp else 16.dp, top = 24.dp, bottom = 8.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                   )
-                }
+                    // Files Header
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                       Text(
+                            "Files",
+                            modifier = Modifier.padding(start = if (isGridView) 0.dp else 16.dp, end = if (isGridView) 0.dp else 16.dp, top = 24.dp, bottom = 8.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                       )
+                    }
 
-                items(mockFiles.size) { index ->
-                    if (isGridView) {
-                        FileCard(name = mockFiles[index].first, isImage = false) {}
-                    } else {
-                        FileRow(
-                            name = mockFiles[index].first,
-                            subtitle = mockFiles[index].second,
-                            iconTint = mockFiles[index].third,
-                            isLoading = false
-                        ) {}
+                    items(uiState.files.size) { index -> 
+                        val file = uiState.files[index]
+                        if(isGridView) {
+                           FileCard(name=file.name, isImage=file.mimeType.startsWith("image/")) {} 
+                        } else {
+                           FileRow(
+                               name=file.name, 
+                               subtitle=file.updatedAt?:"Unknown", 
+                               iconTint = Color(0xFFEA4335),
+                               isLoading=false
+                           ) {} 
+                        } 
                     }
                 }
             }
@@ -246,9 +222,11 @@ fun FilesScreen(navController: androidx.navigation.NavController) {
             onDismissRequest = { showCreateSheet = false }
         )
     }
-
-    AppDrawer(
-        isOpen = showAppDrawer,
-        onClose = { showAppDrawer = false }
-    )
 }
+
+class FileMock(val name: String, val subtitle: String, val tint: Color, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+
+
+
+
+
