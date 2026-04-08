@@ -272,6 +272,7 @@ class TelegramRepositoryImpl @Inject constructor(
 	}
 
 	private suspend fun resolveCurrentUserId(): String? {
+		supabaseClient.auth.awaitInitialization()
 		supabaseClient.auth.currentUserOrNull()?.id?.let { return it }
 		supabaseClient.auth.currentSessionOrNull()?.user?.id?.let { return it }
 		return runCatching {

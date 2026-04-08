@@ -24,7 +24,7 @@ class AuthRepositoryImpl @Inject constructor(
 
 	override fun hasActiveSession(): Boolean {
 		if (!isConfigured()) return false
-		return !supabaseClient.auth.currentAccessTokenOrNull().isNullOrBlank()
+		return supabaseClient.auth.currentSessionOrNull() != null
 	}
 
 	override fun getCurrentAuthProfile(): AuthProfile? {

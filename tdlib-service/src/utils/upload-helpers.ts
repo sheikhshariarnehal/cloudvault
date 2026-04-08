@@ -201,47 +201,59 @@ export function extractFileInfo(
   let document: Record<string, unknown> | null = null;
   let thumbnail: Record<string, unknown> | null = null;
 
+  const asRecord = (value: unknown): Record<string, unknown> | null => {
+    return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  };
+
+  const extractThumbnailFile = (entry: Record<string, unknown> | null | undefined): Record<string, unknown> | null => {
+    const thumb = asRecord(entry?.thumbnail);
+    return asRecord(thumb?.file);
+  };
+
   switch (content._) {
     case "messagePhoto": {
-      const photo = content.photo as Record<string, unknown>;
+      const photo = asRecord(content.photo);
       const sizes = photo?.sizes as Array<Record<string, unknown>>;
       if (sizes && sizes.length > 0) {
         // Largest photo size
         const largest = sizes[sizes.length - 1];
-        document = largest.photo as Record<string, unknown>;
+        document = asRecord(largest.photo);
         // Smallest for thumbnail
         if (sizes.length > 1) {
           const smallest = sizes[0];
-          thumbnail = smallest.photo as Record<string, unknown>;
+          thumbnail = asRecord(smallest.photo);
         }
       }
       break;
     }
     case "messageVideo": {
-      const video = content.video as Record<string, unknown>;
-      document = video?.video as Record<string, unknown>;
-      const thumb = video?.thumbnail as Record<string, unknown>;
-      if (thumb) {
-        thumbnail = thumb.file as Record<string, unknown>;
-      }
+      const video = asRecord(content.video);
+      document = asRecord(video?.video);
+      thumbnail = extractThumbnailFile(video);
       break;
     }
     case "messageAudio": {
-      const audio = content.audio as Record<string, unknown>;
-      document = audio?.audio as Record<string, unknown>;
-      const thumb = audio?.album_cover_thumbnail as Record<string, unknown>;
-      if (thumb) {
-        thumbnail = thumb.file as Record<string, unknown>;
-      }
+      const audio = asRecord(content.audio);
+      document = asRecord(audio?.audio);
+      thumbnail = extractThumbnailFile(audio);
       break;
     }
     case "messageDocument": {
-      const doc = content.document as Record<string, unknown>;
-      document = doc?.document as Record<string, unknown>;
-      const thumb = doc?.thumbnail as Record<string, unknown>;
-      if (thumb) {
-        thumbnail = thumb.file as Record<string, unknown>;
-      }
+      const doc = asRecord(content.document);
+      document = asRecord(doc?.document) || asRecord(doc?.file) || doc;
+      thumbnail = extractThumbnailFile(doc);
+      break;
+    }
+    case "messageSticker": {
+      const sticker = asRecord(content.sticker);
+      document = asRecord(sticker?.sticker) || asRecord(sticker?.file) || sticker;
+      thumbnail = extractThumbnailFile(sticker);
+      break;
+    }
+    case "messageAnimation": {
+      const animation = asRecord(content.animation);
+      document = asRecord(animation?.animation) || asRecord(animation?.file) || animation;
+      thumbnail = extractThumbnailFile(animation);
       break;
     }
     default:
