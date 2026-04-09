@@ -14,12 +14,22 @@ function extractThumbnailInfo(content: Record<string, unknown>): {
   let thumbnailFileId: number | null = null;
   let minithumbnail: string | null = null;
 
+  const asRecord = (value: unknown): Record<string, unknown> | null => {
+    return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  };
+
+  const extractThumbFileId = (entry: Record<string, unknown> | null | undefined): number | null => {
+    const thumb = asRecord(entry?.thumbnail);
+    const thumbFile = asRecord(thumb?.file);
+    return (thumbFile?.id as number) ?? null;
+  };
+
   switch (content?._) {
     case "messagePhoto": {
-      const photo = content.photo as Record<string, unknown>;
+      const photo = asRecord(content.photo);
       const sizes = photo?.sizes as Array<Record<string, unknown>>;
       if (sizes?.length) {
-        const thumbFile = (sizes[0].photo as Record<string, unknown>);
+        const thumbFile = asRecord(sizes[0].photo);
         thumbnailFileId = thumbFile?.id as number ?? null;
       }
       const mini = (photo?.minithumbnail as Record<string, unknown>);
@@ -27,23 +37,27 @@ function extractThumbnailInfo(content: Record<string, unknown>): {
       break;
     }
     case "messageVideo": {
-      const video = content.video as Record<string, unknown>;
-      const thumb = video?.thumbnail as Record<string, unknown>;
-      if (thumb) {
-        const thumbFile = thumb.file as Record<string, unknown>;
-        thumbnailFileId = thumbFile?.id as number ?? null;
-      }
+      const video = asRecord(content.video);
+      thumbnailFileId = extractThumbFileId(video);
       const mini = (video?.minithumbnail as Record<string, unknown>);
       if (mini?.data) minithumbnail = `data:image/jpeg;base64,${mini.data}`;
       break;
     }
     case "messageDocument": {
-      const doc = content.document as Record<string, unknown>;
-      const thumb = doc?.thumbnail as Record<string, unknown>;
-      if (thumb) {
-        const thumbFile = thumb.file as Record<string, unknown>;
-        thumbnailFileId = thumbFile?.id as number ?? null;
-      }
+      const doc = asRecord(content.document);
+      thumbnailFileId = extractThumbFileId(doc);
+      break;
+    }
+    case "messageSticker": {
+      const sticker = asRecord(content.sticker);
+      thumbnailFileId = extractThumbFileId(sticker);
+      const mini = asRecord(sticker?.thumbnail)?.minithumbnail as Record<string, unknown> | undefined;
+      if (mini?.data) minithumbnail = `data:image/jpeg;base64,${mini.data}`;
+      break;
+    }
+    case "messageAnimation": {
+      const animation = asRecord(content.animation);
+      thumbnailFileId = extractThumbFileId(animation);
       break;
     }
   }
