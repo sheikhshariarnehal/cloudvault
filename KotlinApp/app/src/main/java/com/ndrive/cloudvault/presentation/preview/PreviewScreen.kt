@@ -5,7 +5,9 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -158,42 +160,86 @@ private fun openWithDefaultApp(
 	onOpened: () -> Unit,
 	onFailure: (String) -> Unit,
 ) {
-	val safeMime = mimeType.ifBlank { "*/*" }
+	val hasActivityContext = context.findActivity() != null
+	val normalizedMime = normalizeMimeType(mimeType)
+	val guessedMime = guessMimeTypeFromName(fileName)
+	val candidateMimes = listOf(normalizedMime, guessedMime, "*/*")
+		.filterNotNull()
+		.filter { it.isNotBlank() }
+		.distinct()
 
-	val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-		setDataAndType(fileUri, safeMime)
-		clipData = ClipData.newUri(context.contentResolver, fileName, fileUri)
-		addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-		if (context.findActivity() == null) {
-			addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+	var lastError: Throwable? = null
+	val packageManager = context.packageManager
+
+	for (candidateMime in candidateMimes) {
+		val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+			setDataAndType(fileUri, candidateMime)
+			clipData = ClipData.newUri(context.contentResolver, fileName, fileUri)
+			addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+			if (!hasActivityContext) {
+				addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+			}
+		}
+
+		val handlers = packageManager.queryIntentActivities(
+			viewIntent,
+			PackageManager.MATCH_DEFAULT_ONLY,
+		)
+
+		if (handlers.isEmpty() && candidateMime != "*/*") {
+			continue
+		}
+
+		handlers.forEach { resolveInfo ->
+			runCatching {
+				context.grantUriPermission(
+					resolveInfo.activityInfo.packageName,
+					fileUri,
+					Intent.FLAG_GRANT_READ_URI_PERMISSION,
+				)
+			}
+		}
+
+		val chooser = Intent.createChooser(viewIntent, "Open with").apply {
+			addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+			if (!hasActivityContext) {
+				addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+			}
+		}
+
+		val launched = runCatching {
+			ContextCompat.startActivity(context, chooser, null)
+		}.onFailure { error ->
+			lastError = error
+		}.isSuccess
+
+		if (launched) {
+			onOpened()
+			return
 		}
 	}
 
-	val resolver = context.packageManager
-	if (viewIntent.resolveActivity(resolver) == null) {
-		onFailure("No compatible app found on this device.")
-		return
+	val message = when (val error = lastError) {
+		is ActivityNotFoundException -> "No compatible app found on this device."
+		is SecurityException -> "Permission denied while opening this file."
+		null -> "No compatible app found on this device."
+		else -> error.message?.takeIf { it.isNotBlank() } ?: "Unable to open this file."
 	}
+	onFailure(message)
+}
 
-	val chooser = Intent.createChooser(viewIntent, "Open with").apply {
-		addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-		if (context.findActivity() == null) {
-			addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-		}
-	}
+private fun normalizeMimeType(rawMime: String?): String? {
+	if (rawMime.isNullOrBlank()) return null
+	val cleaned = rawMime.substringBefore(';').trim().lowercase()
+	if (cleaned.isBlank()) return null
+	if (cleaned == "application/octet-stream" || cleaned == "binary/octet-stream") return null
+	return cleaned
+}
 
-	runCatching {
-		ContextCompat.startActivity(context, chooser, null)
-	}.onSuccess {
-		onOpened()
-	}.onFailure { error ->
-		val message = when (error) {
-			is ActivityNotFoundException -> "No compatible app found on this device."
-			is SecurityException -> "Permission denied while opening this file."
-			else -> error.message?.takeIf { it.isNotBlank() } ?: "Unable to open this file."
-		}
-		onFailure(message)
-	}
+private fun guessMimeTypeFromName(fileName: String): String? {
+	val extension = fileName.substringAfterLast('.', "").trim().lowercase()
+	if (extension.isBlank()) return null
+	return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
 }
 
 private tailrec fun Context.findActivity(): Activity? {
