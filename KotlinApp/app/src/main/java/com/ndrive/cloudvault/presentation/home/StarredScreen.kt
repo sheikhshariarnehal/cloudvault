@@ -1,5 +1,6 @@
 package com.ndrive.cloudvault.presentation.home
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -55,6 +56,10 @@ fun StarredScreen(
     var showCreateSheet by remember { mutableStateOf(false) }
     var showAppDrawer by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
+
+    val navigateToPreview: (String) -> Unit = { fileId ->
+        navController.navigate("preview/${Uri.encode(fileId)}")
+    }
 
     val backgroundColor = MaterialTheme.colorScheme.background
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -222,14 +227,18 @@ fun StarredScreen(
                     items(uiState.files.size) { index -> 
                         val file = uiState.files[index]
                         if(isGridView) {
-                           FileCard(name=file.name, thumbnailUrl=file.thumbnailUrl, isImage=file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {} 
+                           FileCard(name=file.name, thumbnailUrl=file.thumbnailUrl, isImage=file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {
+                               navigateToPreview(file.id)
+                           }
                         } else {
                            FileRow(
                                name=file.name, 
                                subtitle=file.updatedAt?:"Unknown", 
                                iconTint = Color(0xFFFFC107),
                                isLoading=false
-                           ) {} 
+                           ) {
+                               navigateToPreview(file.id)
+                           }
                         } 
                     }
                 }

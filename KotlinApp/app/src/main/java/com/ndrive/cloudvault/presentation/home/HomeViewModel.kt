@@ -11,6 +11,7 @@ import com.ndrive.cloudvault.domain.model.UploadPhase
 import com.ndrive.cloudvault.domain.model.UploadState
 import com.ndrive.cloudvault.domain.repository.FileRepository
 import com.ndrive.cloudvault.domain.repository.FolderRepository
+import com.ndrive.cloudvault.domain.repository.TelegramRepository
 import com.ndrive.cloudvault.domain.usecase.UploadFileUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -57,6 +58,7 @@ data class HomeUiState(
     val query: String = "",
     val errorMessage: String? = null,
     val uploadPanel: UploadPanelState = UploadPanelState(),
+    val showTelegramConnectPrompt: Boolean = false,
 )
 
 @HiltViewModel
@@ -64,6 +66,7 @@ class HomeViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val fileRepository: FileRepository,
     private val folderRepository: FolderRepository,
+    private val telegramRepository: TelegramRepository,
     private val uploadFileUseCase: UploadFileUseCase,
     private val uploadPanelStore: UploadPanelStore,
 ) : ViewModel() {
@@ -117,6 +120,10 @@ class HomeViewModel @Inject constructor(
         _uiState.update { it.copy(errorMessage = null) }
     }
 
+    fun dismissTelegramConnectPrompt() {
+        _uiState.update { it.copy(showTelegramConnectPrompt = false) }
+    }
+
     fun clearUploadState() {
         uploadPanelStore.clearAll()
     }
@@ -161,21 +168,33 @@ class HomeViewModel @Inject constructor(
         if (uploadQueue.isEmpty()) return
         if (uploadPanelStore.state.value.isRunning) return
 
-        val queueItems = uploadQueue.map { fileUri ->
-            UploadItemUiState(
-                id = nextUploadId++,
-                fileName = resolveDisplayName(fileUri),
-            )
-        }
-
-        uploadPanelStore.startQueue(queueItems)
-
         viewModelScope.launch {
+            _uiState.update { it.copy(showTelegramConnectPrompt = false) }
+
+            val telegramConnected = telegramRepository.getStatus()
+                .getOrNull()
+                ?.connected
+
+            if (telegramConnected == false) {
+                _uiState.update { it.copy(showTelegramConnectPrompt = true) }
+                return@launch
+            }
+
+            val queueItems = uploadQueue.map { fileUri ->
+                UploadItemUiState(
+                    id = nextUploadId++,
+                    fileName = resolveDisplayName(fileUri),
+                )
+            }
+
+            uploadPanelStore.startQueue(queueItems)
+
             var successCount = 0
             var failedCount = 0
 
             // Upload files sequentially to keep progress predictable and avoid backend spikes.
-            queueItems.forEachIndexed { index, item ->
+            for (index in queueItems.indices) {
+                val item = queueItems[index]
                 val fileUri = uploadQueue[index]
                 var fileSuccess: UploadState.Success? = null
                 var fileError: UploadState.Error? = null
@@ -218,14 +237,36 @@ class HomeViewModel @Inject constructor(
                 } else {
                     failedCount += 1
                     val errorState = fileError ?: UploadState.Error("Upload failed")
+                    val needsTelegramConnect = isTelegramConnectionRequiredError(errorState.message)
                     uploadPanelStore.updateItem(
                         itemId = item.id,
                         status = UploadItemStatus.ERROR,
                         phase = null,
                         progressPercent = 0,
-                        message = errorState.message,
+                        message = if (needsTelegramConnect) {
+                            TELEGRAM_CONNECT_REQUIRED_MESSAGE
+                        } else {
+                            errorState.message
+                        },
                         retryAfterSeconds = errorState.retryAfterSeconds,
                     )
+
+                    if (needsTelegramConnect) {
+                        _uiState.update { it.copy(showTelegramConnectPrompt = true) }
+
+                        for (remainingItem in queueItems.drop(index + 1)) {
+                            uploadPanelStore.updateItem(
+                                itemId = remainingItem.id,
+                                status = UploadItemStatus.ERROR,
+                                phase = null,
+                                progressPercent = 0,
+                                message = TELEGRAM_CONNECT_SKIPPED_MESSAGE,
+                                retryAfterSeconds = null,
+                            )
+                            failedCount += 1
+                        }
+                        break
+                    }
                 }
             }
 
@@ -236,6 +277,12 @@ class HomeViewModel @Inject constructor(
                 totalCount = queueItems.size,
             )
         }
+    }
+
+    private fun isTelegramConnectionRequiredError(message: String?): Boolean {
+        val normalized = message?.lowercase() ?: return false
+        return normalized.contains("connect your telegram number") ||
+            normalized.contains("connect telegram")
     }
 
     private fun resolveDisplayName(fileUri: Uri): String {
@@ -264,6 +311,11 @@ class HomeViewModel @Inject constructor(
             UploadPhase.TELEGRAM -> "Uploading to Telegram"
             UploadPhase.FINALIZING -> "Finalizing"
         }
+    }
+
+    companion object {
+        private const val TELEGRAM_CONNECT_REQUIRED_MESSAGE = "Connect Telegram to continue uploads."
+        private const val TELEGRAM_CONNECT_SKIPPED_MESSAGE = "Upload skipped. Connect Telegram first."
     }
 
     fun filteredFolders(): List<DriveFolder> {

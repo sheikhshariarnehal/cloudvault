@@ -1,5 +1,6 @@
 package com.ndrive.cloudvault.presentation.home
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -46,6 +47,10 @@ import com.ndrive.cloudvault.presentation.home.components.TopSearchBar
 fun FilesScreen(navController: androidx.navigation.NavController, viewModel: FilesViewModel = androidx.hilt.navigation.compose.hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var isGridView by remember { mutableStateOf(false) }
+
+    val navigateToPreview: (String) -> Unit = { fileId ->
+        navController.navigate("preview/${Uri.encode(fileId)}")
+    }
 
     var selectedTabIndex by remember { mutableStateOf(0) }
 
@@ -219,14 +224,18 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
                     items(uiState.files.size) { index -> 
                         val file = uiState.files[index]
                         if(isGridView) {
-                           FileCard(name=file.name, thumbnailUrl=file.thumbnailUrl, isImage=file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {} 
+                           FileCard(name=file.name, thumbnailUrl=file.thumbnailUrl, isImage=file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {
+                               navigateToPreview(file.id)
+                           }
                         } else {
                            FileRow(
                                name=file.name, 
                                subtitle=file.updatedAt?:"Unknown", 
                                iconTint = Color(0xFFEA4335),
                                isLoading=false
-                           ) {} 
+                           ) {
+                               navigateToPreview(file.id)
+                           }
                         } 
                     }
                 }

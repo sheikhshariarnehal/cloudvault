@@ -487,6 +487,35 @@ fun HomeScreen(
         )
     }
 
+    if (uiState.showTelegramConnectPrompt) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissTelegramConnectPrompt() },
+            title = { Text("Connect Telegram") },
+            text = {
+                Text(
+                    "Upload needs your Telegram account connection. Connect now to continue uploading files.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.dismissTelegramConnectPrompt()
+                        navController.navigate("profile_route?openTelegramDialog=true") {
+                            launchSingleTop = true
+                        }
+                    },
+                ) {
+                    Text("Connect now")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissTelegramConnectPrompt() }) {
+                    Text("Not now")
+                }
+            },
+        )
+    }
+
     AppDrawer(
         isOpen = showAppDrawer,
         onClose = { showAppDrawer = false },

@@ -1,5 +1,6 @@
 package com.ndrive.cloudvault.presentation.search
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -198,7 +199,10 @@ fun SearchScreen(
                 // ── Results state ────────────────────────────────────────────
                 SearchResultsContent(
                     uiState = uiState,
-                    onToggleGridView = { viewModel.toggleGridView() }
+                    onToggleGridView = { viewModel.toggleGridView() },
+                    onOpenFile = { fileId ->
+                        navController.navigate("preview/${Uri.encode(fileId)}")
+                    },
                 )
             }
         }
@@ -315,7 +319,8 @@ private fun RecentSearchRow(
 @Composable
 private fun SearchResultsContent(
     uiState: SearchUiState,
-    onToggleGridView: () -> Unit
+    onToggleGridView: () -> Unit,
+    onOpenFile: (String) -> Unit,
 ) {
     val allItems = uiState.filteredFolders + uiState.filteredFiles // folders first
     val hasResults = allItems.isNotEmpty()
@@ -452,14 +457,18 @@ private fun SearchResultsContent(
                             name         = file.name,
                             thumbnailUrl = file.thumbnailUrl,
                             isImage      = file.mimeType.startsWith("image/")
-                        ) {}
+                        ) {
+                            onOpenFile(file.id)
+                        }
                     } else {
                         val subtitle = buildString {
                             append("Updated")
                             file.updatedAt?.take(10)?.let { append(" • $it") }
                             append(" • ${formatBytes(file.sizeBytes)}")
                         }
-                        FileRow(name = file.name, subtitle = subtitle) {}
+                        FileRow(name = file.name, subtitle = subtitle) {
+                            onOpenFile(file.id)
+                        }
                     }
                 }
             }

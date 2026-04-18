@@ -82,7 +82,8 @@ private data class ProfileOption(
 @Composable
 fun ProfileScreen(
     navController: NavController,
-    viewModel: ProfileViewModel = hiltViewModel()
+    openTelegramDialogOnStart: Boolean = false,
+    viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val profile = uiState.profile
@@ -133,6 +134,9 @@ fun ProfileScreen(
     var telegramPhoneInput by rememberSaveable { mutableStateOf("") }
     var telegramCodeInput by rememberSaveable { mutableStateOf("") }
     var telegramPasswordInput by rememberSaveable { mutableStateOf("") }
+    var pendingAutoOpenTelegramDialog by rememberSaveable(openTelegramDialogOnStart) {
+        mutableStateOf(openTelegramDialogOnStart)
+    }
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { message -> snackbarHostState.showSnackbar(message) }
@@ -157,6 +161,23 @@ fun ProfileScreen(
             telegramPhoneInput = ""
             telegramCodeInput = ""
             telegramPasswordInput = ""
+        }
+    }
+
+    LaunchedEffect(
+        pendingAutoOpenTelegramDialog,
+        uiState.profile,
+        uiState.isTelegramStatusLoading,
+        uiState.isTelegramConnected,
+        uiState.telegramDialogOpen,
+    ) {
+        if (!pendingAutoOpenTelegramDialog) return@LaunchedEffect
+        if (uiState.profile == null || uiState.isTelegramStatusLoading) return@LaunchedEffect
+
+        pendingAutoOpenTelegramDialog = false
+        if (!uiState.isTelegramConnected && !uiState.telegramDialogOpen) {
+            telegramPhoneInput = uiState.telegramPhone ?: ""
+            viewModel.openTelegramDialog()
         }
     }
 

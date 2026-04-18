@@ -12,15 +12,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.ndrive.cloudvault.presentation.auth.LoginScreen
 import com.ndrive.cloudvault.presentation.auth.SignupScreen
 import com.ndrive.cloudvault.presentation.home.HomeScreen
 import com.ndrive.cloudvault.presentation.home.FilesScreen
 import com.ndrive.cloudvault.presentation.home.StarredScreen
 import com.ndrive.cloudvault.presentation.home.PhotosScreen
+import com.ndrive.cloudvault.presentation.preview.PreviewScreen
 import com.ndrive.cloudvault.presentation.profile.ProfileScreen
 import com.ndrive.cloudvault.presentation.search.SearchScreen
 import com.ndrive.cloudvault.presentation.upload.UploadsScreen
@@ -90,8 +93,22 @@ fun NDriveNavGraph(navController: NavHostController) {
         ) {
             PhotosScreen(navController)
         }
-        composable("profile_route") {
-            ProfileScreen(navController)
+        composable(
+            route = "profile_route?openTelegramDialog={openTelegramDialog}",
+            arguments = listOf(
+                navArgument("openTelegramDialog") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
+            ),
+        ) { backStackEntry ->
+            val openTelegramDialog = backStackEntry.arguments
+                ?.getBoolean("openTelegramDialog")
+                ?: false
+            ProfileScreen(
+                navController = navController,
+                openTelegramDialogOnStart = openTelegramDialog,
+            )
         }
         composable("search",
             enterTransition = { fadeIn(animationSpec = tween(200)) },
@@ -109,6 +126,24 @@ fun NDriveNavGraph(navController: NavHostController) {
             popExitTransition = { fadeOut(animationSpec = tween(200)) },
         ) {
             UploadsScreen(navController)
+        }
+        composable(
+            route = "preview/{fileId}",
+            arguments = listOf(
+                navArgument("fileId") {
+                    type = NavType.StringType
+                },
+            ),
+            enterTransition = { fadeIn(animationSpec = tween(200)) },
+            exitTransition = { fadeOut(animationSpec = tween(200)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(200)) },
+            popExitTransition = { fadeOut(animationSpec = tween(200)) },
+        ) { backStackEntry ->
+            val fileId = backStackEntry.arguments?.getString("fileId").orEmpty()
+            PreviewScreen(
+                navController = navController,
+                fileId = fileId,
+            )
         }
     }
 }
