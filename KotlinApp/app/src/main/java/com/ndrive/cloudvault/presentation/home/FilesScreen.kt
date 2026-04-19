@@ -169,9 +169,14 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
         // Folders and Files content
         LazyVerticalGrid(
             columns = GridCells.Fixed(if (isGridView) 2 else 1),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(
+                start = if (isGridView) 16.dp else 0.dp,
+                end = if (isGridView) 16.dp else 0.dp,
+                top = 8.dp,
+                bottom = 88.dp
+            ),
+            horizontalArrangement = Arrangement.spacedBy(if (isGridView) 16.dp else 0.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isGridView) 16.dp else 0.dp),
             modifier = Modifier.fillMaxSize()
         ) {
                 if (uiState.isLoading) {
@@ -188,16 +193,6 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
                         }
                     }
                 } else {
-                    // Folders Header
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            "Folders",
-                            modifier = Modifier.padding(start = if (isGridView) 0.dp else 16.dp, end = if (isGridView) 0.dp else 16.dp, top = 8.dp, bottom = 8.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
                     items(uiState.folders.size) { index ->
                         val folder = uiState.folders[index]
                         if (isGridView) {
@@ -213,16 +208,6 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
                                 navController.navigate("folder/${Uri.encode(folder.id)}")
                             }
                         }
-                    }
-
-                    // Files Header
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                       Text(
-                            "Files",
-                            modifier = Modifier.padding(start = if (isGridView) 0.dp else 16.dp, end = if (isGridView) 0.dp else 16.dp, top = 24.dp, bottom = 8.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                       )
                     }
 
                     items(uiState.files.size) { index -> 

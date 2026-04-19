@@ -21,9 +21,13 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,8 +48,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -86,19 +92,25 @@ fun FolderScreen(
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(if (isGridView) 2 else 1),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(
+                    start = if (isGridView) 16.dp else 0.dp,
+                    end = if (isGridView) 16.dp else 0.dp,
+                    top = 8.dp,
+                    bottom = 88.dp
+                ),
+                horizontalArrangement = Arrangement.spacedBy(if (isGridView) 12.dp else 0.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isGridView) 12.dp else 0.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding(),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
+                        // 1. Top App Bar Style Header
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             IconButton(onClick = {
@@ -110,66 +122,74 @@ fun FolderScreen(
                                 }
                             }) {
                                 Icon(
-                                    imageVector = Icons.Default.ArrowBack,
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "Back",
                                 )
                             }
 
                             Text(
                                 text = uiState.currentFolder?.name ?: "Folder",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Normal,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 8.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
 
+                            IconButton(onClick = { navController.navigate("search") }) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search",
+                                )
+                            }
+
+                            IconButton(onClick = { /* Menu */ }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More",
+                                )
+                            }
+                        }
+
+                        // 2. View Controls / Sort header row (Like the Google Drive screenshot)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // "Name ^" button
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    .clickable { /* Sort */ }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Name",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowUpward,
+                                    contentDescription = "Sort ascending",
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .padding(start = 4.dp),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            // View toggle (List vs Grid)
                             GridListToggle(
                                 isGridView = isGridView,
                                 onToggle = { isGridView = !isGridView },
                             )
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 12.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            uiState.breadcrumbs.forEachIndexed { index, crumb ->
-                                if (index > 0) {
-                                    Icon(
-                                        imageVector = Icons.Default.KeyboardArrowRight,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                }
-
-                                val isLast = index == uiState.breadcrumbs.lastIndex
-                                Text(
-                                    text = crumb.name,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (isLast) {
-                                        MaterialTheme.colorScheme.onSurface
-                                    } else {
-                                        MaterialTheme.colorScheme.primary
-                                    },
-                                    fontWeight = if (isLast) FontWeight.SemiBold else FontWeight.Normal,
-                                    modifier = Modifier
-                                        .clickable(enabled = !isLast) {
-                                            if (crumb.id == null) {
-                                                navController.navigate("files") {
-                                                    launchSingleTop = true
-                                                }
-                                            } else {
-                                                navController.navigate("folder/${Uri.encode(crumb.id)}") {
-                                                    launchSingleTop = true
-                                                }
-                                            }
-                                        }
-                                        .padding(horizontal = 2.dp),
-                                )
-                            }
                         }
                     }
                 }
@@ -179,7 +199,7 @@ fun FolderScreen(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 4.dp),
+                                .padding(horizontal = 16.dp),
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.errorContainer,
                             ),
@@ -209,16 +229,6 @@ fun FolderScreen(
                     }
                 } else {
                     if (uiState.folders.isNotEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            Text(
-                                text = "Folders",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                            )
-                        }
-
                         items(uiState.folders.size) { index ->
                             val folder = uiState.folders[index]
                             if (isGridView) {
@@ -238,16 +248,6 @@ fun FolderScreen(
                     }
 
                     if (uiState.files.isNotEmpty()) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            Text(
-                                text = "Files",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                            )
-                        }
-
                         items(uiState.files.size) { index ->
                             val file = uiState.files[index]
                             if (isGridView) {

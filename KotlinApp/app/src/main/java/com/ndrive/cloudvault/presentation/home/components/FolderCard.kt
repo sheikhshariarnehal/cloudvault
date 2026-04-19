@@ -25,7 +25,7 @@ fun FolderCard(
     name: String,
     subtitle: String = "",
     isLoading: Boolean = false,
-    iconTint: Color = Color(0xFFE2E2E2), // Light grey matching the image
+    iconTint: Color = Color(0xFFE3E3E3), // Solid light gray as seen in Google Drive dark mode folder
     iconVector: androidx.compose.ui.graphics.vector.ImageVector = Icons.Filled.Folder,
     onClick: () -> Unit
 ) {
@@ -44,23 +44,15 @@ fun FolderCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = !isLoading) { onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFFE8EAED).copy(alpha = 0.1f)), // Subtle background
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = iconVector,
-                contentDescription = "Folder",
-                tint = iconTint,
-                modifier = Modifier.size(28.dp)
-            )
-        }
+        Icon(
+            imageVector = iconVector,
+            contentDescription = "Folder",
+            tint = iconTint,
+            modifier = Modifier.size(40.dp) // Large solid folder icon
+        )
         
         Spacer(modifier = Modifier.width(16.dp))
         
@@ -77,17 +69,19 @@ fun FolderCard(
             )
             if (subtitle.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
 
-        IconButton(onClick = { /* Menu */ }) {
+        IconButton(onClick = { /* Menu */ }, modifier = Modifier.size(24.dp)) {
             Icon(
                 imageVector = Icons.Default.MoreVert,
                 contentDescription = "More",
