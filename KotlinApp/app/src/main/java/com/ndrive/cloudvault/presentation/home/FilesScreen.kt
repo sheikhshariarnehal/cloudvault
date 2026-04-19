@@ -201,13 +201,17 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
                     items(uiState.folders.size) { index ->
                         val folder = uiState.folders[index]
                         if (isGridView) {
-                            com.ndrive.cloudvault.presentation.home.components.FolderGridCard(name = folder.name) {}
+                            com.ndrive.cloudvault.presentation.home.components.FolderGridCard(name = folder.name) {
+                                navController.navigate("folder/${Uri.encode(folder.id)}")
+                            }
                         } else {
                             FolderCard(
                                 name = folder.name,
                                 subtitle = folder.updatedAt ?: "Unknown",
                                 iconTint = Color(0xFF4285F4)
-                            ) {}
+                            ) {
+                                navController.navigate("folder/${Uri.encode(folder.id)}")
+                            }
                         }
                     }
 

@@ -45,6 +45,54 @@ class FolderRepositoryImpl @Inject constructor(
                         }
         }
 
+        override suspend fun getFoldersByParentId(parentId: String, limit: Int): Result<List<DriveFolder>> = runCatching {
+                supabaseClient
+                        .from("folders")
+                        .select(
+                                Columns.list(
+                                        "id",
+                                        "name",
+                                        "parent_id",
+                                        "updated_at",
+                                        "color"
+                                )
+                        ) {
+                                filter {
+                                        eq("parent_id", parentId)
+                                        eq("is_trashed", false)
+                                }
+                                order(column = "updated_at", order = Order.DESCENDING)
+                                limit(limit.toLong())
+                        }
+                        .decodeList<FolderRow>()
+                        .map { row ->
+                                row.toDomain()
+                        }
+        }
+
+        override suspend fun getFolderById(folderId: String): Result<DriveFolder?> = runCatching {
+                supabaseClient
+                        .from("folders")
+                        .select(
+                                Columns.list(
+                                        "id",
+                                        "name",
+                                        "parent_id",
+                                        "updated_at",
+                                        "color"
+                                )
+                        ) {
+                                filter {
+                                        eq("id", folderId)
+                                        eq("is_trashed", false)
+                                }
+                                limit(1)
+                        }
+                        .decodeList<FolderRow>()
+                        .firstOrNull()
+                        ?.toDomain()
+        }
+
         override suspend fun createFolder(name: String, parentId: String?): Result<DriveFolder> = runCatching {
                 val payload = buildJsonObject {
                         put("name", name)

@@ -203,6 +203,9 @@ fun SearchScreen(
                     onOpenFile = { fileId ->
                         navController.navigate("preview/${Uri.encode(fileId)}")
                     },
+                    onOpenFolder = { folderId ->
+                        navController.navigate("folder/${Uri.encode(folderId)}")
+                    },
                 )
             }
         }
@@ -321,6 +324,7 @@ private fun SearchResultsContent(
     uiState: SearchUiState,
     onToggleGridView: () -> Unit,
     onOpenFile: (String) -> Unit,
+    onOpenFolder: (String) -> Unit,
 ) {
     val allItems = uiState.filteredFolders + uiState.filteredFiles // folders first
     val hasResults = allItems.isNotEmpty()
@@ -441,9 +445,13 @@ private fun SearchResultsContent(
                 items(uiState.filteredFolders.size) { index ->
                     val folder = uiState.filteredFolders[index]
                     if (uiState.isGridView) {
-                        FileCard(name = folder.name, isImage = false) {}
+                        FileCard(name = folder.name, isImage = false) {
+                            onOpenFolder(folder.id)
+                        }
                     } else {
-                        FolderCard(name = folder.name) {}
+                        FolderCard(name = folder.name) {
+                            onOpenFolder(folder.id)
+                        }
                     }
                 }
             }

@@ -335,7 +335,9 @@ fun HomeScreen(
                     items(visibleFolders.size) { index ->
                         val folder = visibleFolders[index]
                         if (isGridView) {
-                            FolderGridCard(name = folder.name) { }
+                            FolderGridCard(name = folder.name) {
+                                navController.navigate("folder/${Uri.encode(folder.id)}")
+                            }
                         } else {
                             val subtitle = "Modified ${folder.updatedAt?.take(10) ?: "Unknown"}"
                             val folderTint = when (folder.color?.lowercase()) {
@@ -350,7 +352,9 @@ fun HomeScreen(
                                 name = folder.name,
                                 subtitle = subtitle,
                                 iconTint = folder.color?.let { folderTint } ?: Color(0xFF5F6368),
-                            ) { }
+                            ) {
+                                navController.navigate("folder/${Uri.encode(folder.id)}")
+                            }
                         }
                     }
                 }

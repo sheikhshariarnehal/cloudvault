@@ -127,6 +127,43 @@ class FileRepositoryImpl @Inject constructor(
                         }
         }
 
+        override suspend fun getFilesByFolderId(folderId: String, limit: Int): Result<List<DriveFile>> = runCatching {
+                supabaseClient
+                        .from("files")
+                        .select(
+                                Columns.list(
+                                        "id",
+                                        "name",
+                                        "mime_type",
+                                        "size_bytes",
+                                        "folder_id",
+                                        "updated_at",
+                                        "is_starred",
+                                        "thumbnail_url"
+                                )
+                        ) {
+                                filter {
+                                        eq("folder_id", folderId)
+                                        eq("is_trashed", false)
+                                }
+                                order(column = "updated_at", order = Order.DESCENDING)
+                                limit(limit.toLong())
+                        }
+                        .decodeList<FileRow>()
+                        .map { row ->
+                                DriveFile(
+                                        id = row.id,
+                                        name = row.name,
+                                        mimeType = row.mimeType,
+                                        sizeBytes = row.sizeBytes,
+                                        folderId = row.folderId,
+                                        updatedAt = row.updatedAt,
+                                        isStarred = row.isStarred,
+                                        thumbnailUrl = row.thumbnailUrl
+                                )
+                        }
+        }
+
         @Serializable
         private data class FileRow(
                 val id: String,

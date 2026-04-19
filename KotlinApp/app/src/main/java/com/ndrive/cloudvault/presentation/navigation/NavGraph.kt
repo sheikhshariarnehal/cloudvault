@@ -21,6 +21,7 @@ import com.ndrive.cloudvault.presentation.auth.LoginScreen
 import com.ndrive.cloudvault.presentation.auth.SignupScreen
 import com.ndrive.cloudvault.presentation.home.HomeScreen
 import com.ndrive.cloudvault.presentation.home.FilesScreen
+import com.ndrive.cloudvault.presentation.home.FolderScreen
 import com.ndrive.cloudvault.presentation.home.StarredScreen
 import com.ndrive.cloudvault.presentation.home.PhotosScreen
 import com.ndrive.cloudvault.presentation.preview.PreviewScreen
@@ -76,6 +77,24 @@ fun NDriveNavGraph(navController: NavHostController) {
             popExitTransition = { fadeOut(animationSpec = tween(200)) }
         ) {
             FilesScreen(navController)
+        }
+        composable(
+            route = "folder/{folderId}",
+            arguments = listOf(
+                navArgument("folderId") {
+                    type = NavType.StringType
+                },
+            ),
+            enterTransition = { fadeIn(animationSpec = tween(200)) },
+            exitTransition = { fadeOut(animationSpec = tween(200)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(200)) },
+            popExitTransition = { fadeOut(animationSpec = tween(200)) }
+        ) { backStackEntry ->
+            val folderId = backStackEntry.arguments?.getString("folderId").orEmpty()
+            FolderScreen(
+                navController = navController,
+                folderId = folderId,
+            )
         }
         composable("starred",
             enterTransition = { fadeIn(animationSpec = tween(200)) },

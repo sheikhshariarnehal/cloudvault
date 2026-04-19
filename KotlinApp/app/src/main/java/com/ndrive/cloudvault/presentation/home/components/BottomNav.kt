@@ -25,6 +25,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 fun NDriveBottomNav(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val effectiveRoute = if (currentRoute?.startsWith("folder") == true) "files" else currentRoute
 
     val items = listOf("Home", "Starred", "Photos", "Files")
     val routes = listOf("home", "starred", "photos", "files")
@@ -47,14 +48,14 @@ fun NDriveBottomNav(navController: NavController) {
             NavigationBarItem(
                 icon = {
                     Icon(
-                        imageVector = if (currentRoute == routes[index]) selectedIcons[index] else unselectedIcons[index],
+                        imageVector = if (effectiveRoute == routes[index]) selectedIcons[index] else unselectedIcons[index],
                         contentDescription = item
                     )
                 },
                 label = { Text(item) },
-                selected = currentRoute == routes[index],
+                selected = effectiveRoute == routes[index],
                 onClick = { 
-                    if(currentRoute != routes[index]) {
+                    if(effectiveRoute != routes[index]) {
                         navController.navigate(routes[index]) {
                             popUpTo(navController.graph.startDestinationId) { saveState = true }
                             launchSingleTop = true
