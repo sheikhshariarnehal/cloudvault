@@ -24,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.ndrive.cloudvault.domain.model.DriveFile
+import com.ndrive.cloudvault.domain.model.DriveFolder
 import com.ndrive.cloudvault.presentation.home.components.FileCard
 import com.ndrive.cloudvault.presentation.home.components.FileRow
 import com.ndrive.cloudvault.presentation.home.components.FolderCard
@@ -48,23 +50,35 @@ fun FilesScreen(
 
     val tabs = remember { listOf("All", "Recent", "Starred") }
 
-    val visibleFolders by remember(uiState.folders, selectedTabIndex) {
-        derivedStateOf {
-            when (selectedTabIndex) {
-                1 -> emptyList() // Recent tab only shows files
-                2 -> uiState.folders.filter { it.isStarred }.sortedBy { it.name.lowercase() }
-                else -> uiState.folders.sortedBy { it.name.lowercase() }
-            }
+    val foldersByName = remember(uiState.folders) {
+        uiState.folders.sortedWith(FOLDER_NAME_COMPARATOR)
+    }
+    val filesByName = remember(uiState.files) {
+        uiState.files.sortedWith(FILE_NAME_COMPARATOR)
+    }
+    val recentFiles = remember(uiState.files) {
+        uiState.files.sortedWith(FILE_RECENT_COMPARATOR)
+    }
+    val starredFolders = remember(foldersByName) {
+        foldersByName.filter { it.isStarred }
+    }
+    val starredFiles = remember(filesByName) {
+        filesByName.filter { it.isStarred }
+    }
+
+    val visibleFolders = remember(selectedTabIndex, foldersByName, starredFolders) {
+        when (selectedTabIndex) {
+            1 -> emptyList() // Recent tab only shows files
+            2 -> starredFolders
+            else -> foldersByName
         }
     }
 
-    val visibleFiles by remember(uiState.files, selectedTabIndex) {
-        derivedStateOf {
-            when (selectedTabIndex) {
-                1 -> uiState.files.sortedByDescending { it.updatedAt.orEmpty() }
-                2 -> uiState.files.filter { it.isStarred }.sortedBy { it.name.lowercase() }
-                else -> uiState.files.sortedBy { it.name.lowercase() }
-            }
+    val visibleFiles = remember(selectedTabIndex, filesByName, recentFiles, starredFiles) {
+        when (selectedTabIndex) {
+            1 -> recentFiles
+            2 -> starredFiles
+            else -> filesByName
         }
     }
 
@@ -210,7 +224,8 @@ fun FilesScreen(
                 if (uiState.isLoading) {
                     items(
                         count = 8,
-                        key = { index -> "loading-$index" }
+                        key = { index -> "loading-$index" },
+                        contentType = { "loading" },
                     ) { index ->
                         if (isGridView) {
                             Box(
@@ -240,7 +255,8 @@ fun FilesScreen(
                 } else {
                     items(
                         count = visibleFolders.size,
-                        key = { index -> visibleFolders[index].id }
+                        key = { index -> visibleFolders[index].id },
+                        contentType = { "folder" },
                     ) { index ->
                         val folder = visibleFolders[index]
                         if (isGridView) {
@@ -267,7 +283,8 @@ fun FilesScreen(
 
                     items(
                         count = visibleFiles.size,
-                        key = { index -> visibleFiles[index].id }
+                        key = { index -> visibleFiles[index].id },
+                        contentType = { "file" },
                     ) { index ->
                         val file = visibleFiles[index]
                         if (isGridView) {
@@ -340,6 +357,16 @@ fun FilesScreen(
         )
     }
 }
+
+private val FOLDER_NAME_COMPARATOR =
+    compareBy<DriveFolder, String>(String.CASE_INSENSITIVE_ORDER) { it.name }
+
+private val FILE_NAME_COMPARATOR =
+    compareBy<DriveFile, String>(String.CASE_INSENSITIVE_ORDER) { it.name }
+
+private val FILE_RECENT_COMPARATOR =
+    compareByDescending<DriveFile> { it.updatedAt.orEmpty() }
+        .then(FILE_NAME_COMPARATOR)
 
 private fun formatUpdatedAt(updatedAt: String?): String {
     if (updatedAt.isNullOrBlank()) return "Modified recently"
