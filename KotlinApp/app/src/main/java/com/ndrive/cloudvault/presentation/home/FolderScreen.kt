@@ -229,7 +229,10 @@ fun FolderScreen(
                     }
                 } else {
                     if (uiState.folders.isNotEmpty()) {
-                        items(uiState.folders.size) { index ->
+                        items(
+                            count = uiState.folders.size,
+                            key = { index -> uiState.folders[index].id }
+                        ) { index ->
                             val folder = uiState.folders[index]
                             if (isGridView) {
                                 FolderGridCard(name = folder.name) {
@@ -248,7 +251,10 @@ fun FolderScreen(
                     }
 
                     if (uiState.files.isNotEmpty()) {
-                        items(uiState.files.size) { index ->
+                        items(
+                            count = uiState.files.size,
+                            key = { index -> uiState.files[index].id }
+                        ) { index ->
                             val file = uiState.files[index]
                             if (isGridView) {
                                 FileCard(

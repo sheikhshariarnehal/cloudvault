@@ -193,7 +193,10 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
                         }
                     }
                 } else {
-                    items(uiState.folders.size) { index ->
+                    items(
+                        count = uiState.folders.size,
+                        key = { index -> uiState.folders[index].id }
+                    ) { index ->
                         val folder = uiState.folders[index]
                         if (isGridView) {
                             com.ndrive.cloudvault.presentation.home.components.FolderGridCard(name = folder.name) {
@@ -210,7 +213,10 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
                         }
                     }
 
-                    items(uiState.files.size) { index -> 
+                    items(
+                        count = uiState.files.size,
+                        key = { index -> uiState.files[index].id }
+                    ) { index -> 
                         val file = uiState.files[index]
                         if(isGridView) {
                            FileCard(name=file.name, thumbnailUrl=file.thumbnailUrl, isImage=file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {
