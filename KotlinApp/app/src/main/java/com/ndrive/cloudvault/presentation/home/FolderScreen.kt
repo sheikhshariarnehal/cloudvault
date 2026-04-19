@@ -92,14 +92,9 @@ fun FolderScreen(
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(if (isGridView) 2 else 1),
-                contentPadding = PaddingValues(
-                    start = if (isGridView) 16.dp else 0.dp,
-                    end = if (isGridView) 16.dp else 0.dp,
-                    top = 8.dp,
-                    bottom = 88.dp
-                ),
-                horizontalArrangement = Arrangement.spacedBy(if (isGridView) 12.dp else 0.dp),
-                verticalArrangement = Arrangement.spacedBy(if (isGridView) 12.dp else 0.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp),
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isGridView) 16.dp else 0.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -220,9 +215,16 @@ fun FolderScreen(
                 }
 
                 if (uiState.isLoading) {
-                    items(8) {
+                    items(8) { index ->
                         if (isGridView) {
-                            FileCard(name = "", isLoading = true) { }
+                            Box(
+                                modifier = Modifier.padding(
+                                    start = if (index % 2 == 0) 16.dp else 8.dp,
+                                    end = if (index % 2 == 0) 8.dp else 16.dp
+                                )
+                            ) {
+                                FileCard(name = "", isLoading = true) { }
+                            }
                         } else {
                             FileRow(name = "", subtitle = "", isLoading = true) { }
                         }
@@ -235,8 +237,15 @@ fun FolderScreen(
                         ) { index ->
                             val folder = uiState.folders[index]
                             if (isGridView) {
-                                FolderGridCard(name = folder.name) {
-                                    navController.navigate("folder/${Uri.encode(folder.id)}")
+                                Box(
+                                    modifier = Modifier.padding(
+                                        start = if (index % 2 == 0) 16.dp else 8.dp,
+                                        end = if (index % 2 == 0) 8.dp else 16.dp
+                                    )
+                                ) {
+                                    FolderGridCard(name = folder.name) {
+                                        navController.navigate("folder/${Uri.encode(folder.id)}")
+                                    }
                                 }
                             } else {
                                 FolderCard(
@@ -257,12 +266,20 @@ fun FolderScreen(
                         ) { index ->
                             val file = uiState.files[index]
                             if (isGridView) {
-                                FileCard(
-                                    name = file.name,
-                                    thumbnailUrl = file.thumbnailUrl,
-                                    isImage = file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/"),
+                                val globalIndex = uiState.folders.size + index
+                                Box(
+                                    modifier = Modifier.padding(
+                                        start = if (globalIndex % 2 == 0) 16.dp else 8.dp,
+                                        end = if (globalIndex % 2 == 0) 8.dp else 16.dp
+                                    )
                                 ) {
-                                    navController.navigate("preview/${Uri.encode(file.id)}")
+                                    FileCard(
+                                        name = file.name,
+                                        thumbnailUrl = file.thumbnailUrl,
+                                        isImage = file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/"),
+                                    ) {
+                                        navController.navigate("preview/${Uri.encode(file.id)}")
+                                    }
                                 }
                             } else {
                                 FileRow(

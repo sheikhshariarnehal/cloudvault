@@ -169,20 +169,23 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
         // Folders and Files content
         LazyVerticalGrid(
             columns = GridCells.Fixed(if (isGridView) 2 else 1),
-            contentPadding = PaddingValues(
-                start = if (isGridView) 16.dp else 0.dp,
-                end = if (isGridView) 16.dp else 0.dp,
-                top = 8.dp,
-                bottom = 88.dp
-            ),
-            horizontalArrangement = Arrangement.spacedBy(if (isGridView) 16.dp else 0.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp),
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
             verticalArrangement = Arrangement.spacedBy(if (isGridView) 16.dp else 0.dp),
             modifier = Modifier.fillMaxSize()
         ) {
                 if (uiState.isLoading) {
-                    items(8) {
-                        if (isGridView) FileCard(name = "", isLoading = true) {}
-                        else {
+                    items(8) { index ->
+                        if (isGridView) {
+                            Box(
+                                modifier = Modifier.padding(
+                                    start = if (index % 2 == 0) 16.dp else 8.dp,
+                                    end = if (index % 2 == 0) 8.dp else 16.dp
+                                )
+                            ) {
+                                FileCard(name = "", isLoading = true) {}
+                            }
+                        } else {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -199,8 +202,15 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
                     ) { index ->
                         val folder = uiState.folders[index]
                         if (isGridView) {
-                            com.ndrive.cloudvault.presentation.home.components.FolderGridCard(name = folder.name) {
-                                navController.navigate("folder/${Uri.encode(folder.id)}")
+                            Box(
+                                modifier = Modifier.padding(
+                                    start = if (index % 2 == 0) 16.dp else 8.dp,
+                                    end = if (index % 2 == 0) 8.dp else 16.dp
+                                )
+                            ) {
+                                com.ndrive.cloudvault.presentation.home.components.FolderGridCard(name = folder.name) {
+                                    navController.navigate("folder/${Uri.encode(folder.id)}")
+                                }
                             }
                         } else {
                             FolderCard(
@@ -219,8 +229,16 @@ fun FilesScreen(navController: androidx.navigation.NavController, viewModel: Fil
                     ) { index -> 
                         val file = uiState.files[index]
                         if(isGridView) {
-                           FileCard(name=file.name, thumbnailUrl=file.thumbnailUrl, isImage=file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {
-                               navigateToPreview(file.id)
+                           val globalIndex = uiState.folders.size + index
+                           Box(
+                               modifier = Modifier.padding(
+                                   start = if (globalIndex % 2 == 0) 16.dp else 8.dp,
+                                   end = if (globalIndex % 2 == 0) 8.dp else 16.dp
+                               )
+                           ) {
+                               FileCard(name=file.name, thumbnailUrl=file.thumbnailUrl, isImage=file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {
+                                   navigateToPreview(file.id)
+                               }
                            }
                         } else {
                            FileRow(
