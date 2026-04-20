@@ -22,14 +22,24 @@ class AuthRepositoryImpl @Inject constructor(
 
 	override fun isConfigured(): Boolean = configurationError() == null
 
-	override fun hasActiveSession(): Boolean {
+	override suspend fun hasActiveSession(): Boolean {
 		if (!isConfigured()) return false
-		return supabaseClient.auth.currentSessionOrNull() != null
+		supabaseClient.auth.awaitInitialization()
+
+		if (supabaseClient.auth.currentSessionOrNull() != null) return true
+		if (supabaseClient.auth.currentUserOrNull() != null) return true
+
+		return try {
+			supabaseClient.auth.retrieveUserForCurrentSession(updateSession = true)
+			true
+		} catch (_: Exception) {
+			false
+		}
 	}
 
-	override fun getCurrentAuthProfile(): AuthProfile? {
+	override suspend fun getCurrentAuthProfile(): AuthProfile? {
 		if (!isConfigured()) return null
-		val user = supabaseClient.auth.currentUserOrNull() ?: return null
+		val user = resolveCurrentUserOrNull() ?: return null
 
 		val metadata = user.userMetadata
 		val displayName = metadata?.get("display_name")?.jsonPrimitive?.contentOrNull
@@ -96,6 +106,15 @@ class AuthRepositoryImpl @Inject constructor(
 	override suspend fun signOut(): Result<Unit> = runCatching {
 		if (!isConfigured()) return@runCatching
 		supabaseClient.auth.signOut()
+	}
+
+	private suspend fun resolveCurrentUserOrNull() = try {
+		supabaseClient.auth.awaitInitialization()
+		supabaseClient.auth.currentUserOrNull()
+			?: supabaseClient.auth.currentSessionOrNull()?.user
+			?: supabaseClient.auth.retrieveUserForCurrentSession(updateSession = true)
+	} catch (_: Exception) {
+		null
 	}
 
 	private fun ensureConfigured() {

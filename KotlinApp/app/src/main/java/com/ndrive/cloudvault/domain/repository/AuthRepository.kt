@@ -16,9 +16,9 @@ data class AuthProfile(
 interface AuthRepository {
 	fun isConfigured(): Boolean
 
-	fun hasActiveSession(): Boolean
+	suspend fun hasActiveSession(): Boolean
 
-	fun getCurrentAuthProfile(): AuthProfile?
+	suspend fun getCurrentAuthProfile(): AuthProfile?
 
 	suspend fun signIn(email: String, password: String): Result<Unit>
 

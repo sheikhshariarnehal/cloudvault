@@ -8,15 +8,21 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.ndrive.cloudvault.presentation.auth.AuthViewModel
 import com.ndrive.cloudvault.presentation.auth.LoginScreen
 import com.ndrive.cloudvault.presentation.auth.SignupScreen
 import com.ndrive.cloudvault.presentation.home.HomeScreen
@@ -33,7 +39,7 @@ import com.ndrive.cloudvault.presentation.upload.UploadsScreen
 fun NDriveNavGraph(navController: NavHostController) {
     NavHost(
         navController = navController, 
-        startDestination = "login",
+        startDestination = "startup",
         enterTransition = {
             slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, animationSpec = tween(400)) + fadeIn(animationSpec = tween(400))
         },
@@ -47,6 +53,29 @@ fun NDriveNavGraph(navController: NavHostController) {
             slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, animationSpec = tween(400)) + fadeOut(animationSpec = tween(400))
         }
     ) {
+        composable("startup") {
+            val viewModel: AuthViewModel = hiltViewModel()
+            val uiState by viewModel.uiState.collectAsState()
+
+            LaunchedEffect(uiState.isLoading, uiState.navigateToHome) {
+                if (uiState.isLoading) return@LaunchedEffect
+
+                val destination = if (uiState.navigateToHome) "home" else "login"
+                viewModel.onNavigationHandled()
+                navController.navigate(destination) {
+                    popUpTo("startup") { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
+        }
+
         composable("login") {
             LoginScreen(
                 onNavigateToHome = { navController.navigate("home") { popUpTo("login") { inclusive = true } } },

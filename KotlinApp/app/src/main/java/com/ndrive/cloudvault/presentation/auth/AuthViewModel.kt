@@ -30,14 +30,7 @@ class AuthViewModel @Inject constructor(
 	val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
 	init {
-		if (!authRepository.isConfigured()) {
-			_uiState.value = _uiState.value.copy(
-				isConfigured = false,
-				errorMessage = "Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in local.properties."
-			)
-		} else if (authRepository.hasActiveSession()) {
-			_uiState.value = _uiState.value.copy(navigateToHome = true)
-		}
+		initializeAuthState()
 	}
 
 	fun signIn(email: String, password: String) {
@@ -87,7 +80,12 @@ class AuthViewModel @Inject constructor(
 
 	fun checkExistingSession() {
 		if (!authRepository.isConfigured()) return
-		if (authRepository.hasActiveSession()) {
+
+		viewModelScope.launch {
+			val hasSession = runCatching { authRepository.hasActiveSession() }
+				.getOrDefault(false)
+			if (!hasSession) return@launch
+
 			_uiState.update {
 				it.copy(
 					navigateToHome = true,
@@ -194,6 +192,30 @@ class AuthViewModel @Inject constructor(
 		if (_uiState.value.isConfigured) return true
 		setError("Supabase is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY in local.properties.")
 		return false
+	}
+
+	private fun initializeAuthState() {
+		if (!authRepository.isConfigured()) {
+			_uiState.value = _uiState.value.copy(
+				isConfigured = false,
+				errorMessage = "Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in local.properties."
+			)
+			return
+		}
+
+		viewModelScope.launch {
+			_uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+			val hasSession = runCatching { authRepository.hasActiveSession() }
+				.getOrDefault(false)
+
+			_uiState.update {
+				it.copy(
+					isLoading = false,
+					navigateToHome = hasSession
+				)
+			}
+		}
 	}
 
 	private fun isValidEmail(email: String): Boolean =

@@ -30,6 +30,9 @@ object AuthModule {
 			install(Auth) {
 				scheme = "ndrive"
 				host = "auth-callback"
+				autoLoadFromStorage = true
+				autoSaveToStorage = true
+				alwaysAutoRefresh = true
 			}
 			install(Postgrest)
 		}
