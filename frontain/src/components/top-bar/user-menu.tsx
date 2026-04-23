@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Settings, LogOut } from "lucide-react";
 
 export function UserMenu() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isTelegramConnected } = useAuth();
   const router = useRouter();
 
   const displayName =
@@ -42,7 +42,11 @@ export function UserMenu() {
           className="flex items-center justify-center h-10 w-10 md:h-12 md:w-12 rounded-full hover:bg-[#f1f3f4] dark:hover:bg-gray-800 focus:outline-none transition-colors"
           aria-label="Open user menu"
         >
-          <Avatar className="h-8 w-8 md:h-10 md:w-10 ring-2 ring-transparent ring-offset-0">
+          <Avatar
+            className={`h-8 w-8 md:h-10 md:w-10 ring-2 ring-offset-0 transition-colors ${
+              isTelegramConnected ? "ring-emerald-500 dark:ring-emerald-400" : "ring-transparent"
+            }`}
+          >
             <AvatarImage src={avatarUrl} alt={displayName} />
             <AvatarFallback className="bg-[#ba68c8] hover:bg-[#ab47bc] transition-colors text-white text-[14px] md:text-[16px] font-medium transition-colors">
               {initials}
