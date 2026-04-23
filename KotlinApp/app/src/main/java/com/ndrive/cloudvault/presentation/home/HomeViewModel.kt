@@ -100,15 +100,16 @@ class HomeViewModel @Inject constructor(
             val foldersDeferred = async { folderRepository.getRootFolders(limit = 20) }
             val filesDeferred = async { fileRepository.getRecentFiles(limit = 60) }
             val telegramStatusDeferred = async { telegramRepository.getStatus() }
-            val profile = authRepository.getCurrentAuthProfile()
-            val profileInitial = resolveProfileInitial(
-                displayName = profile?.displayName,
-                email = profile?.email,
-            )
+            val profileDeferred = async { authRepository.getCurrentAuthProfile() }
 
             val folderResult = foldersDeferred.await()
             val fileResult = filesDeferred.await()
             val telegramStatusResult = telegramStatusDeferred.await()
+            val profile = profileDeferred.await()
+            val profileInitial = resolveProfileInitial(
+                displayName = profile?.displayName,
+                email = profile?.email,
+            )
 
             val error = folderResult.exceptionOrNull()?.message
                 ?: fileResult.exceptionOrNull()?.message

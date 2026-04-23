@@ -8,6 +8,7 @@ import com.ndrive.cloudvault.domain.repository.FileRepository
 import com.ndrive.cloudvault.domain.repository.FolderRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,7 +29,7 @@ class FilesViewModel @Inject constructor(
 ) : ViewModel() {
 
         private companion object {
-                const val ROOT_ITEMS_LIMIT = 1000
+                const val ROOT_ITEMS_LIMIT = 200
         }
 
         private val _uiState = MutableStateFlow(FilesUiState())
@@ -42,8 +43,11 @@ class FilesViewModel @Inject constructor(
                 viewModelScope.launch {
                         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
-                        val filesResult = fileRepository.getRootFiles(limit = ROOT_ITEMS_LIMIT)
-                        val foldersResult = folderRepository.getRootFolders(limit = ROOT_ITEMS_LIMIT)
+                        val filesDeferred = async { fileRepository.getRootFiles(limit = ROOT_ITEMS_LIMIT) }
+                        val foldersDeferred = async { folderRepository.getRootFolders(limit = ROOT_ITEMS_LIMIT) }
+
+                        val filesResult = filesDeferred.await()
+                        val foldersResult = foldersDeferred.await()
 
                         val hasError = filesResult.isFailure || foldersResult.isFailure
 

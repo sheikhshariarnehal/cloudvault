@@ -25,14 +25,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.OndemandVideo
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.Slideshow
-import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -54,12 +46,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,6 +63,7 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.ndrive.cloudvault.BuildConfig
+import com.ndrive.cloudvault.presentation.common.resolveFileIconStyle
 import com.ndrive.cloudvault.presentation.home.components.AppDrawer
 import com.ndrive.cloudvault.presentation.home.components.CreateNewBottomSheet
 import com.ndrive.cloudvault.presentation.home.components.FileCard
@@ -100,7 +93,7 @@ fun HomeScreen(
 
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState()
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val navigateToPreview: (String) -> Unit = { fileId ->
         navController.navigate("preview/${Uri.encode(fileId)}")
@@ -311,7 +304,11 @@ fun HomeScreen(
             }
 
             if (uiState.isLoading) {
-                items(10) {
+                items(
+                    count = 10,
+                    key = { index -> "loading-$index" },
+                    contentType = { "loading" },
+                ) {
                     if (isGridView) {
                         FileCard(name = "", isLoading = true) { }
                     } else {
@@ -332,7 +329,11 @@ fun HomeScreen(
                         }
                     }
 
-                    items(visibleFolders.size) { index ->
+                    items(
+                        count = visibleFolders.size,
+                        key = { index -> visibleFolders[index].id },
+                        contentType = { "folder" },
+                    ) { index ->
                         val folder = visibleFolders[index]
                         if (isGridView) {
                             FolderGridCard(name = folder.name) {
@@ -371,13 +372,22 @@ fun HomeScreen(
                     }
                 }
 
-                items(visibleFiles.size) { index ->
+                items(
+                    count = visibleFiles.size,
+                    key = { index -> visibleFiles[index].id },
+                    contentType = { "file" },
+                ) { index ->
                     val file = visibleFiles[index]
+                    val fileIconStyle = remember(file.name, file.mimeType) {
+                        resolveFileIconStyle(file.name, file.mimeType)
+                    }
                     if (isGridView) {
                         FileCard(
                             name = file.name,
                             thumbnailUrl = file.thumbnailUrl,
-                            isImage = file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/"),
+                            isImage = fileIconStyle.prefersMediaPreview,
+                            fileTypeIcon = fileIconStyle.icon,
+                            fileTypeTint = fileIconStyle.tint,
                         ) {
                             navigateToPreview(file.id)
                         }
@@ -388,23 +398,11 @@ fun HomeScreen(
                             append(file.updatedAt?.take(10) ?: "Unknown")
                         }
 
-                        val mimeParts = file.mimeType.lowercase()
-                        val (iconVector, tint) = when {
-                            mimeParts.contains("image") -> Icons.Default.Image to Color(0xFFEA4335)
-                            mimeParts.contains("video") -> Icons.Default.OndemandVideo to Color(0xFFEA4335)
-                            mimeParts.contains("audio") -> Icons.Default.LibraryMusic to Color(0xFFEA4335)
-                            mimeParts.contains("pdf") -> Icons.Default.PictureAsPdf to Color(0xFFEA4335)
-                            mimeParts.contains("sheet") || mimeParts.contains("excel") || mimeParts.contains("csv") -> Icons.Default.TableChart to Color(0xFF34A853)
-                            mimeParts.contains("android") || mimeParts.contains("apk") -> Icons.Default.Android to Color(0xFF34A853)
-                            mimeParts.contains("presentation") || mimeParts.contains("powerpoint") -> Icons.Default.Slideshow to Color(0xFFFBBC04)
-                            else -> Icons.Default.Description to Color(0xFF4285F4)
-                        }
-
                         FileRow(
                             name = file.name,
                             subtitle = subtitle,
-                            iconTint = tint,
-                            iconVector = iconVector,
+                            iconTint = fileIconStyle.tint,
+                            iconVector = fileIconStyle.icon,
                         ) {
                             navigateToPreview(file.id)
                         }

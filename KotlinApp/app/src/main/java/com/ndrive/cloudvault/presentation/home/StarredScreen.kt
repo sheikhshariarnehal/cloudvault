@@ -23,6 +23,8 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ndrive.cloudvault.presentation.common.resolveFileIconStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,7 +50,7 @@ fun StarredScreen(
     navController: androidx.navigation.NavController,
     viewModel: StarredViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var isGridView by remember { mutableStateOf(false) }
 
     var selectedTabIndex by remember { mutableStateOf(2) } // Defaulting to "Starred"
@@ -179,7 +181,11 @@ fun StarredScreen(
             modifier = Modifier.fillMaxSize()
         ) {
                 if (uiState.isLoading) {
-                    items(8) {
+                    items(
+                        count = 8,
+                        key = { index -> "starred-loading-$index" },
+                        contentType = { "loading" },
+                    ) {
                         if (isGridView) FileCard(name = "", isLoading = true) {}
                         else {
                             Box(
@@ -224,18 +230,30 @@ fun StarredScreen(
                        )
                     }
 
-                    items(uiState.files.size) { index -> 
+                    items(
+                        count = uiState.files.size,
+                        key = { index -> uiState.files[index].id },
+                        contentType = { "file" },
+                    ) { index -> 
                         val file = uiState.files[index]
+                        val fileIconStyle = resolveFileIconStyle(file.name, file.mimeType)
                         if(isGridView) {
-                           FileCard(name=file.name, thumbnailUrl=file.thumbnailUrl, isImage=file.mimeType.startsWith("image/") || file.mimeType.startsWith("video/")) {
+                           FileCard(
+                               name = file.name,
+                               thumbnailUrl = file.thumbnailUrl,
+                               isImage = fileIconStyle.prefersMediaPreview,
+                               fileTypeIcon = fileIconStyle.icon,
+                               fileTypeTint = fileIconStyle.tint,
+                           ) {
                                navigateToPreview(file.id)
                            }
                         } else {
                            FileRow(
-                               name=file.name, 
-                               subtitle=file.updatedAt?:"Unknown", 
-                               iconTint = Color(0xFFFFC107),
-                               isLoading=false
+                               name = file.name, 
+                               subtitle = file.updatedAt ?: "Unknown", 
+                               iconTint = fileIconStyle.tint,
+                               iconVector = fileIconStyle.icon,
+                               isLoading = false,
                            ) {
                                navigateToPreview(file.id)
                            }

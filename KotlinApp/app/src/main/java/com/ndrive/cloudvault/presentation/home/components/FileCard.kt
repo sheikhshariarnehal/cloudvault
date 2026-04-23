@@ -18,7 +18,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.ndrive.cloudvault.presentation.common.shimmerEffect
 
 @Composable
@@ -60,8 +63,14 @@ fun FileCard(
                     } else {
                         "https://pub-99b846451dcc4c879db177b7e8b60c2f.r2.dev/$thumbnailUrl"
                     }
+                    val context = LocalContext.current
                     AsyncImage(
-                        model = finalUrl,
+                        model = ImageRequest.Builder(context)
+                            .data(finalUrl)
+                            .crossfade(300)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .build(),
                         contentDescription = name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
